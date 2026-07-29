@@ -3,237 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pharma Temperature & Route Analyzer</title>
-    <!-- Tailwind CSS CDN -->
+    <title>Pharma Temp & Route Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-50 min-h-screen text-slate-800 font-sans">
-
-    <!-- Header -->
-    <header class="bg-blue-900 text-white shadow-md py-4 px-6 mb-6">
-        <div class="max-w-6xl mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-bold tracking-wide">Pharma Temp & Route Intelligence</h1>
-            <span class="text-xs bg-blue-700 px-3 py-1 rounded-full font-medium">Logistic Dept</span>
-        </div>
-    </header>
-
-    <main class="max-w-6xl mx-auto px-4 pb-12 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <!-- Cột Trái: Nhập liệu & Cấu hình -->
-        <div class="lg:col-span-1 space-y-6">
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-                <h2 class="text-base font-semibold text-slate-700 mb-4 pb-2 border-b">1. Thông tin tuyến & Dữ liệu</h2>
-                
-                <form id="analyzerForm" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Mã tuyến đường (Route Code)</label>
-                        <input type="text" id="routeCode" required placeholder="VD: HPH-YANGON-01" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Tên sản phẩm</label>
-                        <input type="text" id="productName" required placeholder="VD: Bacilys / Novodia" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Min Temp (°C)</label>
-                            <input type="number" step="0.1" id="minTempReq" value="2.0" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Max Temp (°C)</label>
-                            <input type="number" step="0.1" id="maxTempReq" value="8.0" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Dán dữ liệu nhiệt độ (Text / CSV từ Logger)</label>
-                        <textarea id="rawData" rows="6" required placeholder="Dán nội dung trích xuất từ file PDF/CSV, ví dụ các cột thời gian và nhiệt độ..." class="w-full px-3 py-2 border rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
-                    </div>
-
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg text-sm transition shadow">
-                        Phân tích & Đề xuất Container
-                    </button>
-                </form>
-            </div>
-
-            <!-- Tìm kiếm Lịch sử tuyến -->
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-                <h2 class="text-base font-semibold text-slate-700 mb-3">Tra cứu tuyến đã lưu</h2>
-                <input type="text" id="searchRoute" placeholder="Nhập mã tuyến để tra cứu..." class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none mb-3" oninput="filterHistory()">
-                <div id="routeHistoryList" class="space-y-2 max-h-48 overflow-y-auto text-xs">
-                    <p class="text-slate-400 italic">Chưa có lịch sử lưu trữ.</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Cột Phải: Kết quả Phân tích -->
-        <div class="lg:col-span-2 space-y-6">
-            <!-- Thẻ Kết quả Chính -->
-            <div id="resultCard" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hidden">
-                <h2 class="text-base font-semibold text-slate-700 mb-4 pb-2 border-b">2. Kết quả đánh giá dữ liệu Logger</h2>
-                
-                <div id="recommendationBanner" class="p-4 rounded-xl mb-6 flex items-center space-x-4">
-                    <div id="recIcon" class="text-3xl"></div>
-                    <div>
-                        <h3 id="recTitle" class="text-lg font-bold"></h3>
-                        <p id="recDesc" class="text-sm mt-1"></p>
-                    </div>
-                </div>
-
-                <!-- Thống kê thông số -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 text-center">
-                        <span class="block text-xs uppercase text-slate-400 font-medium">Nhiệt độ Thấp nhất</span>
-                        <span id="statMin" class="text-xl font-bold text-slate-700">-</span>
-                    </div>
-                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 text-center">
-                        <span class="block text-xs uppercase text-slate-400 font-medium">Nhiệt độ Cao nhất</span>
-                        <span id="statMax" class="text-xl font-bold text-slate-700">-</span>
-                    </div>
-                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 text-center">
-                        <span class="block text-xs uppercase text-slate-400 font-medium">Nhiệt độ Trung bình</span>
-                        <span id="statAvg" class="text-xl font-bold text-slate-700">-</span>
-                    </div>
-                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 text-center">
-                        <span class="block text-xs uppercase text-slate-400 font-medium">Tổng số bản ghi</span>
-                        <span id="statCount" class="text-xl font-bold text-slate-700">-</span>
-                    </div>
-                </div>
-
-                <div class="flex justify-end space-x-3">
-                    <button onclick="saveCurrentResult()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg text-sm transition shadow">
-                        Lưu quyết định vào hệ thống
-                    </button>
-                </div>
-            </div>
-
-            <!-- Hướng dẫn sử dụng nhanh -->
-            <div id="welcomeCard" class="bg-blue-50 border border-blue-100 p-6 rounded-xl text-blue-900">
-                <h3 class="font-bold text-base mb-2">Hướng dẫn nhanh sử dụng công cụ:</h3>
-                <ul class="list-disc list-inside text-sm space-y-1.5 text-blue-800">
-                    <li>Nhập mã tuyến vận chuyển (ví dụ: <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">HPH-YANGON</code>) và tên sản phẩm.</li>
-                    <li>Thiết lập khoảng nhiệt độ yêu cầu từ giấy phép hoặc dossier (VD: 2.0°C đến 8.0°C).</li>
-                    <li>Dán dữ liệu thô trích xuất từ file PDF hoặc file CSV của Data Logger vào ô nhập liệu.</li>
-                    <li>Nhấn nút <b>Phân tích & Đề xuất Container</b> để hệ thống tự động kiểm tra xem lô hàng cần dùng Container lạnh (Reefer) hay Container thường (Standard).</li>
-                    <li>Lưu kết quả lại để tham khảo cho các shipment tiếp theo trên cùng tuyến đường.</li>
-                </ul>
-            </div>
-        </div>
-
-    </main>
-
-    <!-- Script xử lý logic -->
+    <!-- Thư viện đọc file PDF trực tiếp -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
-        let currentAnalysisData = null;
-
-        document.getElementById('analyzerForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+</head>
+<body class="bg-slate-100 min-h-screen p-6">
+    <div class="max-w-3xl mx-auto bg-white rounded-xl shadow-md p-6 space-y-6">
+        <h1 class="text-2xl font-bold text-blue-900">Pharma Temp & Route Intelligence</h1>
+        
+        <div class="space-y-2">
+            <label class="block text-sm font-semibold text-gray-700">TẢI LÊN HOẶC DÁN DỮ LIỆU NHIỆT ĐỘ (PDF / CSV / TEXT)</label>
             
-            const routeCode = document.getElementById('routeCode').value.trim();
-            const productName = document.getElementById('productName').value.trim();
-            const minReq = parseFloat(document.getElementById('minTempReq').value);
-            const maxReq = parseFloat(document.getElementById('maxTempReq').value);
-            const rawData = document.getElementById('rawData').value;
-
-            // Thuật toán trích xuất các con số nhiệt độ từ chuỗi văn bản/CSV dán vào
-            const numberPattern = /-?\d+([.,]\d+)?/g;
-            const matches = rawData.match(numberPattern);
-
-            if (!matches || matches.length === 0) {
-                alert('Không tìm thấy dữ liệu số hợp lệ trong phần văn bản bạn dán. Vui lòng kiểm tra lại!');
-                return;
-            }
-
-            // Chuyển đổi các chuỗi số tìm được sang dạng float (hỗ trợ dấu phẩy thành dấu chấm)
-            const temperatures = matches.map(m => parseFloat(m.replace(',', '.'))).filter(n => !isNaN(n) && n > -50 && n < 80);
-
-            if (temperatures.length === 0) {
-                alert('Không trích xuất được giá trị nhiệt độ hợp lệ từ dữ liệu.');
-                return;
-            }
-
-            const min = Math.min(...temperatures);
-            const max = Math.max(...temperatures);
-            const sum = temperatures.reduce((a, b) => a + b, 0);
-            const avg = (sum / temperatures.length).toFixed(2);
-
-            // Đánh giá đề xuất container
-            let isSafe = min >= minReq && max <= maxReq;
-            let containerRec = isSafe ? "Standard Container (Đủ điều kiện đi container thường / khô)" : "Reefer Container (BẮT BUỘC dùng container lạnh do vượt ngưỡng nhiệt độ)";
-            let bannerClass = isSafe ? "bg-emerald-50 border border-emerald-200 text-emerald-900" : "bg-amber-50 border border-amber-200 text-amber-900";
-            let iconText = isSafe ? "🟢" : "⚠️";
-
-            // Hiển thị giao diện kết quả
-            document.getElementById('welcomeCard').classList.add('hidden');
-            document.getElementById('resultCard').classList.remove('hidden');
-
-            const banner = document.getElementById('recommendationBanner');
-            banner.className = `p-4 rounded-xl mb-6 flex items-center space-x-4 ${bannerClass}`;
-            document.getElementById('recIcon').innerText = iconText;
-            document.getElementById('recTitle').innerText = isSafe ? "Khuyến nghị: Container Thường" : "Khuyến nghị: Container Lạnh (Reefer)";
-            document.getElementById('recDesc').innerText = containerRec + ` (Min: ${min}°C, Max: ${max}°C so với biên độ chuẩn ${minReq}°C - ${maxReq}°C)`;
-
-            document.getElementById('statMin').innerText = min + "°C";
-            document.getElementById('statMax').innerText = max + "°C";
-            document.getElementById('statAvg').innerText = avg + "°C";
-            document.getElementById('statCount').innerText = temperatures.length + " mẫu";
-
-            // Lưu trữ tạm thời để chuẩn bị bấm nút lưu chính thức
-            currentAnalysisData = {
-                routeCode,
-                productName,
-                minReq,
-                maxReq,
-                min,
-                max,
-                avg,
-                isSafe,
-                containerRec,
-                timestamp: new Date().toLocaleString()
-            };
-        });
-
-        function saveCurrentResult() {
-            if (!currentAnalysisData) return;
-
-            let history = JSON.parse(localStorage.getItem('pharma_routes_history') || '[]');
-            // Thêm vào đầu danh sách
-            history.unshift(currentAnalysisData);
-            // Giới hạn lưu 50 mục gần nhất
-            if (history.length > 50) history.pop();
-
-            localStorage.setItem('pharma_routes_history', JSON.stringify(history));
-            alert('Đã lưu kết quả phân tích thành công cho tuyến đường này!');
-            loadHistory();
-        }
-
-        function loadHistory() {
-            const history = JSON.parse(localStorage.getItem('pharma_routes_history') || '[]');
-            const container = document.getElementById('routeHistoryList');
-            
-            if (history.length === 0) {
-                container.innerHTML = '<p class="text-slate-400 italic">Chưa có lịch sử lưu trữ.</p>';
-                return;
-            }
-
-            container.innerHTML = history.map((item, idx) => `
-                <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
-                    <div class="flex justify-between font-semibold text-slate-700">
-                        <span>${item.routeCode}</span>
-                        <span class="${item.isSafe ? 'text-emerald-600' : 'text-amber-600'}">${item.isSafe ? 'Standard' : 'Reefer'}</span>
+            <!-- Khu vực chọn file PDF -->
+            <div class="flex items-center justify-center w-full">
+                <label for="pdf-file-input" class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                        <svg class="w-8 h-8 mb-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Bấm để chọn file PDF báo cáo</span></p>
+                        <p class="text-xs text-gray-500">Hỗ trợ file PDF, CSV, TXT từ Data Logger</p>
                     </div>
-                    <div class="text-slate-500 text-[11px] mt-0.5">Sản phẩm: ${item.productName} (${item.timestamp})</div>
-                </div>
-            `).join('');
-        }
+                    <input id="pdf-file-input" type="file" accept=".pdf,.csv,.txt" class="hidden" onchange="handleFileSelect(event)" />
+                </label>
+            </div>
 
-        function filterHistory() {
-            // Có thể mở rộng bộ lọc tìm kiếm nhanh nếu cần
-        }
+            <!-- Khung text dự phòng -->
+            <textarea id="raw-data-input" rows="5" class="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" placeholder="Nội dung dữ liệu sẽ hiển thị ở đây sau khi chọn file..."></textarea>
+        </div>
+    </div>
 
-        // Tải lịch sử khi mở trang
-        window.onload = loadHistory;
+    <script>
+        async function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (file.type === 'application/pdf') {
+                const reader = new FileReader();
+                reader.readAsArrayBuffer(file);
+                reader.onload = async function() {
+                    const typedarray = new Uint8Array(this.result);
+                    try {
+                        const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                        let fullText = '';
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const textContent = await page.getTextContent();
+                            const pageText = textContent.items.map(item => item.str).join(' ');
+                            fullText += `--- Trang ${i} ---\n` + pageText + '\n';
+                        }
+                        document.getElementById('raw-data-input').value = fullText;
+                        alert(`Đã đọc thành công file PDF (${pdf.numPages} trang)!`);
+                    } catch (error) {
+                        console.error("Lỗi đọc PDF:", error);
+                        alert("Không thể đọc file PDF này.");
+                    }
+                };
+            } else {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('raw-data-input').value = e.target.result;
+                };
+                reader.readAsText(file);
+            }
+        }
     </script>
 </body>
 </html>
