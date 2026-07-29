@@ -5,33 +5,82 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pharma Temp & Route Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Thư viện đọc file PDF trực tiếp -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
 </head>
 <body class="bg-slate-100 min-h-screen p-6">
-    <div class="max-w-3xl mx-auto bg-white rounded-xl shadow-md p-6 space-y-6">
-        <h1 class="text-2xl font-bold text-blue-900">Pharma Temp & Route Intelligence</h1>
-        
-        <div class="space-y-2">
-            <label class="block text-sm font-semibold text-gray-700">TẢI LÊN HOẶC DÁN DỮ LIỆU NHIỆT ĐỘ (PDF / CSV / TEXT)</label>
-            
-            <!-- Khu vực chọn file PDF -->
-            <div class="flex items-center justify-center w-full">
-                <label for="pdf-file-input" class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                        <svg class="w-8 h-8 mb-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                        <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Bấm để chọn file PDF báo cáo</span></p>
-                        <p class="text-xs text-gray-500">Hỗ trợ file PDF, CSV, TXT từ Data Logger</p>
-                    </div>
-                    <input id="pdf-file-input" type="file" accept=".pdf,.csv,.txt" class="hidden" onchange="handleFileSelect(event)" />
-                </label>
+    <div class="max-w-4xl mx-auto space-y-6">
+        <!-- Card tải file -->
+        <div class="bg-white rounded-xl shadow-md p-6 space-y-4">
+            <h1 class="text-2xl font-bold text-blue-900">Pharma Temp & Route Intelligence</h1>
+            <div class="space-y-2">
+                <label class="block text-sm font-semibold text-gray-700">TẢI LÊN HOẶC DÁN DỮ LIỆU NHIỆT ĐỘ (PDF / CSV / TEXT)</label>
+                <div class="flex items-center justify-center w-full">
+                    <label for="pdf-file-input" class="flex flex-col items-center justify-center w-full h-28 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                        <div class="flex flex-col items-center justify-center pt-4 pb-4">
+                            <svg class="w-6 h-6 mb-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            <p class="text-sm text-gray-500"><span class="font-semibold">Bấm để chọn file PDF báo cáo nhiệt độ</span></p>
+                        </div>
+                        <input id="pdf-file-input" type="file" accept=".pdf,.csv,.txt" class="hidden" onchange="handleFileSelect(event)" />
+                    </label>
+                </div>
             </div>
 
-            <!-- Khung text dự phòng -->
-            <textarea id="raw-data-input" rows="5" class="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" placeholder="Nội dung dữ liệu sẽ hiển thị ở đây sau khi chọn file..."></textarea>
+            <!-- Bảng kết quả phân tích chỉ số chung -->
+            <div id="analysis-result" class="grid grid-cols-4 gap-4 pt-2 hidden">
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                    <p class="text-xs text-blue-600 font-semibold">THẤP NHẤT</p>
+                    <p id="val-min" class="text-xl font-bold text-blue-900">--</p>
+                </div>
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                    <p class="text-xs text-blue-600 font-semibold">CAO NHẤT</p>
+                    <p id="val-max" class="text-xl font-bold text-blue-900">--</p>
+                </div>
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                    <p class="text-xs text-blue-600 font-semibold">TRUNG BÌNH</p>
+                    <p id="val-avg" class="text-xl font-bold text-blue-900">--</p>
+                </div>
+                <div class="bg-purple-50 p-4 rounded-lg border border-purple-100">
+                    <p class="text-xs text-purple-600 font-semibold">TỔNG SỐ BẢN GHI</p>
+                    <p id="val-count" class="text-xl font-bold text-purple-900">--</p>
+                </div>
+            </div>
+
+            <!-- Khu vực thống kê thời gian vượt ngưỡng & gợi ý phương án vận chuyển -->
+            <div id="logistics-advice-section" class="space-y-4 hidden">
+                <!-- Thống kê thời gian vượt ngưỡng -->
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+                    <h2 class="text-sm font-bold text-amber-900 uppercase">Thống kê thời gian vượt ngưỡng nhiệt độ</h2>
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div class="bg-white p-3 rounded-lg shadow-sm border border-amber-100">
+                            <p class="text-xs text-gray-500">Trên 30°C</p>
+                            <p id="time-gt-30" class="text-lg font-bold text-amber-700">0 giờ</p>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg shadow-sm border border-amber-100">
+                            <p class="text-xs text-gray-500">Trên 40°C</p>
+                            <p id="time-gt-40" class="text-lg font-bold text-orange-600">0 giờ</p>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg shadow-sm border border-amber-100">
+                            <p class="text-xs text-gray-500">Trên 50°C</p>
+                            <p id="time-gt-50" class="text-lg font-bold text-red-600">0 giờ</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gợi ý phương án container -->
+                <div id="container-suggestion-box" class="p-4 rounded-xl border">
+                    <h2 id="suggestion-title" class="text-base font-bold"></h2>
+                    <p id="suggestion-desc" class="text-sm mt-1"></p>
+                </div>
+            </div>
+
+            <!-- Khung text nội dung thô -->
+            <div>
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Dữ liệu thô trích xuất từ file:</label>
+                <textarea id="raw-data-input" rows="4" class="w-full p-3 border border-gray-300 rounded-lg text-xs font-mono bg-gray-50" placeholder="Nội dung sẽ hiển thị ở đây..."></textarea>
+            </div>
         </div>
     </div>
 
@@ -52,10 +101,10 @@
                             const page = await pdf.getPage(i);
                             const textContent = await page.getTextContent();
                             const pageText = textContent.items.map(item => item.str).join(' ');
-                            fullText += `--- Trang ${i} ---\n` + pageText + '\n';
+                            fullText += pageText + '\n';
                         }
                         document.getElementById('raw-data-input').value = fullText;
-                        alert(`Đã đọc thành công file PDF (${pdf.numPages} trang)!`);
+                        parseTemperatureData(fullText);
                     } catch (error) {
                         console.error("Lỗi đọc PDF:", error);
                         alert("Không thể đọc file PDF này.");
@@ -65,8 +114,84 @@
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     document.getElementById('raw-data-input').value = e.target.result;
+                    parseTemperatureData(e.target.result);
                 };
                 reader.readAsText(file);
+            }
+        }
+
+        function parseTemperatureData(text) {
+            // Regex tìm các con số dạng thập phân hoặc nguyên có thể là nhiệt độ
+            const regex = /\b(-?\d{1,2}\.\d|-?\d{1,2})\b/g;
+            const matches = text.match(regex);
+            
+            if (matches && matches.length > 0) {
+                // Lọc các giá trị hợp lý trong dải nhiệt độ vận chuyển (-30 đến 70 độ C)
+                const numbers = matches.map(Number).filter(n => n >= -30 && n <= 70);
+                
+                if (numbers.length > 0) {
+                    const min = Math.min(...numbers);
+                    const max = Math.max(...numbers);
+                    const avg = (numbers.reduce((a, b) => a + b, 0) / numbers.length).toFixed(1);
+
+                    document.getElementById('val-min').innerText = min + "°C";
+                    document.getElementById('val-max').innerText = max + "°C";
+                    document.getElementById('val-avg').innerText = avg + "°C";
+                    document.getElementById('val-count').innerText = numbers.length + " mốc";
+                    
+                    // Giả sử mỗi mốc đo cách nhau khoảng 10-15 phút (hoặc tính quy đổi số điểm dữ liệu)
+                    // Ở đây quy ước mỗi mốc tương đương 15 phút = 0.25 giờ để tính thời gian tích lũy
+                    const hoursPerPoint = 0.25; 
+                    
+                    let countGt30 = numbers.filter(n => n > 30).length;
+                    let countGt40 = numbers.filter(n => n > 40).length;
+                    let countGt50 = numbers.filter(n => n > 50).length;
+
+                    let hours30 = (countGt30 * hoursPerPoint).toFixed(1);
+                    let hours40 = (countGt40 * hoursPerPoint).toFixed(1);
+                    let hours50 = (countGt50 * hoursPerPoint).toFixed(1);
+
+                    document.getElementById('time-gt-30').innerText = hours30 + " giờ (~" + (hours30/24).toFixed(1) + " ngày)";
+                    document.getElementById('time-gt-40').innerText = hours40 + " giờ (~" + (hours40/24).toFixed(1) + " ngày)";
+                    document.getElementById('time-gt-50').innerText = hours50 + " giờ (~" + (hours50/24).toFixed(1) + " ngày)";
+
+                    // Đánh giá gợi ý đi Cont lạnh (Reefer) hay Cont thường (Dry)
+                    const suggestionBox = document.getElementById('container-suggestion-box');
+                    const suggestionTitle = document.getElementById('suggestion-title');
+                    const suggestionDesc = document.getElementById('suggestion-title'); // Giữ chỗ
+
+                    let adviceTitle = "";
+                    let adviceDesc = "";
+                    let boxClass = "";
+
+                    if (hours50 > 0 || hours40 > 24) {
+                        boxClass = "bg-red-50 border-red-200 text-red-900";
+                        adviceTitle = "🚨 KHUYẾN NGHỊ: BẮT BUỘC ĐI CONTAINER LẠNH (REEFER)";
+                        adviceDesc = `Nhiệt độ ghi nhận có thời điểm vượt trên 40°C-50°C trong thời gian dài (trên 24 giờ). Sản phẩm dược phẩm bảo quản dưới 30°C sẽ bị suy giảm chất lượng nghiêm trọng nếu phơi nhiễm mức nhiệt cao này.`;
+                        document.getElementById('suggestion-title').className = "text-base font-bold text-red-800";
+                        document.getElementById('suggestion-desc').className = "text-sm mt-1 text-red-700";
+                    } else if (hours30 > 48) {
+                        boxClass = "bg-amber-50 border-amber-200 text-amber-900";
+                        adviceTitle = "⚠️ KHUYẾN NGHỊ: CÂN NHẮC KỸ (ƯU TIÊN CONT LẠNH HOẶC ĐƯỜNG HÀNG KHÔNG)";
+                        adviceDesc = `Nhiệt độ trên 30°C kéo dài hơn 2 ngày. Mặc dù hàng có thể chịu được ngưỡng nhiệt cao trong ngắn hạn, nhưng rủi ro vượt quá giới hạn thẩm định (Stability limit) là khá cao.`;
+                        document.getElementById('suggestion-title').className = "text-base font-bold text-amber-800";
+                        document.getElementById('suggestion-desc').className = "text-sm mt-1 text-amber-700";
+                    } else {
+                        boxClass = "bg-emerald-50 border-emerald-200 text-emerald-900";
+                        adviceTitle = "✅ KHUYẾN NGHỊ: CÓ THỂ ĐI CONTAINER THƯỜNG (DRY CONTAINER)";
+                        adviceDesc = `Hành trình duy trì nhiệt độ ổn định, thời gian vượt ngưỡng 30°C không đáng kể. Phù hợp với các mặt hàng dược phẩm có yêu cầu bảo quản dưới 30°C và chịu được biên độ nhiệt thông thường trong quá trình vận chuyển đường bộ/đường biển.`;
+                        document.getElementById('suggestion-title').className = "text-base font-bold text-emerald-800";
+                        document.getElementById('suggestion-desc').className = "text-sm mt-1 text-emerald-700";
+                    }
+
+                    suggestionBox.className = `p-4 rounded-xl border ${boxClass}`;
+                    document.getElementById('suggestion-title').innerText = adviceTitle;
+                    document.getElementById('suggestion-desc').innerText = adviceDesc;
+
+                    // Hiển thị các khối kết quả
+                    document.getElementById('analysis-result').classList.remove('hidden');
+                    document.getElementById('logistics-advice-section').classList.remove('hidden');
+                }
             }
         }
     </script>
