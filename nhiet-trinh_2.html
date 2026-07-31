@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>NHIỆT TRÌNH — Phân tích logger &amp; khuyến nghị container</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EDF0E9;
+    --paper:#F8F9F4;
+    --ink:#16202A;
+    --ink-soft:#4B5A63;
+    --line:#C7CDBE;
+    --line-soft:#DBDFD3;
+    --cold:#0F8B8D;
+    --cold-deep:#0B6567;
+    --cold-tint:#E1F1F0;
+    --warn:#B5651D;
+    --warn-tint:#F5E7D8;
+    --danger:#A6321C;
+    --danger-tint:#F5DFD8;
+    --mono:'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    --display:'Space Grotesk', 'Inter', sans-serif;
+    --body:'Inter', system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px;}
+
+  /* ---- header / manifest strip ---- */
+  .manifest-head{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:22px;
+    gap:16px;flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand-mark{
+    width:40px;height:40px;border:2px solid var(--ink);display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-weight:600;font-size:11px;letter-spacing:0.5px;
+    background:repeating-linear-gradient(135deg, var(--ink) 0 1px, transparent 1px 6px);
+    color:var(--paper);
+  }
+  .brand-mark span{background:var(--ink);padding:2px 3px;}
+  h1{font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:0.5px;margin:0;text-transform:uppercase;}
+  .subtitle{font-size:13px;color:var(--ink-soft);margin-top:2px;}
+  .manifest-meta{font-family:var(--mono);font-size:11px;color:var(--ink-soft);text-align:right;line-height:1.6;}
+
+  /* ---- layout ---- */
+  .grid{display:grid;grid-template-columns:1.15fr 0.85fr;gap:20px;align-items:start;}
+  @media (max-width:900px){.grid{grid-template-columns:1fr;}}
+
+  .card{
+    background:var(--paper);border:1px solid var(--line);
+    padding:20px 22px;margin-bottom:20px;
+  }
+  .card h2{
+    font-family:var(--display);font-size:13px;font-weight:600;text-transform:uppercase;
+    letter-spacing:1.2px;color:var(--ink-soft);margin:0 0 14px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .card h2::before{content:'';width:6px;height:6px;background:var(--cold);display:inline-block;}
+
+  /* ---- upload zone ---- */
+  .dropzone{
+    border:1.5px dashed var(--ink-soft);padding:28px 16px;text-align:center;cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .dropzone.drag{border-color:var(--cold);background:var(--cold-tint);}
+  .dropzone p{margin:4px 0;}
+  .dropzone .big{font-family:var(--display);font-weight:600;font-size:15px;}
+  .dropzone .small{font-size:12px;color:var(--ink-soft);}
+  input[type=file]{display:none;}
+  .btn{
+    font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:0.4px;text-transform:uppercase;
+    border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);
+    padding:9px 16px;cursor:pointer;transition:opacity .15s;
+  }
+  .btn:hover{opacity:0.82;}
+  .btn.ghost{background:transparent;color:var(--ink);}
+  .btn.small{padding:5px 10px;font-size:11px;}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+
+  .manual-toggle{font-size:12px;color:var(--cold-deep);text-decoration:underline;cursor:pointer;margin-top:10px;display:inline-block;}
+  textarea.manual{
+    width:100%;min-height:110px;margin-top:10px;font-family:var(--mono);font-size:12px;
+    border:1px solid var(--line);padding:10px;background:#fff;resize:vertical;
+  }
+  .status-line{font-family:var(--mono);font-size:12px;margin-top:12px;color:var(--ink-soft);}
+  .status-line.err{color:var(--danger);}
+  .status-line.ok{color:var(--cold-deep);}
+
+  /* ---- stats ---- */
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin-top:4px;}
+  @media (max-width:520px){.stat-grid{grid-template-columns:repeat(2,1fr);}}
+  .stat{background:var(--paper);padding:12px 10px;}
+  .stat .label{font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-soft);font-family:var(--mono);}
+  .stat .value{font-family:var(--display);font-size:19px;font-weight:600;margin-top:3px;}
+
+  canvas{width:100%;display:block;}
+
+  /* ---- form ---- */
+  label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);font-family:var(--mono);margin-bottom:5px;margin-top:14px;}
+  label:first-of-type{margin-top:0;}
+  input[type=text], select{
+    width:100%;padding:9px 10px;border:1px solid var(--line);background:#fff;font-family:var(--body);font-size:13.5px;color:var(--ink);
+  }
+  input[type=text]:focus, select:focus, input[type=number]:focus{outline:2px solid var(--cold);outline-offset:1px;}
+  .range-row{display:flex;gap:10px;}
+  .range-row input{width:100%;padding:9px 10px;border:1px solid var(--line);font-family:var(--mono);font-size:13px;}
+  .hint{font-size:11.5px;color:var(--ink-soft);margin-top:4px;line-height:1.4;}
+  .suggest-banner{
+    background:var(--cold-tint);border:1px solid var(--cold);padding:9px 11px;font-size:12px;margin-top:10px;color:var(--cold-deep);
+  }
+
+  /* ---- verdict stamp (signature element) ---- */
+  .stamp-zone{display:flex;justify-content:center;padding:14px 0 6px;}
+  .stamp{
+    display:inline-block;border:3px double var(--cold-deep);color:var(--cold-deep);
+    font-family:var(--mono);font-weight:600;text-transform:uppercase;letter-spacing:1.3px;
+    padding:14px 22px;transform:rotate(-3deg);text-align:center;font-size:15px;line-height:1.4;
+    background:rgba(15,139,141,0.05);
+  }
+  .stamp.warn{border-color:var(--warn);color:var(--warn);background:rgba(181,101,29,0.06);}
+  .stamp.danger{border-color:var(--danger);color:var(--danger);background:rgba(166,50,28,0.06);}
+  .stamp small{display:block;font-size:10px;letter-spacing:0.6px;font-weight:500;margin-top:4px;opacity:0.85;}
+
+  .reasons{margin:14px 0 0;padding-left:18px;font-size:13px;line-height:1.7;color:var(--ink-soft);}
+  .reasons b{color:var(--ink);}
+
+  /* ---- history table ---- */
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead th{
+    text-align:left;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;
+    color:var(--ink-soft);border-bottom:1.5px solid var(--ink);padding:6px 8px;
+  }
+  tbody td{padding:8px;border-bottom:1px solid var(--line-soft);vertical-align:middle;}
+  tbody tr:hover{background:var(--cold-tint);}
+  .chip{
+    font-family:var(--mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;
+    padding:3px 8px;border:1.5px solid; display:inline-block;
+  }
+  .chip.ok{color:var(--cold-deep);border-color:var(--cold-deep);}
+  .chip.warn{color:var(--warn);border-color:var(--warn);}
+  .chip.danger{color:var(--danger);border-color:var(--danger);}
+  .empty{font-size:13px;color:var(--ink-soft);padding:20px 0;text-align:center;}
+  .del{cursor:pointer;color:var(--ink-soft);font-family:var(--mono);font-size:11px;text-decoration:underline;background:none;border:none;padding:0;}
+  .del:hover{color:var(--danger);}
+  .privacy-note{font-size:11px;color:var(--ink-soft);margin-top:10px;font-family:var(--mono);}
+  .filter-row{display:flex;gap:8px;margin-bottom:12px;}
+  .filter-row input{flex:1;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="manifest-head">
+    <div class="brand">
+      <div class="brand-mark"><span>N/T</span></div>
+      <div>
+        <h1>Nhiệt Trình</h1>
+        <div class="subtitle">Đọc dữ liệu logger nhiệt độ &amp; khuyến nghị loại container cho lô hàng dược phẩm</div>
+      </div>
+    </div>
+    <div class="manifest-meta" id="clock"></div>
+  </div>
+
+  <div class="grid">
+    <!-- LEFT COLUMN -->
+    <div>
+      <div class="card">
+        <h2>01 — Nạp dữ liệu logger</h2>
+        <div class="dropzone" id="dropzone">
+          <p class="big">Kéo thả file vào đây, hoặc bấm để chọn</p>
+          <p class="small">Nhận file .PDF (báo cáo logger), .CSV hoặc .TXT xuất từ thiết bị</p>
+          <input type="file" id="fileInput" accept=".pdf,.csv,.txt">
+        </div>
+        <span class="manual-toggle" id="manualToggle">Không có file? Dán dữ liệu thủ công</span>
+        <textarea class="manual" id="manualInput" style="display:none" placeholder="Dán các dòng dạng: 15/05/2026 19:11:33  29.4"></textarea>
+        <div id="manualParseBtnWrap" style="display:none;margin-top:8px;">
+          <button class="btn small ghost" id="manualParseBtn">Phân tích dữ liệu dán</button>
+        </div>
+        <div class="status-line" id="statusLine">Chưa có dữ liệu.</div>
+      </div>
+
+      <div class="card" id="statsCard" style="display:none;">
+        <h2>02 — Tóm tắt hành trình nhiệt</h2>
+        <div class="stat-grid">
+          <div class="stat"><div class="label">Thấp nhất</div><div class="value" id="stMin">–</div></div>
+          <div class="stat"><div class="label">Cao nhất</div><div class="value" id="stMax">–</div></div>
+          <div class="stat"><div class="label">Trung bình</div><div class="value" id="stAvg">–</div></div>
+          <div class="stat"><div class="label">MKT*</div><div class="value" id="stMkt">–</div></div>
+          <div class="stat"><div class="label">Bắt đầu</div><div class="value" id="stStart" style="font-size:12.5px;">–</div></div>
+          <div class="stat"><div class="label">Kết thúc</div><div class="value" id="stStop" style="font-size:12.5px;">–</div></div>
+          <div class="stat"><div class="label">Thời lượng</div><div class="value" id="stDur" style="font-size:13px;">–</div></div>
+          <div class="stat"><div class="label">Số điểm đo</div><div class="value" id="stN">–</div></div>
+        </div>
+        <div style="margin-top:16px;">
+          <canvas id="chart" height="220"></canvas>
+        </div>
+        <div class="hint" style="margin-top:10px;">*MKT (Mean Kinetic Temperature) — nhiệt độ động học trung bình, ước tính theo Ea/R ≈ 10.000K, dùng để đánh giá tác động nhiệt tích lũy lên sản phẩm theo thời gian.</div>
+
+        <div style="margin-top:18px;">
+          <div style="font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-soft);margin-bottom:8px;">Thống kê ngưỡng nhiệt cao</div>
+          <table id="thresholdTable">
+            <thead><tr><th>Ngưỡng</th><th>Giờ vượt</th><th>Chuỗi liên tục dài nhất</th><th>Số ngày có vượt</th><th>Chuỗi ngày liên tục</th></tr></thead>
+            <tbody id="thresholdBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div>
+      <div class="card">
+        <h2>03 — Thông tin lô hàng</h2>
+        <label for="routeInput">Tuyến vận chuyển</label>
+        <input type="text" id="routeInput" placeholder="VD: Hải Phòng → Hà Nội">
+        <div id="suggestBanner" style="display:none;" class="suggest-banner"></div>
+
+        <label for="productInput">Sản phẩm / lô (tuỳ chọn)</label>
+        <input type="text" id="productInput" placeholder="VD: Vắc xin X — Lô 2026-07">
+
+        <label for="rangePreset">Ngưỡng nhiệt độ yêu cầu của sản phẩm</label>
+        <select id="rangePreset">
+          <option value="2,8">2 – 8°C — Cold chain (vắc xin, sinh phẩm)</option>
+          <option value="8,15">8 – 15°C — Mát (cool)</option>
+          <option value="15,25" selected>15 – 25°C — Nhiệt độ phòng có kiểm soát (CRT)</option>
+          <option value="2,30">2 – 30°C — CRT mở rộng (WHO)</option>
+          <option value="custom">Tuỳ chỉnh…</option>
+        </select>
+        <div class="range-row" id="customRangeRow" style="display:none;margin-top:8px;">
+          <input type="number" id="customLow" placeholder="Thấp (°C)">
+          <input type="number" id="customHigh" placeholder="Cao (°C)">
+        </div>
+
+        <div style="margin-top:16px;">
+          <button class="btn" id="analyzeBtn" disabled>Phân tích &amp; Lưu lô hàng</button>
+        </div>
+      </div>
+
+      <div class="card" id="verdictCard" style="display:none;">
+        <h2>04 — Khuyến nghị</h2>
+        <div class="stamp-zone"><div class="stamp" id="stampEl"></div></div>
+        <ul class="reasons" id="reasonsEl"></ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>05 — Tra cứu theo điểm đến</h2>
+    <div class="hint" style="margin-bottom:10px;">Gõ tên một quốc gia/điểm đến (VD: Chile, Haiti, Brazil…). Hệ thống tìm khớp trực tiếp trong lịch sử, và nếu không có, gợi ý các tuyến đã lưu tới khu vực <b>gần</b> điểm đến đó nhất.</div>
+    <div class="filter-row">
+      <input type="text" id="destSearchInput" placeholder="VD: Haiti">
+      <button class="btn small" id="destSearchBtn">Tìm</button>
+    </div>
+    <div id="destSearchResult"></div>
+  </div>
+
+  <div class="card">
+    <h2>06 — Lịch sử lô hàng đã lưu</h2>
+    <div class="filter-row">
+      <input type="text" id="historyFilter" placeholder="Lọc theo tuyến hoặc sản phẩm…">
+      <button class="btn small ghost" id="refreshHistoryBtn">Làm mới</button>
+    </div>
+    <div id="historyWrap"><div class="empty">Đang tải…</div></div>
+    <div class="privacy-note">⚠ Dữ liệu lô hàng được lưu <b>dùng chung</b> — bất kỳ ai mở trang này đều xem được toàn bộ lịch sử.</div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+// ============================================================
+// BACKEND CONFIG — điền URL và anon key của dự án Supabase vào đây
+// Xem hướng dẫn tạo trong file HUONG-DAN-DEPLOY.md đi kèm.
+// ============================================================
+const SUPABASE_URL = 'https://xehopglolsuudwjtahe.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_UIWDjltDBvHVqf08VnbYOA_RS11vXbU';
+const IS_CONFIGURED = !SUPABASE_URL.includes('YOUR-PROJECT-REF') && !SUPABASE_ANON_KEY.includes('YOUR-ANON-PUBLIC-KEY');
+
+function sbHeaders(extra){
+  return Object.assign({
+    'apikey': SUPABASE_ANON_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+    'Content-Type': 'application/json'
+  }, extra||{});
+}
+
+function toDbRow(r){
+  return {
+    id: r.id, saved_at: r.savedAt, route: r.route, product: r.product,
+    dest_text: r.destText, dest_country_id: r.destCountryId, dest_lat: r.destLat, dest_lng: r.destLng,
+    device_id: r.deviceId, range_low: r.rangeLow, range_high: r.rangeHigh,
+    min_temp: r.min, max_temp: r.max, avg_temp: r.avg, mkt: r.mkt,
+    start_ts: r.start, stop_ts: r.stop, n_points: r.n,
+    verdict_level: r.verdictLevel, verdict_title: r.verdictTitle, thresholds: r.thresholds
+  };
+}
+function fromDbRow(row){
+  return {
+    id: row.id, savedAt: row.saved_at, route: row.route, product: row.product,
+    destText: row.dest_text, destCountryId: row.dest_country_id, destLat: row.dest_lat, destLng: row.dest_lng,
+    deviceId: row.device_id, rangeLow: row.range_low, rangeHigh: row.range_high,
+    min: row.min_temp, max: row.max_temp, avg: row.avg_temp, mkt: row.mkt,
+    start: row.start_ts, stop: row.stop_ts, n: row.n_points,
+    verdictLevel: row.verdict_level, verdictTitle: row.verdict_title, thresholds: row.thresholds
+  };
+}
+
+if (!IS_CONFIGURED){
+  document.addEventListener('DOMContentLoaded', () => {
+    const banner = document.createElement('div');
+    banner.style.cssText = 'background:#F5DFD8;border:1.5px solid #A6321C;color:#A6321C;padding:12px 16px;margin-bottom:20px;font-family:var(--mono);font-size:12.5px;line-height:1.6;';
+    banner.innerHTML = '⚠ Chưa cấu hình backend. Mở file HTML, tìm dòng <code>SUPABASE_URL</code> / <code>SUPABASE_ANON_KEY</code> ở đầu thẻ &lt;script&gt; và điền thông tin dự án Supabase của bạn (xem HUONG-DAN-DEPLOY.md). Chức năng lưu/tải lịch sử sẽ không hoạt động cho tới khi cấu hình xong.';
+    document.querySelector('.wrap').prepend(banner);
+  });
+}
+
+// ---------- clock ----------
+document.getElementById('clock').textContent = 'PHIÊN LÀM VIỆC: ' + new Date().toLocaleString('vi-VN');
+
+// ---------- state ----------
+let points = []; // {t: epoch ms, temp: number}
+let meta = { deviceId: null };
+let currentVerdict = null;
+
+const statusLine = document.getElementById('statusLine');
+const statsCard = document.getElementById('statsCard');
+const verdictCard = document.getElementById('verdictCard');
+const analyzeBtn = document.getElementById('analyzeBtn');
+
+function setStatus(msg, cls){
+  statusLine.textContent = msg;
+  statusLine.className = 'status-line' + (cls ? ' ' + cls : '');
+}
+
+// ---------- parsing ----------
+const ROW_RE = /(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})\s+(-?\d{1,3}\.\d)/g;
+
+function extractPoints(text){
+  const seen = new Map();
+  let m;
+  ROW_RE.lastIndex = 0;
+  while((m = ROW_RE.exec(text)) !== null){
+    const [, dd, mo, yyyy, hh, mi, ss, tempStr] = m;
+    const temp = parseFloat(tempStr);
+    if (temp < -50 || temp > 100) continue;
+    const dt = new Date(parseInt(yyyy), parseInt(mo)-1, parseInt(dd), parseInt(hh), parseInt(mi), parseInt(ss));
+    const t = dt.getTime();
+    if (isNaN(t)) continue;
+    if (!seen.has(t)) seen.set(t, temp);
+  }
+  const arr = Array.from(seen.entries()).map(([t,temp]) => ({t, temp}));
+  arr.sort((a,b) => a.t - b.t);
+  return arr;
+}
+
+function extractDeviceId(text){
+  const m = text.match(/Device\s*ID:?\s*([A-Za-z0-9]{3,})/);
+  return m ? m[1] : null;
+}
+
+async function parsePdfFile(file){
+  const buf = await file.arrayBuffer();
+  const doc = await pdfjsLib.getDocument({ data: buf }).promise;
+  let fullText = '';
+  for (let p = 1; p <= doc.numPages; p++){
+    const page = await doc.getPage(p);
+    const content = await page.getTextContent();
+    const pageText = content.items.map(i => i.str).join(' ');
+    fullText += pageText + '\n';
+  }
+  return fullText;
+}
+
+function nameFromFilename(filename){
+  return filename.replace(/\.[^/.]+$/, '').replace(/[_]+/g, ' ').trim();
+}
+
+async function handleFile(file){
+  setStatus('Đang đọc file "' + file.name + '"…');
+  analyzeBtn.disabled = true;
+  const routeInput = document.getElementById('routeInput');
+  if (!routeInput.value.trim()){
+    routeInput.value = nameFromFilename(file.name);
+    routeInput.dispatchEvent(new Event('input'));
+  }
+  try{
+    let text;
+    if (/\.pdf$/i.test(file.name)){
+      text = await parsePdfFile(file);
+    } else {
+      text = await file.text();
+    }
+    ingestText(text, file.name);
+  } catch(err){
+    console.error(err);
+    setStatus('Không đọc được file. Thử dán dữ liệu thủ công bên dưới, hoặc kiểm tra định dạng file.', 'err');
+  }
+}
+
+function ingestText(text, sourceLabel){
+  const pts = extractPoints(text);
+  if (pts.length < 2){
+    setStatus('Không tìm thấy dữ liệu nhiệt độ hợp lệ trong "' + (sourceLabel||'nội dung dán') + '". Kiểm tra lại định dạng (cần các dòng dd/mm/yyyy hh:mm:ss  nhiệt độ).', 'err');
+    return;
+  }
+  points = pts;
+  meta.deviceId = extractDeviceId(text);
+  setStatus('Đã trích được ' + pts.length + ' điểm đo từ "' + (sourceLabel||'dữ liệu dán') + '"' + (meta.deviceId ? ' — thiết bị ' + meta.deviceId : '') + '.', 'ok');
+  renderStats();
+  analyzeBtn.disabled = false;
+  verdictCard.style.display = 'none';
+}
+
+// ---------- stats + MKT ----------
+function computeStats(pts){
+  const temps = pts.map(p => p.temp);
+  const min = Math.min(...temps);
+  const max = Math.max(...temps);
+  const avg = temps.reduce((a,b)=>a+b,0) / temps.length;
+  const EaR = 10000; // K, standard approximation (Ea ≈ 83.144 kJ/mol)
+  const sumExp = temps.reduce((s,t) => s + Math.exp(-EaR/(t+273.15)), 0);
+  const mktK = -EaR / Math.log(sumExp/temps.length);
+  const mkt = mktK - 273.15;
+  const start = pts[0].t, stop = pts[pts.length-1].t;
+  const durMs = stop - start;
+  return { min, max, avg, mkt, start, stop, durMs, n: pts.length };
+}
+
+function fmtDur(ms){
+  const totalMin = Math.round(ms/60000);
+  const d = Math.floor(totalMin/1440);
+  const h = Math.floor((totalMin%1440)/60);
+  const mnt = totalMin%60;
+  return d+'ng '+h+'g '+mnt+'p';
+}
+function fmtDate(ts){
+  const d = new Date(ts);
+  return d.toLocaleString('vi-VN', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+// ---------- country dictionary for destination matching ----------
+const COUNTRIES = [
+  {id:'vn', lat:16.0, lng:108.0, names:['viet nam','vietnam']},
+  {id:'cn', lat:35.0, lng:103.0, names:['trung quoc','china']},
+  {id:'jp', lat:36.2, lng:138.3, names:['nhat ban','japan','nhat']},
+  {id:'kr', lat:36.5, lng:127.8, names:['han quoc','korea','south korea']},
+  {id:'in', lat:22.0, lng:79.0, names:['an do','india']},
+  {id:'th', lat:15.9, lng:101.0, names:['thai lan','thailand']},
+  {id:'sg', lat:1.35, lng:103.8, names:['singapore']},
+  {id:'my', lat:4.2, lng:101.9, names:['malaysia']},
+  {id:'id', lat:-0.8, lng:113.9, names:['indonesia']},
+  {id:'ph', lat:12.9, lng:121.8, names:['philippines']},
+  {id:'kh', lat:12.6, lng:104.9, names:['campuchia','cambodia']},
+  {id:'la', lat:19.9, lng:102.6, names:['lao','laos']},
+  {id:'mm', lat:21.9, lng:95.9, names:['myanmar']},
+  {id:'bd', lat:23.7, lng:90.4, names:['bangladesh']},
+  {id:'pk', lat:30.4, lng:69.3, names:['pakistan']},
+  {id:'ae', lat:23.4, lng:53.8, names:['uae','ả rập thống nhất','united arab emirates']},
+  {id:'sa', lat:23.9, lng:45.1, names:['saudi arabia','a rap xe ut']},
+  {id:'tr', lat:38.9, lng:35.2, names:['tho nhi ky','turkey']},
+  {id:'il', lat:31.0, lng:34.8, names:['israel']},
+  {id:'ru', lat:61.5, lng:105.3, names:['nga','russia']},
+  {id:'de', lat:51.2, lng:10.4, names:['duc','germany']},
+  {id:'fr', lat:46.6, lng:2.2, names:['phap','france']},
+  {id:'gb', lat:54.0, lng:-2.0, names:['anh','uk','united kingdom','england']},
+  {id:'it', lat:42.8, lng:12.6, names:['y','italy','italia']},
+  {id:'es', lat:40.0, lng:-4.0, names:['tay ban nha','spain']},
+  {id:'nl', lat:52.3, lng:5.5, names:['ha lan','netherlands','holland']},
+  {id:'be', lat:50.6, lng:4.5, names:['bi','belgium']},
+  {id:'pl', lat:51.9, lng:19.1, names:['ba lan','poland']},
+  {id:'se', lat:60.1, lng:18.6, names:['thuy dien','sweden']},
+  {id:'ch', lat:46.8, lng:8.2, names:['thuy si','switzerland']},
+  {id:'ua', lat:48.4, lng:31.2, names:['ukraina','ukraine']},
+  {id:'gr', lat:39.1, lng:21.8, names:['hy lap','greece']},
+  {id:'pt', lat:39.4, lng:-8.2, names:['bo dao nha','portugal']},
+  {id:'eg', lat:26.8, lng:30.8, names:['ai cap','egypt']},
+  {id:'za', lat:-30.6, lng:22.9, names:['nam phi','south africa']},
+  {id:'ng', lat:9.1, lng:8.7, names:['nigeria']},
+  {id:'ke', lat:-0.02, lng:37.9, names:['kenya']},
+  {id:'ma', lat:31.8, lng:-7.1, names:['ma roc','morocco']},
+  {id:'gh', lat:7.9, lng:-1.0, names:['ghana']},
+  {id:'et', lat:9.1, lng:40.5, names:['ethiopia']},
+  {id:'tz', lat:-6.4, lng:34.9, names:['tanzania']},
+  {id:'us', lat:39.8, lng:-98.6, names:['my','hoa ky','usa','united states','united states of america']},
+  {id:'ca', lat:56.1, lng:-106.3, names:['canada']},
+  {id:'mx', lat:23.6, lng:-102.6, names:['mexico']},
+  {id:'br', lat:-14.2, lng:-51.9, names:['brazil','brasil']},
+  {id:'ar', lat:-38.4, lng:-63.6, names:['argentina']},
+  {id:'cl', lat:-35.7, lng:-71.5, names:['chile','chi le']},
+  {id:'pe', lat:-9.2, lng:-75.0, names:['peru']},
+  {id:'co', lat:4.6, lng:-74.3, names:['colombia']},
+  {id:'ve', lat:6.4, lng:-66.6, names:['venezuela']},
+  {id:'ec', lat:-1.8, lng:-78.2, names:['ecuador']},
+  {id:'bo', lat:-16.3, lng:-63.6, names:['bolivia']},
+  {id:'py', lat:-23.4, lng:-58.4, names:['paraguay']},
+  {id:'uy', lat:-32.5, lng:-55.8, names:['uruguay']},
+  {id:'cu', lat:21.5, lng:-77.8, names:['cuba']},
+  {id:'ht', lat:18.9, lng:-72.3, names:['haiti']},
+  {id:'do', lat:18.7, lng:-70.2, names:['dominica','dominican republic','cong hoa dominica']},
+  {id:'jm', lat:18.1, lng:-77.3, names:['jamaica']},
+  {id:'pa', lat:8.5, lng:-80.8, names:['panama']},
+  {id:'cr', lat:9.7, lng:-83.8, names:['costa rica']},
+  {id:'gt', lat:15.8, lng:-90.2, names:['guatemala']},
+  {id:'hn', lat:15.2, lng:-86.2, names:['honduras']},
+  {id:'ni', lat:12.9, lng:-85.2, names:['nicaragua']},
+  {id:'sv', lat:13.8, lng:-88.9, names:['el salvador']},
+  {id:'au', lat:-25.3, lng:133.8, names:['uc','australia']},
+  {id:'nz', lat:-41.0, lng:174.9, names:['new zealand']},
+  {id:'pg', lat:-6.3, lng:143.9, names:['papua new guinea']},
+  {id:'fj', lat:-17.7, lng:178.1, names:['fiji']}
+];
+
+function normalizeVN(str){
+  return (str||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/đ/g,'d')
+    .replace(/[^a-z0-9\s]/g,' ')
+    .replace(/\s+/g,' ').trim();
+}
+
+function resolveCountry(text){
+  const n = normalizeVN(text);
+  if (!n) return null;
+  let best = null, bestLen = 0;
+  COUNTRIES.forEach(c => {
+    c.names.forEach(alias => {
+      const a = normalizeVN(alias);
+      if (n === a || n.includes(a) || a.includes(n)){
+        if (a.length > bestLen){ best = c; bestLen = a.length; }
+      }
+    });
+  });
+  return best;
+}
+
+function haversine(lat1,lng1,lat2,lng2){
+  const R = 6371;
+  const dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function parseDestination(route){
+  const parts = route.split(/→|->|-|–|,/).map(s=>s.trim()).filter(Boolean);
+  const candidate = parts.length ? parts[parts.length-1] : route;
+  let country = resolveCountry(candidate);
+  if (!country) country = resolveCountry(route);
+  return { text: candidate, country };
+}
+
+// ---------- threshold (30/40/50°C) day analysis ----------
+function computeThresholdStats(pts){
+  let intervalMin = 60;
+  if (pts.length > 1) intervalMin = Math.max(1, Math.round((pts[1].t - pts[0].t)/60000));
+  const thresholds = [30,40,50];
+  const result = {};
+  thresholds.forEach(T => {
+    let hoursOver = 0, maxStreakPts = 0, curStreak = 0;
+    const daysWithExceed = new Set();
+    pts.forEach(p => {
+      if (p.temp > T){
+        hoursOver += intervalMin/60;
+        curStreak++;
+        if (curStreak > maxStreakPts) maxStreakPts = curStreak;
+        const d = new Date(p.t);
+        daysWithExceed.add(d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate());
+      } else {
+        curStreak = 0;
+      }
+    });
+    // longest run of consecutive calendar days present in daysWithExceed
+    const dayNums = Array.from(daysWithExceed).map(s => {
+      const [y,m,d] = s.split('-').map(Number);
+      return Math.floor(new Date(y,m-1,d).getTime()/86400000);
+    }).sort((a,b)=>a-b);
+    let maxConsecDays = dayNums.length ? 1 : 0, run = dayNums.length ? 1 : 0;
+    for (let i=1;i<dayNums.length;i++){
+      if (dayNums[i] === dayNums[i-1]+1){ run++; if (run>maxConsecDays) maxConsecDays = run; }
+      else run = 1;
+    }
+    result[T] = {
+      hoursOver: Math.round(hoursOver*10)/10,
+      maxStreakHours: Math.round((maxStreakPts*intervalMin/60)*10)/10,
+      daysCount: daysWithExceed.size,
+      maxConsecDays
+    };
+  });
+  return result;
+}
+
+function renderThresholdTable(ts){
+  const tbody = document.getElementById('thresholdBody');
+  tbody.innerHTML = [30,40,50].map(T => {
+    const r = ts[T];
+    return `<tr><td>&gt; ${T}°C</td><td>${r.hoursOver}h</td><td>${r.maxStreakHours}h</td><td>${r.daysCount}</td><td>${r.maxConsecDays}</td></tr>`;
+  }).join('');
+}
+
+function renderStats(){
+  const s = computeStats(points);
+  statsCard.style.display = 'block';
+  document.getElementById('stMin').textContent = s.min.toFixed(1)+'°C';
+  document.getElementById('stMax').textContent = s.max.toFixed(1)+'°C';
+  document.getElementById('stAvg').textContent = s.avg.toFixed(1)+'°C';
+  document.getElementById('stMkt').textContent = s.mkt.toFixed(1)+'°C';
+  document.getElementById('stStart').textContent = fmtDate(s.start);
+  document.getElementById('stStop').textContent = fmtDate(s.stop);
+  document.getElementById('stDur').textContent = fmtDur(s.durMs);
+  document.getElementById('stN').textContent = s.n;
+  drawChart(s);
+  renderThresholdTable(computeThresholdStats(points));
+}
+
+// ---------- chart ----------
+function getRange(){
+  const preset = document.getElementById('rangePreset').value;
+  if (preset === 'custom'){
+    const low = parseFloat(document.getElementById('customLow').value);
+    const high = parseFloat(document.getElementById('customHigh').value);
+    if (isNaN(low) || isNaN(high)) return null;
+    return {low, high};
+  }
+  const [low, high] = preset.split(',').map(Number);
+  return {low, high};
+}
+
+function drawChart(){
+  const canvas = document.getElementById('chart');
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth || 600;
+  const cssH = 220;
+  canvas.width = cssW*dpr; canvas.height = cssH*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,cssW,cssH);
+
+  const pad = {l:38,r:12,t:14,b:22};
+  const w = cssW-pad.l-pad.r, h = cssH-pad.t-pad.b;
+  const temps = points.map(p=>p.temp);
+  let tmin = Math.min(...temps), tmax = Math.max(...temps);
+  const range = getRange();
+  if (range){ tmin = Math.min(tmin, range.low); tmax = Math.max(tmax, range.high); }
+  const pad2 = (tmax-tmin)*0.1 || 1;
+  tmin -= pad2; tmax += pad2;
+
+  const x = i => pad.l + (i/(points.length-1))*w;
+  const y = t => pad.t + h - ((t-tmin)/(tmax-tmin))*h;
+
+  // threshold band
+  if (range){
+    ctx.fillStyle = 'rgba(15,139,141,0.10)';
+    const yTop = y(range.high), yBot = y(range.low);
+    ctx.fillRect(pad.l, yTop, w, yBot-yTop);
+    ctx.strokeStyle = '#0F8B8D'; ctx.setLineDash([3,3]); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(pad.l,yTop); ctx.lineTo(pad.l+w,yTop); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(pad.l,yBot); ctx.lineTo(pad.l+w,yBot); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // axis
+  ctx.strokeStyle = '#C7CDBE'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(pad.l,pad.t); ctx.lineTo(pad.l,pad.t+h); ctx.lineTo(pad.l+w,pad.t+h); ctx.stroke();
+  ctx.fillStyle = '#4B5A63'; ctx.font = '10px IBM Plex Mono, monospace';
+  ctx.fillText(tmax.toFixed(0)+'°', 4, pad.t+8);
+  ctx.fillText(tmin.toFixed(0)+'°', 4, pad.t+h);
+
+  // line
+  ctx.beginPath();
+  points.forEach((p,i)=>{
+    const px = x(i), py = y(p.temp);
+    if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  });
+  ctx.strokeStyle = '#16202A'; ctx.lineWidth = 1.4; ctx.stroke();
+
+  // out-of-range points
+  if (range){
+    points.forEach((p,i)=>{
+      if (p.temp < range.low || p.temp > range.high){
+        ctx.fillStyle = (p.temp < range.low-2 || p.temp > range.high+2) ? '#A6321C' : '#B5651D';
+        ctx.beginPath(); ctx.arc(x(i), y(p.temp), 1.6, 0, Math.PI*2); ctx.fill();
+      }
+    });
+  }
+}
+window.addEventListener('resize', () => { if (points.length) drawChart(); });
+
+// ---------- upload UI wiring ----------
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+dropzone.addEventListener('click', ()=> fileInput.click());
+fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+['dragenter','dragover'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('drag'); }));
+['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('drag'); }));
+dropzone.addEventListener('drop', e => { if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+document.getElementById('manualToggle').addEventListener('click', () => {
+  const ta = document.getElementById('manualInput');
+  const wrap = document.getElementById('manualParseBtnWrap');
+  const show = ta.style.display === 'none';
+  ta.style.display = show ? 'block' : 'none';
+  wrap.style.display = show ? 'block' : 'none';
+});
+document.getElementById('manualParseBtn').addEventListener('click', () => {
+  const txt = document.getElementById('manualInput').value;
+  if (txt.trim()) ingestText(txt, 'dữ liệu dán');
+});
+
+document.getElementById('rangePreset').addEventListener('change', e => {
+  document.getElementById('customRangeRow').style.display = e.target.value === 'custom' ? 'flex' : 'none';
+  if (points.length) drawChart();
+});
+['customLow','customHigh'].forEach(id => document.getElementById(id).addEventListener('input', ()=>{ if(points.length) drawChart(); }));
+
+// ---------- verdict logic ----------
+function computeVerdict(stats, range){
+  const outPoints = points.filter(p => p.temp < range.low || p.temp > range.high);
+  const outPct = (outPoints.length / points.length) * 100;
+  let intervalMin = 60;
+  if (points.length > 1) intervalMin = Math.max(1, Math.round((points[1].t - points[0].t)/60000));
+  const outHours = (outPoints.length * intervalMin) / 60;
+  let maxExcursion = 0;
+  outPoints.forEach(p => {
+    const dev = p.temp < range.low ? (range.low - p.temp) : (p.temp - range.high);
+    if (dev > maxExcursion) maxExcursion = dev;
+  });
+
+  let level, title, sub;
+  if (outPoints.length === 0){
+    level = 'ok';
+    title = 'Cont thường đủ dùng';
+    sub = 'Toàn bộ hành trình nằm trong ngưỡng yêu cầu';
+  } else if (outPct <= 5 && maxExcursion <= 2){
+    level = 'warn';
+    title = 'Cont thường — cần giám sát';
+    sub = 'Có lệch nhẹ, mức độ thấp';
+  } else {
+    level = 'danger';
+    title = 'Cần cont lạnh (reefer)';
+    sub = 'Vượt ngưỡng đáng kể hoặc kéo dài';
+  }
+
+  const reasons = [];
+  reasons.push(`Ngưỡng yêu cầu của sản phẩm: <b>${range.low}–${range.high}°C</b>. Nhiệt độ thực đo dao động <b>${stats.min.toFixed(1)}–${stats.max.toFixed(1)}°C</b>.`);
+  if (outPoints.length === 0){
+    reasons.push('Không ghi nhận điểm đo nào vượt ngưỡng trong suốt hành trình.');
+  } else {
+    reasons.push(`<b>${outPoints.length}</b> / ${points.length} điểm đo (${outPct.toFixed(1)}%) nằm ngoài ngưỡng, tương đương khoảng <b>${outHours.toFixed(1)} giờ</b> vượt ngưỡng.`);
+    reasons.push(`Mức lệch lớn nhất so với ngưỡng: <b>${maxExcursion.toFixed(1)}°C</b>.`);
+  }
+  reasons.push(`MKT (nhiệt động học trung bình) toàn hành trình: <b>${stats.mkt.toFixed(1)}°C</b> — phản ánh tác động nhiệt tích luỹ, nên so với khuyến cáo bảo quản của nhà sản xuất dược phẩm.`);
+  if (level !== 'ok'){
+    reasons.push('Khuyến nghị mang tính tham khảo dựa trên dữ liệu logger; quyết định cuối cùng nên đối chiếu với yêu cầu bảo quản cụ thể ghi trên nhãn/hồ sơ sản phẩm.');
+  }
+
+  return { level, title, sub, reasons, outPct, outHours, maxExcursion };
+}
+
+function renderVerdict(v){
+  verdictCard.style.display = 'block';
+  const stamp = document.getElementById('stampEl');
+  stamp.className = 'stamp' + (v.level==='ok' ? '' : ' '+v.level);
+  stamp.innerHTML = v.title + '<small>' + v.sub + '</small>';
+  const ul = document.getElementById('reasonsEl');
+  ul.innerHTML = v.reasons.map(r => '<li>'+r+'</li>').join('');
+}
+
+// ---------- route suggestion from history ----------
+let historyCache = [];
+document.getElementById('routeInput').addEventListener('input', async (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  const banner = document.getElementById('suggestBanner');
+  if (!q){ banner.style.display='none'; return; }
+  const matches = historyCache.filter(h => h.route && h.route.toLowerCase().includes(q));
+  if (matches.length){
+    const verdictCounts = {};
+    matches.forEach(m => verdictCounts[m.verdictTitle] = (verdictCounts[m.verdictTitle]||0)+1);
+    const top = Object.entries(verdictCounts).sort((a,b)=>b[1]-a[1])[0];
+    banner.style.display = 'block';
+    banner.textContent = `Tuyến này từng ghi nhận ${matches.length} lô trước đây. Khuyến nghị phổ biến nhất: "${top[0]}" (${top[1]}/${matches.length} lần).`;
+  } else {
+    banner.style.display = 'none';
+  }
+});
+
+// ---------- destination search ----------
+function renderDestSearch(){
+  const q = document.getElementById('destSearchInput').value.trim();
+  const out = document.getElementById('destSearchResult');
+  if (!q){ out.innerHTML = ''; return; }
+  const qn = normalizeVN(q);
+  const queryCountry = resolveCountry(q);
+
+  const exact = historyCache.filter(h =>
+    normalizeVN(h.route).includes(qn) ||
+    normalizeVN(h.destText||'').includes(qn) ||
+    (queryCountry && h.destCountryId === queryCountry.id)
+  );
+
+  let nearby = [];
+  if (queryCountry){
+    const exactIds = new Set(exact.map(h=>h.id));
+    nearby = historyCache
+      .filter(h => !exactIds.has(h.id) && h.destCountryId && h.destLat != null)
+      .map(h => ({ h, dist: haversine(queryCountry.lat, queryCountry.lng, h.destLat, h.destLng) }))
+      .sort((a,b) => a.dist - b.dist)
+      .slice(0, 6);
+  }
+
+  if (!exact.length && !nearby.length){
+    out.innerHTML = '<div class="empty">' + (queryCountry
+      ? 'Chưa có lô hàng nào được lưu tới khu vực gần "' + escapeHtml(q) + '".'
+      : 'Không nhận diện được điểm đến này, và không có kết quả khớp trực tiếp. Thử một tên quốc gia khác.') + '</div>';
+    return;
+  }
+
+  let html = '';
+  if (exact.length){
+    html += '<div style="font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);margin:10px 0 6px;">Khớp trực tiếp</div>';
+    html += renderShipRows(exact);
+  }
+  if (nearby.length){
+    html += '<div style="font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);margin:14px 0 6px;">Tuyến gần khu vực điểm đến (theo khoảng cách)</div>';
+    html += '<table><thead><tr><th>Khoảng cách</th><th>Tuyến</th><th>Điểm đến ghi nhận</th><th>Min/Max</th><th>Ngưỡng</th><th>Khuyến nghị</th></tr></thead><tbody>';
+    nearby.forEach(({h,dist}) => {
+      html += `<tr><td>${Math.round(dist).toLocaleString('vi-VN')} km</td><td>${escapeHtml(h.route)}</td><td>${escapeHtml(h.destText||'—')}</td>
+        <td>${h.min.toFixed(1)} / ${h.max.toFixed(1)}°C</td><td>${h.rangeLow}–${h.rangeHigh}°C</td>
+        <td><span class="chip ${verdictChipClass(h.verdictLevel)}">${escapeHtml(h.verdictTitle)}</span></td></tr>`;
+    });
+    html += '</tbody></table>';
+  }
+  out.innerHTML = html;
+}
+
+function renderShipRows(list){
+  let html = '<table><thead><tr><th>Ngày lưu</th><th>Tuyến</th><th>Min/Max</th><th>&gt;30°C</th><th>&gt;40°C</th><th>&gt;50°C</th><th>Khuyến nghị</th></tr></thead><tbody>';
+  list.forEach(h => {
+    const t = h.thresholds || {};
+    html += `<tr><td>${fmtDate(h.savedAt)}</td><td>${escapeHtml(h.route)}</td><td>${h.min.toFixed(1)} / ${h.max.toFixed(1)}°C</td>
+      <td>${t[30]?t[30].hoursOver+'h / '+t[30].daysCount+'ng':'—'}</td>
+      <td>${t[40]?t[40].hoursOver+'h / '+t[40].daysCount+'ng':'—'}</td>
+      <td>${t[50]?t[50].hoursOver+'h / '+t[50].daysCount+'ng':'—'}</td>
+      <td><span class="chip ${verdictChipClass(h.verdictLevel)}">${escapeHtml(h.verdictTitle)}</span></td></tr>`;
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+document.getElementById('destSearchBtn').addEventListener('click', renderDestSearch);
+document.getElementById('destSearchInput').addEventListener('keydown', e => { if (e.key === 'Enter') renderDestSearch(); });
+
+// ---------- analyze & save ----------
+analyzeBtn.addEventListener('click', async () => {
+  if (!points.length) return;
+  const range = getRange();
+  if (!range){ setStatus('Nhập đủ ngưỡng nhiệt độ tuỳ chỉnh trước khi phân tích.', 'err'); return; }
+  const stats = computeStats(points);
+  const verdict = computeVerdict(stats, range);
+  renderVerdict(verdict);
+  drawChart();
+
+  const route = document.getElementById('routeInput').value.trim() || '(chưa đặt tên tuyến)';
+  const product = document.getElementById('productInput').value.trim();
+  const dest = parseDestination(route);
+  const thresholds = computeThresholdStats(points);
+  const record = {
+    id: 'ship_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    savedAt: Date.now(),
+    route, product,
+    destText: dest.text,
+    destCountryId: dest.country ? dest.country.id : null,
+    destLat: dest.country ? dest.country.lat : null,
+    destLng: dest.country ? dest.country.lng : null,
+    deviceId: meta.deviceId,
+    rangeLow: range.low, rangeHigh: range.high,
+    min: stats.min, max: stats.max, avg: stats.avg, mkt: stats.mkt,
+    start: stats.start, stop: stats.stop, n: stats.n,
+    verdictLevel: verdict.level, verdictTitle: verdict.title,
+    thresholds
+  };
+  try{
+    const res = await fetch(SUPABASE_URL + '/rest/v1/shipments', {
+      method: 'POST',
+      headers: sbHeaders({ 'Prefer': 'return=minimal' }),
+      body: JSON.stringify(toDbRow(record))
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + await res.text());
+    setStatus('Đã lưu lô hàng vào lịch sử.', 'ok');
+    loadHistory();
+  } catch(err){
+    console.error(err);
+    setStatus('Phân tích xong nhưng không lưu được vào lịch sử (kiểm tra cấu hình backend / kết nối mạng).', 'err');
+  }
+});
+
+// ---------- history ----------
+function verdictChipClass(level){
+  return level === 'ok' ? 'ok' : level === 'warn' ? 'warn' : 'danger';
+}
+
+async function loadHistory(){
+  const wrap = document.getElementById('historyWrap');
+  wrap.innerHTML = '<div class="empty">Đang tải…</div>';
+  if (!IS_CONFIGURED){
+    wrap.innerHTML = '<div class="empty">Chưa cấu hình backend — xem cảnh báo phía trên đầu trang.</div>';
+    historyCache = [];
+    return;
+  }
+  try{
+    const res = await fetch(SUPABASE_URL + '/rest/v1/shipments?select=*&order=saved_at.desc', {
+      headers: sbHeaders()
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    const records = rows.map(fromDbRow);
+    historyCache = records;
+    if (!records.length){
+      wrap.innerHTML = '<div class="empty">Chưa có lô hàng nào được lưu. Phân tích một lô để bắt đầu lịch sử.</div>';
+      return;
+    }
+    renderHistory(records);
+  } catch(err){
+    console.error(err);
+    wrap.innerHTML = '<div class="empty">Không tải được lịch sử từ backend. Kiểm tra kết nối mạng hoặc cấu hình Supabase.</div>';
+  }
+}
+
+function renderHistory(records){
+  const wrap = document.getElementById('historyWrap');
+  const filterVal = document.getElementById('historyFilter').value.trim().toLowerCase();
+  const filtered = filterVal ? records.filter(r =>
+    (r.route||'').toLowerCase().includes(filterVal) || (r.product||'').toLowerCase().includes(filterVal)
+  ) : records;
+
+  if (!filtered.length){
+    wrap.innerHTML = '<div class="empty">Không có kết quả phù hợp.</div>';
+    return;
+  }
+  let html = '<table><thead><tr><th>Ngày lưu</th><th>Tuyến</th><th>Điểm đến</th><th>Sản phẩm</th><th>Ngưỡng</th><th>Min/Max</th><th>MKT</th><th>&gt;30°C</th><th>&gt;40°C</th><th>&gt;50°C</th><th>Khuyến nghị</th><th></th></tr></thead><tbody>';
+  filtered.forEach(r => {
+    const t = r.thresholds || {};
+    html += `<tr>
+      <td>${fmtDate(r.savedAt)}</td>
+      <td>${escapeHtml(r.route)}</td>
+      <td>${escapeHtml(r.destText||'—')}${r.destCountryId ? '' : ' <span style="color:var(--ink-soft);font-size:10px;">(chưa nhận diện)</span>'}</td>
+      <td>${escapeHtml(r.product||'—')}</td>
+      <td>${r.rangeLow}–${r.rangeHigh}°C</td>
+      <td>${r.min.toFixed(1)} / ${r.max.toFixed(1)}°C</td>
+      <td>${r.mkt.toFixed(1)}°C</td>
+      <td>${t[30]?t[30].hoursOver+'h/'+t[30].daysCount+'ng':'—'}</td>
+      <td>${t[40]?t[40].hoursOver+'h/'+t[40].daysCount+'ng':'—'}</td>
+      <td>${t[50]?t[50].hoursOver+'h/'+t[50].daysCount+'ng':'—'}</td>
+      <td><span class="chip ${verdictChipClass(r.verdictLevel)}">${escapeHtml(r.verdictTitle)}</span></td>
+      <td><button class="del" data-id="${r.id}">xoá</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('.del').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try{
+        const res = await fetch(SUPABASE_URL + '/rest/v1/shipments?id=eq.' + encodeURIComponent(btn.getAttribute('data-id')), {
+          method: 'DELETE',
+          headers: sbHeaders()
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+      } catch(err){
+        console.error(err);
+        alert('Không xoá được — kiểm tra kết nối mạng / cấu hình backend.');
+      }
+      loadHistory();
+    });
+  });
+}
+
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.getElementById('historyFilter').addEventListener('input', () => renderHistory(historyCache));
+document.getElementById('refreshHistoryBtn').addEventListener('click', loadHistory);
+
+loadHistory();
+</script>
+</body>
+</html>
