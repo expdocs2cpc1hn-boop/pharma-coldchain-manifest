@@ -1,991 +1,1980 @@
+
 <!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>NHIỆT TRÌNH — Phân tích logger &amp; khuyến nghị container</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TUYẾN LẠNH — Cố vấn chuỗi lạnh dược phẩm</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
-    --bg:#EDF0E9;
-    --paper:#F8F9F4;
-    --ink:#16202A;
-    --ink-soft:#4B5A63;
-    --line:#C7CDBE;
-    --line-soft:#DBDFD3;
-    --cold:#0F8B8D;
-    --cold-deep:#0B6567;
-    --cold-tint:#E1F1F0;
-    --warn:#B5651D;
-    --warn-tint:#F5E7D8;
-    --danger:#A6321C;
-    --danger-tint:#F5DFD8;
-    --mono:'IBM Plex Mono', ui-monospace, Menlo, monospace;
-    --display:'Space Grotesk', 'Inter', sans-serif;
-    --body:'Inter', system-ui, sans-serif;
+    --bg:#0A1420;
+    --surface:#0F1B2C;
+    --surface-2:#152238;
+    --surface-3:#1B2C46;
+    --border:#243652;
+    --border-soft:#1B2A42;
+    --text:#E7ECF3;
+    --text-muted:#8CA0BC;
+    --text-dim:#5D7290;
+    --ice:#5BD9E8;
+    --ice-dim:#2C8FA0;
+    --ice-glow:rgba(91,217,232,.15);
+    --amber:#F2A65A;
+    --danger:#FF6E6E;
+    --danger-dim:rgba(255,110,110,.12);
+    --safe:#67D99A;
+    --safe-dim:rgba(103,217,154,.12);
+    --warn-dim:rgba(242,166,90,.12);
+    --radius:14px;
+    --radius-sm:9px;
+    --font-display:'Space Grotesk',sans-serif;
+    --font-body:'Inter',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);}
-  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(91,217,232,.08), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(242,166,90,.05), transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--ice);color:#04202a;}
+  a{color:var(--ice);}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:8px;}
 
-  /* ---- header / manifest strip ---- */
-  .manifest-head{
-    display:flex;justify-content:space-between;align-items:flex-end;
-    border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:22px;
-    gap:16px;flex-wrap:wrap;
+  /* ---------- Header ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:40;
+    background:rgba(10,20,32,.85);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border-soft);
+  }
+  .topbar-inner{
+    max-width:1180px;margin:0 auto;padding:16px 24px;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
   }
   .brand{display:flex;align-items:center;gap:12px;}
   .brand-mark{
-    width:40px;height:40px;border:2px solid var(--ink);display:flex;align-items:center;justify-content:center;
-    font-family:var(--mono);font-weight:600;font-size:11px;letter-spacing:0.5px;
-    background:repeating-linear-gradient(135deg, var(--ink) 0 1px, transparent 1px 6px);
-    color:var(--paper);
+    width:38px;height:38px;border-radius:10px;
+    background:linear-gradient(135deg,var(--ice) 0%, var(--ice-dim) 55%, #1c5c68 100%);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 1px rgba(91,217,232,.25), 0 4px 18px -4px rgba(91,217,232,.5);
+    flex-shrink:0;
   }
-  .brand-mark span{background:var(--ink);padding:2px 3px;}
-  h1{font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:0.5px;margin:0;text-transform:uppercase;}
-  .subtitle{font-size:13px;color:var(--ink-soft);margin-top:2px;}
-  .manifest-meta{font-family:var(--mono);font-size:11px;color:var(--ink-soft);text-align:right;line-height:1.6;}
+  .brand-mark svg{width:20px;height:20px;}
+  .brand-text{display:flex;flex-direction:column;line-height:1.05;}
+  .brand-text b{font-family:var(--font-display);font-size:18px;letter-spacing:.02em;font-weight:700;}
+  .brand-text span{font-size:11px;color:var(--text-dim);font-family:var(--font-mono);letter-spacing:.03em;}
+  .tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border-soft);padding:4px;border-radius:11px;}
+  .tab-btn{
+    border:none;background:transparent;color:var(--text-muted);
+    padding:9px 16px;border-radius:8px;font-size:13.5px;font-weight:600;
+    display:flex;align-items:center;gap:7px;white-space:nowrap;
+    transition:.15s;
+  }
+  .tab-btn svg{width:15px;height:15px;opacity:.8;}
+  .tab-btn.active{background:var(--surface-3);color:var(--text);box-shadow:inset 0 0 0 1px var(--border);}
+  .tab-btn:not(.active):hover{color:var(--text);}
 
-  /* ---- layout ---- */
-  .grid{display:grid;grid-template-columns:1.15fr 0.85fr;gap:20px;align-items:start;}
-  @media (max-width:900px){.grid{grid-template-columns:1fr;}}
+  .wrap{max-width:1180px;margin:0 auto;padding:32px 24px 80px;}
+  .panel{display:none;}
+  .panel.active{display:block;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+  h1.page-title{font-family:var(--font-display);font-size:26px;margin:0 0 6px;font-weight:700;}
+  p.page-sub{color:var(--text-muted);font-size:14.5px;margin:0 0 28px;max-width:640px;line-height:1.55;}
 
   .card{
-    background:var(--paper);border:1px solid var(--line);
-    padding:20px 22px;margin-bottom:20px;
+    background:linear-gradient(180deg, var(--surface-2), var(--surface));
+    border:1px solid var(--border-soft);
+    border-radius:var(--radius);
+    padding:22px;
   }
-  .card h2{
-    font-family:var(--display);font-size:13px;font-weight:600;text-transform:uppercase;
-    letter-spacing:1.2px;color:var(--ink-soft);margin:0 0 14px;
-    display:flex;align-items:center;gap:8px;
-  }
-  .card h2::before{content:'';width:6px;height:6px;background:var(--cold);display:inline-block;}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  @media(max-width:760px){.grid-2,.grid-3{grid-template-columns:1fr;}}
 
-  /* ---- upload zone ---- */
-  .dropzone{
-    border:1.5px dashed var(--ink-soft);padding:28px 16px;text-align:center;cursor:pointer;
-    transition:border-color .15s, background .15s;
+  label.field-label{display:block;font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;letter-spacing:.02em;text-transform:uppercase;}
+  input[type=text],input[type=number],input[type=month],select,textarea{
+    width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);
+    padding:10px 12px;border-radius:9px;font-size:14px;outline:none;transition:.15s;
   }
-  .dropzone.drag{border-color:var(--cold);background:var(--cold-tint);}
-  .dropzone p{margin:4px 0;}
-  .dropzone .big{font-family:var(--display);font-weight:600;font-size:15px;}
-  .dropzone .small{font-size:12px;color:var(--ink-soft);}
-  input[type=file]{display:none;}
+  input:focus,select:focus,textarea:focus{border-color:var(--ice-dim);box-shadow:0 0 0 3px var(--ice-glow);}
+  input::placeholder{color:var(--text-dim);}
+  .field{margin-bottom:14px;}
+  .field-row{display:flex;gap:10px;}
+  .field-row > *{flex:1;}
+  .hint{font-size:12px;color:var(--text-dim);margin-top:5px;line-height:1.4;}
+
   .btn{
-    font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:0.4px;text-transform:uppercase;
-    border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);
-    padding:9px 16px;cursor:pointer;transition:opacity .15s;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    padding:11px 20px;border-radius:9px;border:1px solid transparent;
+    font-size:14px;font-weight:600;transition:.15s;
   }
-  .btn:hover{opacity:0.82;}
-  .btn.ghost{background:transparent;color:var(--ink);}
-  .btn.small{padding:5px 10px;font-size:11px;}
-  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .btn-primary{background:linear-gradient(180deg,#6EE3F0,var(--ice-dim));color:#04222b;box-shadow:0 4px 14px -4px rgba(91,217,232,.5);}
+  .btn-primary:hover{filter:brightness(1.08);}
+  .btn-primary:disabled{opacity:.5;cursor:not-allowed;filter:none;}
+  .btn-ghost{background:var(--surface-3);color:var(--text);border-color:var(--border);}
+  .btn-ghost:hover{border-color:var(--ice-dim);}
+  .btn-danger{background:transparent;color:var(--danger);border-color:rgba(255,110,110,.35);}
+  .btn-danger:hover{background:var(--danger-dim);}
+  .btn-sm{padding:7px 13px;font-size:12.5px;}
+  .btn-block{width:100%;}
 
-  .manual-toggle{font-size:12px;color:var(--cold-deep);text-decoration:underline;cursor:pointer;margin-top:10px;display:inline-block;}
-  textarea.manual{
-    width:100%;min-height:110px;margin-top:10px;font-family:var(--mono);font-size:12px;
-    border:1px solid var(--line);padding:10px;background:#fff;resize:vertical;
+  /* ---------- Upload dropzone ---------- */
+  .dropzone{
+    border:1.5px dashed var(--border);border-radius:var(--radius);
+    padding:38px 20px;text-align:center;background:var(--surface);
+    transition:.15s;cursor:pointer;
   }
-  .status-line{font-family:var(--mono);font-size:12px;margin-top:12px;color:var(--ink-soft);}
-  .status-line.err{color:var(--danger);}
-  .status-line.ok{color:var(--cold-deep);}
+  .dropzone:hover,.dropzone.drag{border-color:var(--ice-dim);background:var(--ice-glow);}
+  .dropzone svg{width:34px;height:34px;color:var(--ice);margin-bottom:10px;}
+  .dropzone b{display:block;font-size:15px;margin-bottom:4px;}
+  .dropzone span{font-size:12.5px;color:var(--text-dim);}
 
-  /* ---- stats ---- */
-  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin-top:4px;}
-  @media (max-width:520px){.stat-grid{grid-template-columns:repeat(2,1fr);}}
-  .stat{background:var(--paper);padding:12px 10px;}
-  .stat .label{font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-soft);font-family:var(--mono);}
-  .stat .value{font-family:var(--display);font-size:19px;font-weight:600;margin-top:3px;}
+  .pending-card{border:1px solid var(--border-soft);border-radius:var(--radius);background:var(--surface);margin-top:18px;overflow:hidden;}
+  .pending-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border-soft);gap:12px;flex-wrap:wrap;}
+  .pending-head .fname{font-family:var(--font-mono);font-size:13px;color:var(--text-muted);}
+  .pending-body{padding:18px;}
+  .status-chip{font-size:11px;font-weight:700;padding:4px 9px;border-radius:99px;letter-spacing:.03em;text-transform:uppercase;}
+  .status-parsing{background:var(--warn-dim);color:var(--amber);}
+  .status-ok{background:var(--safe-dim);color:var(--safe);}
+  .status-error{background:var(--danger-dim);color:var(--danger);}
+  .status-saved{background:var(--ice-glow);color:var(--ice);}
 
-  canvas{width:100%;display:block;}
+  .stat-strip{display:flex;gap:22px;flex-wrap:wrap;margin:14px 0 18px;}
+  .stat-item b{display:block;font-family:var(--font-mono);font-size:19px;}
+  .stat-item span{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.03em;}
 
-  /* ---- form ---- */
-  label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);font-family:var(--mono);margin-bottom:5px;margin-top:14px;}
-  label:first-of-type{margin-top:0;}
-  input[type=text], select{
-    width:100%;padding:9px 10px;border:1px solid var(--line);background:#fff;font-family:var(--body);font-size:13.5px;color:var(--ink);
+  canvas.ribbon{display:block;width:100%;height:46px;border-radius:7px;}
+  .ribbon-wrap{border:1px solid var(--border-soft);border-radius:9px;padding:6px;background:var(--bg);margin-bottom:16px;}
+
+  /* ---------- Result cards ---------- */
+  .section-label{display:flex;align-items:center;gap:10px;margin:34px 0 14px;}
+  .section-label .dot{width:7px;height:7px;border-radius:99px;background:var(--ice);box-shadow:0 0 8px var(--ice);}
+  .section-label h3{font-family:var(--font-display);font-size:15.5px;margin:0;font-weight:600;}
+  .section-label small{color:var(--text-dim);font-size:12px;font-family:var(--font-mono);}
+
+  .verdict{
+    border-radius:var(--radius);padding:22px 24px;border:1px solid;
+    display:flex;align-items:center;gap:18px;margin-bottom:22px;
   }
-  input[type=text]:focus, select:focus, input[type=number]:focus{outline:2px solid var(--cold);outline-offset:1px;}
-  .range-row{display:flex;gap:10px;}
-  .range-row input{width:100%;padding:9px 10px;border:1px solid var(--line);font-family:var(--mono);font-size:13px;}
-  .hint{font-size:11.5px;color:var(--ink-soft);margin-top:4px;line-height:1.4;}
-  .suggest-banner{
-    background:var(--cold-tint);border:1px solid var(--cold);padding:9px 11px;font-size:12px;margin-top:10px;color:var(--cold-deep);
-  }
+  .verdict.reefer{background:var(--danger-dim);border-color:rgba(255,110,110,.3);}
+  .verdict.standard{background:var(--safe-dim);border-color:rgba(103,217,154,.3);}
+  .verdict.borderline{background:var(--warn-dim);border-color:rgba(242,166,90,.3);}
+  .verdict-icon{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(255,255,255,.06);}
+  .verdict-icon svg{width:24px;height:24px;}
+  .verdict h2{font-family:var(--font-display);font-size:20px;margin:0 0 4px;}
+  .verdict p{margin:0;font-size:13.5px;color:var(--text-muted);line-height:1.5;}
+  .verdict.reefer .verdict-icon svg{color:var(--danger);}
+  .verdict.standard .verdict-icon svg{color:var(--safe);}
+  .verdict.borderline .verdict-icon svg{color:var(--amber);}
 
-  /* ---- verdict stamp (signature element) ---- */
-  .stamp-zone{display:flex;justify-content:center;padding:14px 0 6px;}
-  .stamp{
-    display:inline-block;border:3px double var(--cold-deep);color:var(--cold-deep);
-    font-family:var(--mono);font-weight:600;text-transform:uppercase;letter-spacing:1.3px;
-    padding:14px 22px;transform:rotate(-3deg);text-align:center;font-size:15px;line-height:1.4;
-    background:rgba(15,139,141,0.05);
-  }
-  .stamp.warn{border-color:var(--warn);color:var(--warn);background:rgba(181,101,29,0.06);}
-  .stamp.danger{border-color:var(--danger);color:var(--danger);background:rgba(166,50,28,0.06);}
-  .stamp small{display:block;font-size:10px;letter-spacing:0.6px;font-weight:500;margin-top:4px;opacity:0.85;}
+  .match-card{border:1px solid var(--border-soft);background:var(--surface);border-radius:var(--radius);padding:18px 20px;margin-bottom:12px;}
+  .match-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .match-route{font-family:var(--font-display);font-size:15px;font-weight:600;}
+  .match-route .arrow{color:var(--ice);margin:0 6px;}
+  .match-meta{font-size:12px;color:var(--text-dim);font-family:var(--font-mono);margin-top:3px;}
+  .tag{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:.03em;}
+  .tag-exact{background:var(--safe-dim);color:var(--safe);}
+  .tag-ref{background:var(--warn-dim);color:var(--amber);}
 
-  .reasons{margin:14px 0 0;padding-left:18px;font-size:13px;line-height:1.7;color:var(--ink-soft);}
-  .reasons b{color:var(--ink);}
+  .leg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0;}
+  @media(max-width:760px){.leg-grid{grid-template-columns:1fr;}}
+  .leg-card{background:var(--surface);border:1px solid var(--border-soft);border-radius:12px;padding:15px;}
+  .leg-card .leg-name{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--text-dim);margin-bottom:2px;}
+  .leg-card .leg-month{font-family:var(--font-mono);font-size:12.5px;color:var(--ice);margin-bottom:12px;}
+  .leg-row{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;border-top:1px solid var(--border-soft);}
+  .leg-row:first-of-type{border-top:none;}
+  .leg-row b{font-family:var(--font-mono);}
 
-  /* ---- history table ---- */
-  table{width:100%;border-collapse:collapse;font-size:12.5px;}
-  thead th{
-    text-align:left;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;
-    color:var(--ink-soft);border-bottom:1.5px solid var(--ink);padding:6px 8px;
+  .empty{
+    text-align:center;padding:50px 20px;color:var(--text-dim);
+    border:1px dashed var(--border);border-radius:var(--radius);
   }
-  tbody td{padding:8px;border-bottom:1px solid var(--line-soft);vertical-align:middle;}
-  tbody tr:hover{background:var(--cold-tint);}
-  .chip{
-    font-family:var(--mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;
-    padding:3px 8px;border:1.5px solid; display:inline-block;
-  }
-  .chip.ok{color:var(--cold-deep);border-color:var(--cold-deep);}
-  .chip.warn{color:var(--warn);border-color:var(--warn);}
-  .chip.danger{color:var(--danger);border-color:var(--danger);}
-  .empty{font-size:13px;color:var(--ink-soft);padding:20px 0;text-align:center;}
-  .del{cursor:pointer;color:var(--ink-soft);font-family:var(--mono);font-size:11px;text-decoration:underline;background:none;border:none;padding:0;}
-  .del:hover{color:var(--danger);}
-  .privacy-note{font-size:11px;color:var(--ink-soft);margin-top:10px;font-family:var(--mono);}
-  .filter-row{display:flex;gap:8px;margin-bottom:12px;}
-  .filter-row input{flex:1;}
+  .empty svg{width:32px;height:32px;margin-bottom:10px;opacity:.5;}
+
+  .lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-top:20px;}
+  .lib-card{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--radius);padding:18px;transition:.15s;}
+  .lib-card:hover{border-color:var(--ice-dim);}
+  .lib-card .route{font-family:var(--font-display);font-weight:600;font-size:14.5px;margin-bottom:2px;}
+  .lib-card .period{font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);margin-bottom:12px;}
+  .lib-foot{display:flex;justify-content:space-between;align-items:center;margin-top:14px;}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(4,10,18,.7);backdrop-filter:blur(3px);z-index:100;display:none;align-items:center;justify-content:center;padding:20px;}
+  .modal-bg.active{display:flex;}
+  .modal{background:var(--surface-2);border:1px solid var(--border);border-radius:16px;max-width:760px;width:100%;max-height:85vh;overflow:auto;padding:26px;}
+  .modal-close{float:right;background:var(--surface-3);border:1px solid var(--border);color:var(--text-muted);width:30px;height:30px;border-radius:8px;}
+
+  table.data-table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:12px;margin-top:12px;}
+  table.data-table th{text-align:left;color:var(--text-dim);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface-2);}
+  table.data-table td{padding:5px 8px;border-bottom:1px solid var(--border-soft);}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface-3);border:1px solid var(--border);padding:12px 20px;border-radius:10px;font-size:13.5px;box-shadow:0 10px 30px -6px rgba(0,0,0,.5);z-index:200;opacity:0;transition:.25s;pointer-events:none;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .quick-presets{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .preset-btn{font-size:12px;padding:6px 11px;border-radius:99px;background:var(--surface);border:1px solid var(--border);color:var(--text-muted);}
+  .preset-btn:hover{border-color:var(--ice-dim);color:var(--text);}
+  .preset-btn.active{background:var(--ice-glow);border-color:var(--ice-dim);color:var(--ice);}
+
+  .spinner{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.25);border-top-color:currentColor;animation:spin .7s linear infinite;display:inline-block;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .transit-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;}
+  .transit-row input[type=text]{flex:2;}
+  .transit-row input[type=number]{flex:1;}
+  .transit-row .remove-transit{flex:0 0 auto;width:38px;height:38px;border-radius:9px;background:var(--surface);border:1px solid var(--border);color:var(--text-dim);}
+  .transit-row .remove-transit:hover{color:var(--danger);border-color:rgba(255,110,110,.35);}
+  .transit-row label.mini{display:block;font-size:10.5px;color:var(--text-dim);margin-bottom:4px;}
+
+  .journey-chart-card{border:1px solid var(--border-soft);background:var(--surface);border-radius:var(--radius);padding:20px;margin-bottom:14px;}
+  .journey-legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);margin-top:10px;}
+  .journey-legend span{display:inline-flex;align-items:center;gap:6px;}
+  .journey-legend i{width:14px;height:3px;border-radius:2px;display:inline-block;}
+  .journey-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:18px;}
+  .journey-stat{background:var(--bg);border:1px solid var(--border-soft);border-radius:10px;padding:12px 14px;}
+  .journey-stat b{display:block;font-family:var(--font-mono);font-size:17px;}
+  .journey-stat span{font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.03em;}
+  .journey-stat.warn b{color:var(--danger);}
+
+  .footnote{font-size:11.5px;color:var(--text-dim);line-height:1.6;margin-top:10px;}
 </style>
 </head>
 <body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#04222b" stroke-width="2"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+      </div>
+      <div class="brand-text">
+        <b>TUYẾN LẠNH</b>
+        <span>COLD‑CHAIN ROUTE ADVISOR</span>
+      </div>
+    </div>
+    <div class="tabs" id="tabs">
+      <button class="tab-btn active" data-tab="lookup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        Tra cứu &amp; khuyến nghị
+      </button>
+      <button class="tab-btn" data-tab="upload">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+        Tải lên dữ liệu
+      </button>
+      <button class="tab-btn" data-tab="library">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg>
+        Kho dữ liệu
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="wrap">
 
-  <div class="manifest-head">
-    <div class="brand">
-      <div class="brand-mark"><span>N/T</span></div>
-      <div>
-        <h1>Nhiệt Trình</h1>
-        <div class="subtitle">Đọc dữ liệu logger nhiệt độ &amp; khuyến nghị loại container cho lô hàng dược phẩm</div>
-      </div>
-    </div>
-    <div class="manifest-meta" id="clock"></div>
-  </div>
+  <!-- ================= LOOKUP TAB ================= -->
+  <div class="panel active" id="panel-lookup">
+    <h1 class="page-title">Tra cứu tuyến &amp; khuyến nghị container</h1>
+    <p class="page-sub">Chọn quốc gia đến, ngày đi/ngày đến và cảng trung chuyển (nếu có). Hệ thống sẽ tìm dữ liệu data logger thực tế bạn đã tải lên cho tuyến gần giống, đồng thời luôn ước tính thêm theo dữ liệu khí hậu lịch sử.</p>
 
-  <div class="grid">
-    <!-- LEFT COLUMN -->
-    <div>
-      <div class="card">
-        <h2>01 — Nạp dữ liệu logger</h2>
-        <div class="dropzone" id="dropzone">
-          <p class="big">Kéo thả file vào đây, hoặc bấm để chọn</p>
-          <p class="small">Nhận file .PDF (báo cáo logger), .CSV hoặc .TXT xuất từ thiết bị</p>
-          <input type="file" id="fileInput" accept=".pdf,.csv,.txt">
-        </div>
-        <span class="manual-toggle" id="manualToggle">Không có file? Dán dữ liệu thủ công</span>
-        <textarea class="manual" id="manualInput" style="display:none" placeholder="Dán các dòng dạng: 15/05/2026 19:11:33  29.4"></textarea>
-        <div id="manualParseBtnWrap" style="display:none;margin-top:8px;">
-          <button class="btn small ghost" id="manualParseBtn">Phân tích dữ liệu dán</button>
-        </div>
-        <div class="status-line" id="statusLine">Chưa có dữ liệu.</div>
-      </div>
-
-      <div class="card" id="statsCard" style="display:none;">
-        <h2>02 — Tóm tắt hành trình nhiệt</h2>
-        <div class="stat-grid">
-          <div class="stat"><div class="label">Thấp nhất</div><div class="value" id="stMin">–</div></div>
-          <div class="stat"><div class="label">Cao nhất</div><div class="value" id="stMax">–</div></div>
-          <div class="stat"><div class="label">Trung bình</div><div class="value" id="stAvg">–</div></div>
-          <div class="stat"><div class="label">MKT*</div><div class="value" id="stMkt">–</div></div>
-          <div class="stat"><div class="label">Bắt đầu</div><div class="value" id="stStart" style="font-size:12.5px;">–</div></div>
-          <div class="stat"><div class="label">Kết thúc</div><div class="value" id="stStop" style="font-size:12.5px;">–</div></div>
-          <div class="stat"><div class="label">Thời lượng</div><div class="value" id="stDur" style="font-size:13px;">–</div></div>
-          <div class="stat"><div class="label">Số điểm đo</div><div class="value" id="stN">–</div></div>
-        </div>
-        <div style="margin-top:16px;">
-          <canvas id="chart" height="220"></canvas>
-        </div>
-        <div class="hint" style="margin-top:10px;">*MKT (Mean Kinetic Temperature) — nhiệt độ động học trung bình, ước tính theo Ea/R ≈ 10.000K, dùng để đánh giá tác động nhiệt tích lũy lên sản phẩm theo thời gian.</div>
-
-        <div style="margin-top:18px;">
-          <div style="font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-soft);margin-bottom:8px;">Thống kê ngưỡng nhiệt cao</div>
-          <table id="thresholdTable">
-            <thead><tr><th>Ngưỡng</th><th>Giờ vượt</th><th>Chuỗi liên tục dài nhất</th><th>Số ngày có vượt</th><th>Chuỗi ngày liên tục</th></tr></thead>
-            <tbody id="thresholdBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- RIGHT COLUMN -->
-    <div>
-      <div class="card">
-        <h2>03 — Thông tin lô hàng</h2>
-        <label for="routeInput">Tuyến vận chuyển</label>
-        <input type="text" id="routeInput" placeholder="VD: Hải Phòng → Hà Nội">
-        <div id="suggestBanner" style="display:none;" class="suggest-banner"></div>
-
-        <label for="productInput">Sản phẩm / lô (tuỳ chọn)</label>
-        <input type="text" id="productInput" placeholder="VD: Vắc xin X — Lô 2026-07">
-
-        <label for="rangePreset">Ngưỡng nhiệt độ yêu cầu của sản phẩm</label>
-        <select id="rangePreset">
-          <option value="2,8">2 – 8°C — Cold chain (vắc xin, sinh phẩm)</option>
-          <option value="8,15">8 – 15°C — Mát (cool)</option>
-          <option value="15,25" selected>15 – 25°C — Nhiệt độ phòng có kiểm soát (CRT)</option>
-          <option value="2,30">2 – 30°C — CRT mở rộng (WHO)</option>
-          <option value="custom">Tuỳ chỉnh…</option>
+    <div class="card">
+      <div class="field">
+        <label class="field-label">Cảng / nước đến</label>
+        <select id="lk-dest">
+          <option value="">— Chọn quốc gia —</option>
         </select>
-        <div class="range-row" id="customRangeRow" style="display:none;margin-top:8px;">
-          <input type="number" id="customLow" placeholder="Thấp (°C)">
-          <input type="number" id="customHigh" placeholder="Cao (°C)">
-        </div>
+      </div>
 
-        <div style="margin-top:16px;">
-          <button class="btn" id="analyzeBtn" disabled>Phân tích &amp; Lưu lô hàng</button>
+      <div class="grid-2">
+        <div class="field">
+          <label class="field-label">ETD (ngày đi)</label>
+          <input type="date" id="lk-etd">
+        </div>
+        <div class="field">
+          <label class="field-label">ETA (ngày đến)</label>
+          <input type="date" id="lk-eta">
         </div>
       </div>
 
-      <div class="card" id="verdictCard" style="display:none;">
-        <h2>04 — Khuyến nghị</h2>
-        <div class="stamp-zone"><div class="stamp" id="stampEl"></div></div>
-        <ul class="reasons" id="reasonsEl"></ul>
+      <div class="field">
+        <label class="field-label">Cảng trung chuyển (transit) — tuỳ chọn</label>
+        <div class="hint" style="margin-bottom:10px;">Thêm các cảng tàu ghé/chuyển tải giữa đường, VD Cái Mép trước khi qua Campuchia. Khu vực này thường là nơi container lưu bãi lâu, dễ bị nóng nhất.</div>
+        <div id="transit-list"></div>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-add-transit" style="margin-top:4px;">+ Thêm cảng trung chuyển</button>
       </div>
+
+      <button class="btn btn-primary btn-block" id="btn-run-lookup">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        Tìm khuyến nghị
+      </button>
     </div>
+
+    <div id="lookup-results"></div>
   </div>
 
-  <div class="card">
-    <h2>05 — Tra cứu theo điểm đến</h2>
-    <div class="hint" style="margin-bottom:10px;">Gõ tên một quốc gia/điểm đến (VD: Chile, Haiti, Brazil…). Hệ thống tìm khớp trực tiếp trong lịch sử, và nếu không có, gợi ý các tuyến đã lưu tới khu vực <b>gần</b> điểm đến đó nhất.</div>
-    <div class="filter-row">
-      <input type="text" id="destSearchInput" placeholder="VD: Haiti">
-      <button class="btn small" id="destSearchBtn">Tìm</button>
+  <!-- ================= UPLOAD TAB ================= -->
+  <div class="panel" id="panel-upload">
+    <h1 class="page-title">Tải lên dữ liệu data logger</h1>
+    <p class="page-sub">Tải file PDF xuất từ data logger (Tempaction OR / Shockactions...). Hệ thống tự đọc bảng nhiệt độ — bạn chỉ cần chọn nước đến và loại hình vận chuyển rồi lưu (cảng đi mặc định là Việt Nam). Dữ liệu được giữ trong trình duyệt này để dùng lại về sau.</p>
+
+    <div class="dropzone" id="dropzone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+      <b>Kéo thả file PDF vào đây, hoặc bấm để chọn</b>
+      <span>Hỗ trợ nhiều file cùng lúc · chỉ .pdf</span>
+      <input type="file" id="file-input" accept="application/pdf" multiple style="display:none">
     </div>
-    <div id="destSearchResult"></div>
+
+    <div id="pending-list"></div>
   </div>
 
-  <div class="card">
-    <h2>06 — Lịch sử lô hàng đã lưu</h2>
-    <div class="filter-row">
-      <input type="text" id="historyFilter" placeholder="Lọc theo tuyến hoặc sản phẩm…">
-      <button class="btn small ghost" id="refreshHistoryBtn">Làm mới</button>
-    </div>
-    <div id="historyWrap"><div class="empty">Đang tải…</div></div>
-    <div class="privacy-note">⚠ Dữ liệu lô hàng được lưu <b>dùng chung</b> — bất kỳ ai mở trang này đều xem được toàn bộ lịch sử.</div>
+  <!-- ================= LIBRARY TAB ================= -->
+  <div class="panel" id="panel-library">
+    <h1 class="page-title">Kho dữ liệu đã lưu</h1>
+    <p class="page-sub">Toàn bộ lô data logger đã tải lên. Dữ liệu này được dùng làm căn cứ thực tế khi tra cứu khuyến nghị.</p>
+    <div id="library-list"></div>
   </div>
 
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<div class="modal-bg" id="modal-bg">
+  <div class="modal" id="modal-content"></div>
+</div>
+<div class="toast" id="toast"></div>
+
 <script>
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+/* =========================================================================
+   TUYẾN LẠNH — Cold-chain route advisor
+   Single-file app. Storage: window.storage (personal, per-user).
+   ========================================================================= */
 
-// ============================================================
-// BACKEND CONFIG — điền URL và anon key của dự án Supabase vào đây
-// Xem hướng dẫn tạo trong file HUONG-DAN-DEPLOY.md đi kèm.
-// ============================================================
-const SUPABASE_URL = 'https://xehopglolsuudwjtahe.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_UIWDjltDBvHVqf08VnbYOA_RS11vXbU';
-const IS_CONFIGURED = !SUPABASE_URL.includes('YOUR-PROJECT-REF') && !SUPABASE_ANON_KEY.includes('YOUR-ANON-PUBLIC-KEY');
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-function sbHeaders(extra){
-  return Object.assign({
-    'apikey': SUPABASE_ANON_KEY,
-    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-    'Content-Type': 'application/json'
-  }, extra||{});
+const MONTH_NAMES = ['','Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
+
+/* ---------------- utils ---------------- */
+function uid(){ return 's_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function norm(s){ return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+function escapeHtml(s){ return (s||'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmt1(n){ return (n===null||n===undefined||isNaN(n)) ? '—' : n.toFixed(1); }
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._h);
+  toast._h = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+function haversine(lat1,lon1,lat2,lon2){
+  const R=6371, toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function lerp(a,b,t){ return a+(b-a)*t; }
+function parseDMY(str){
+  // "15/05/2026" "19:11:33" -> Date
+  const m = str.match(/(\d{2})\/(\d{2})\/(\d{4})[ T]?(\d{2}):(\d{2}):(\d{2})/);
+  if(!m) return null;
+  return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]);
 }
 
-function toDbRow(r){
-  return {
-    id: r.id, saved_at: r.savedAt, route: r.route, product: r.product,
-    dest_text: r.destText, dest_country_id: r.destCountryId, dest_lat: r.destLat, dest_lng: r.destLng,
-    device_id: r.deviceId, range_low: r.rangeLow, range_high: r.rangeHigh,
-    min_temp: r.min, max_temp: r.max, avg_temp: r.avg, mkt: r.mkt,
-    start_ts: r.start, stop_ts: r.stop, n_points: r.n,
-    verdict_level: r.verdictLevel, verdict_title: r.verdictTitle, thresholds: r.thresholds
-  };
-}
-function fromDbRow(row){
-  return {
-    id: row.id, savedAt: row.saved_at, route: row.route, product: row.product,
-    destText: row.dest_text, destCountryId: row.dest_country_id, destLat: row.dest_lat, destLng: row.dest_lng,
-    deviceId: row.device_id, rangeLow: row.range_low, rangeHigh: row.range_high,
-    min: row.min_temp, max: row.max_temp, avg: row.avg_temp, mkt: row.mkt,
-    start: row.start_ts, stop: row.stop_ts, n: row.n_points,
-    verdictLevel: row.verdict_level, verdictTitle: row.verdict_title, thresholds: row.thresholds
-  };
-}
+/* ---------------- storage helpers ---------------- */
+/* Works both inside Claude.ai (window.storage) AND as a standalone downloaded file
+   opened in any regular browser (falls back to IndexedDB, which persists locally
+   per-origin regardless of where the file is hosted/opened from). */
+const HAS_CLAUDE_STORAGE = (typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function');
 
-if (!IS_CONFIGURED){
-  document.addEventListener('DOMContentLoaded', () => {
-    const banner = document.createElement('div');
-    banner.style.cssText = 'background:#F5DFD8;border:1.5px solid #A6321C;color:#A6321C;padding:12px 16px;margin-bottom:20px;font-family:var(--mono);font-size:12.5px;line-height:1.6;';
-    banner.innerHTML = '⚠ Chưa cấu hình backend. Mở file HTML, tìm dòng <code>SUPABASE_URL</code> / <code>SUPABASE_ANON_KEY</code> ở đầu thẻ &lt;script&gt; và điền thông tin dự án Supabase của bạn (xem HUONG-DAN-DEPLOY.md). Chức năng lưu/tải lịch sử sẽ không hoạt động cho tới khi cấu hình xong.';
-    document.querySelector('.wrap').prepend(banner);
+const IDB_NAME = 'coldroute-db', IDB_VERSION = 1, IDB_STORE = 'kv';
+let _idbPromise = null;
+function openIDB(){
+  if(_idbPromise) return _idbPromise;
+  _idbPromise = new Promise((resolve, reject)=>{
+    if(!('indexedDB' in window)){ reject(new Error('IndexedDB không khả dụng trên trình duyệt này')); return; }
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = ()=>{ req.result.createObjectStore(IDB_STORE); };
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+  return _idbPromise;
+}
+async function idbGet(key){
+  const db = await openIDB();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(IDB_STORE,'readonly');
+    const req = tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess = ()=>resolve(req.result===undefined ? null : req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+async function idbSet(key, value){
+  const db = await openIDB();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).put(value, key);
+    tx.oncomplete = ()=>resolve(true);
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+async function idbDelete(key){
+  const db = await openIDB();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).delete(key);
+    tx.oncomplete = ()=>resolve(true);
+    tx.onerror = ()=>reject(tx.error);
   });
 }
 
-// ---------- clock ----------
-document.getElementById('clock').textContent = 'PHIÊN LÀM VIỆC: ' + new Date().toLocaleString('vi-VN');
-
-// ---------- state ----------
-let points = []; // {t: epoch ms, temp: number}
-let meta = { deviceId: null };
-let currentVerdict = null;
-
-const statusLine = document.getElementById('statusLine');
-const statsCard = document.getElementById('statsCard');
-const verdictCard = document.getElementById('verdictCard');
-const analyzeBtn = document.getElementById('analyzeBtn');
-
-function setStatus(msg, cls){
-  statusLine.textContent = msg;
-  statusLine.className = 'status-line' + (cls ? ' ' + cls : '');
-}
-
-// ---------- parsing ----------
-const ROW_RE = /(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})\s+(-?\d{1,3}\.\d)/g;
-
-function extractPoints(text){
-  const seen = new Map();
-  let m;
-  ROW_RE.lastIndex = 0;
-  while((m = ROW_RE.exec(text)) !== null){
-    const [, dd, mo, yyyy, hh, mi, ss, tempStr] = m;
-    const temp = parseFloat(tempStr);
-    if (temp < -50 || temp > 100) continue;
-    const dt = new Date(parseInt(yyyy), parseInt(mo)-1, parseInt(dd), parseInt(hh), parseInt(mi), parseInt(ss));
-    const t = dt.getTime();
-    if (isNaN(t)) continue;
-    if (!seen.has(t)) seen.set(t, temp);
-  }
-  const arr = Array.from(seen.entries()).map(([t,temp]) => ({t, temp}));
-  arr.sort((a,b) => a.t - b.t);
-  return arr;
-}
-
-function extractDeviceId(text){
-  const m = text.match(/Device\s*ID:?\s*([A-Za-z0-9]{3,})/);
-  return m ? m[1] : null;
-}
-
-async function parsePdfFile(file){
-  const buf = await file.arrayBuffer();
-  const doc = await pdfjsLib.getDocument({ data: buf }).promise;
-  let fullText = '';
-  for (let p = 1; p <= doc.numPages; p++){
-    const page = await doc.getPage(p);
-    const content = await page.getTextContent();
-    const pageText = content.items.map(i => i.str).join(' ');
-    fullText += pageText + '\n';
-  }
-  return fullText;
-}
-
-function nameFromFilename(filename){
-  return filename.replace(/\.[^/.]+$/, '').replace(/[_]+/g, ' ').trim();
-}
-
-async function handleFile(file){
-  setStatus('Đang đọc file "' + file.name + '"…');
-  analyzeBtn.disabled = true;
-  const routeInput = document.getElementById('routeInput');
-  if (!routeInput.value.trim()){
-    routeInput.value = nameFromFilename(file.name);
-    routeInput.dispatchEvent(new Event('input'));
-  }
+let _storageBroken = false;
+async function safeGet(key, shared=false){
   try{
-    let text;
-    if (/\.pdf$/i.test(file.name)){
-      text = await parsePdfFile(file);
-    } else {
-      text = await file.text();
+    if(HAS_CLAUDE_STORAGE){
+      const r = await window.storage.get(key, shared);
+      return r ? r.value : null;
+    }else{
+      const v = await idbGet(key);
+      return (v===null||v===undefined) ? null : v;
     }
-    ingestText(text, file.name);
-  } catch(err){
-    console.error(err);
-    setStatus('Không đọc được file. Thử dán dữ liệu thủ công bên dưới, hoặc kiểm tra định dạng file.', 'err');
+  }catch(e){ return null; }
+}
+async function safeSet(key, value, shared=false){
+  try{
+    if(HAS_CLAUDE_STORAGE) return await window.storage.set(key, value, shared);
+    await idbSet(key, value);
+    return true;
+  }catch(e){
+    console.error('storage set failed', key, e);
+    if(!_storageBroken){ _storageBroken = true; toast('Không lưu được dữ liệu vào trình duyệt (có thể do chế độ ẩn danh / trình duyệt chặn lưu trữ). Thử mở bằng tab thường.'); }
+    return null;
   }
 }
-
-function ingestText(text, sourceLabel){
-  const pts = extractPoints(text);
-  if (pts.length < 2){
-    setStatus('Không tìm thấy dữ liệu nhiệt độ hợp lệ trong "' + (sourceLabel||'nội dung dán') + '". Kiểm tra lại định dạng (cần các dòng dd/mm/yyyy hh:mm:ss  nhiệt độ).', 'err');
-    return;
-  }
-  points = pts;
-  meta.deviceId = extractDeviceId(text);
-  setStatus('Đã trích được ' + pts.length + ' điểm đo từ "' + (sourceLabel||'dữ liệu dán') + '"' + (meta.deviceId ? ' — thiết bị ' + meta.deviceId : '') + '.', 'ok');
-  renderStats();
-  analyzeBtn.disabled = false;
-  verdictCard.style.display = 'none';
+async function safeDelete(key, shared=false){
+  try{
+    if(HAS_CLAUDE_STORAGE) return await window.storage.delete(key, shared);
+    await idbDelete(key);
+    return true;
+  }catch(e){ return null; }
 }
 
-// ---------- stats + MKT ----------
-function computeStats(pts){
-  const temps = pts.map(p => p.temp);
-  const min = Math.min(...temps);
-  const max = Math.max(...temps);
-  const avg = temps.reduce((a,b)=>a+b,0) / temps.length;
-  const EaR = 10000; // K, standard approximation (Ea ≈ 83.144 kJ/mol)
-  const sumExp = temps.reduce((s,t) => s + Math.exp(-EaR/(t+273.15)), 0);
-  const mktK = -EaR / Math.log(sumExp/temps.length);
-  const mkt = mktK - 273.15;
-  const start = pts[0].t, stop = pts[pts.length-1].t;
-  const durMs = stop - start;
-  return { min, max, avg, mkt, start, stop, durMs, n: pts.length };
+async function loadIndex(){
+  const raw = await safeGet('shipment-index', false);
+  if(!raw) return [];
+  try{ return JSON.parse(raw); }catch(e){ return []; }
+}
+async function saveIndex(idx){
+  await safeSet('shipment-index', JSON.stringify(idx), false);
+}
+async function saveShipment(record){
+  await safeSet('shipment:'+record.id, JSON.stringify(record), false);
+  const idx = await loadIndex();
+  idx.push({
+    id: record.id, fileName: record.fileName,
+    origin: record.origin, dest: record.dest,
+    originLat: record.originLat, originLon: record.originLon,
+    destLat: record.destLat, destLon: record.destLon,
+    drug: record.drug, reqMin: record.reqMin, reqMax: record.reqMax,
+    deviceId: record.deviceId, transportMode: record.transportMode,
+    start: record.start, stop: record.stop,
+    min: record.min, max: record.max, avg: record.avg,
+    months: record.months, uploadedAt: record.uploadedAt
+  });
+  await saveIndex(idx);
+}
+async function getShipment(id){
+  const raw = await safeGet('shipment:'+id, false);
+  return raw ? JSON.parse(raw) : null;
+}
+async function deleteShipment(id){
+  const idx = (await loadIndex()).filter(x=>x.id!==id);
+  await saveIndex(idx);
+  await safeDelete('shipment:'+id, false);
 }
 
-function fmtDur(ms){
-  const totalMin = Math.round(ms/60000);
-  const d = Math.floor(totalMin/1440);
-  const h = Math.floor((totalMin%1440)/60);
-  const mnt = totalMin%60;
-  return d+'ng '+h+'g '+mnt+'p';
-}
-function fmtDate(ts){
-  const d = new Date(ts);
-  return d.toLocaleString('vi-VN', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-}
-
-// ---------- country dictionary for destination matching ----------
-const COUNTRIES = [
-  {id:'vn', lat:16.0, lng:108.0, names:['viet nam','vietnam']},
-  {id:'cn', lat:35.0, lng:103.0, names:['trung quoc','china']},
-  {id:'jp', lat:36.2, lng:138.3, names:['nhat ban','japan','nhat']},
-  {id:'kr', lat:36.5, lng:127.8, names:['han quoc','korea','south korea']},
-  {id:'in', lat:22.0, lng:79.0, names:['an do','india']},
-  {id:'th', lat:15.9, lng:101.0, names:['thai lan','thailand']},
-  {id:'sg', lat:1.35, lng:103.8, names:['singapore']},
-  {id:'my', lat:4.2, lng:101.9, names:['malaysia']},
-  {id:'id', lat:-0.8, lng:113.9, names:['indonesia']},
-  {id:'ph', lat:12.9, lng:121.8, names:['philippines']},
-  {id:'kh', lat:12.6, lng:104.9, names:['campuchia','cambodia']},
-  {id:'la', lat:19.9, lng:102.6, names:['lao','laos']},
-  {id:'mm', lat:21.9, lng:95.9, names:['myanmar']},
-  {id:'bd', lat:23.7, lng:90.4, names:['bangladesh']},
-  {id:'pk', lat:30.4, lng:69.3, names:['pakistan']},
-  {id:'ae', lat:23.4, lng:53.8, names:['uae','ả rập thống nhất','united arab emirates']},
-  {id:'sa', lat:23.9, lng:45.1, names:['saudi arabia','a rap xe ut']},
-  {id:'tr', lat:38.9, lng:35.2, names:['tho nhi ky','turkey']},
-  {id:'il', lat:31.0, lng:34.8, names:['israel']},
-  {id:'ru', lat:61.5, lng:105.3, names:['nga','russia']},
-  {id:'de', lat:51.2, lng:10.4, names:['duc','germany']},
-  {id:'fr', lat:46.6, lng:2.2, names:['phap','france']},
-  {id:'gb', lat:54.0, lng:-2.0, names:['anh','uk','united kingdom','england']},
-  {id:'it', lat:42.8, lng:12.6, names:['y','italy','italia']},
-  {id:'es', lat:40.0, lng:-4.0, names:['tay ban nha','spain']},
-  {id:'nl', lat:52.3, lng:5.5, names:['ha lan','netherlands','holland']},
-  {id:'be', lat:50.6, lng:4.5, names:['bi','belgium']},
-  {id:'pl', lat:51.9, lng:19.1, names:['ba lan','poland']},
-  {id:'se', lat:60.1, lng:18.6, names:['thuy dien','sweden']},
-  {id:'ch', lat:46.8, lng:8.2, names:['thuy si','switzerland']},
-  {id:'ua', lat:48.4, lng:31.2, names:['ukraina','ukraine']},
-  {id:'gr', lat:39.1, lng:21.8, names:['hy lap','greece']},
-  {id:'pt', lat:39.4, lng:-8.2, names:['bo dao nha','portugal']},
-  {id:'eg', lat:26.8, lng:30.8, names:['ai cap','egypt']},
-  {id:'za', lat:-30.6, lng:22.9, names:['nam phi','south africa']},
-  {id:'ng', lat:9.1, lng:8.7, names:['nigeria']},
-  {id:'ke', lat:-0.02, lng:37.9, names:['kenya']},
-  {id:'ma', lat:31.8, lng:-7.1, names:['ma roc','morocco']},
-  {id:'gh', lat:7.9, lng:-1.0, names:['ghana']},
-  {id:'et', lat:9.1, lng:40.5, names:['ethiopia']},
-  {id:'tz', lat:-6.4, lng:34.9, names:['tanzania']},
-  {id:'us', lat:39.8, lng:-98.6, names:['my','hoa ky','usa','united states','united states of america']},
-  {id:'ca', lat:56.1, lng:-106.3, names:['canada']},
-  {id:'mx', lat:23.6, lng:-102.6, names:['mexico']},
-  {id:'br', lat:-14.2, lng:-51.9, names:['brazil','brasil']},
-  {id:'ar', lat:-38.4, lng:-63.6, names:['argentina']},
-  {id:'cl', lat:-35.7, lng:-71.5, names:['chile','chi le']},
-  {id:'pe', lat:-9.2, lng:-75.0, names:['peru']},
-  {id:'co', lat:4.6, lng:-74.3, names:['colombia']},
-  {id:'ve', lat:6.4, lng:-66.6, names:['venezuela']},
-  {id:'ec', lat:-1.8, lng:-78.2, names:['ecuador']},
-  {id:'bo', lat:-16.3, lng:-63.6, names:['bolivia']},
-  {id:'py', lat:-23.4, lng:-58.4, names:['paraguay']},
-  {id:'uy', lat:-32.5, lng:-55.8, names:['uruguay']},
-  {id:'cu', lat:21.5, lng:-77.8, names:['cuba']},
-  {id:'ht', lat:18.9, lng:-72.3, names:['haiti']},
-  {id:'do', lat:18.7, lng:-70.2, names:['dominica','dominican republic','cong hoa dominica']},
-  {id:'jm', lat:18.1, lng:-77.3, names:['jamaica']},
-  {id:'pa', lat:8.5, lng:-80.8, names:['panama']},
-  {id:'cr', lat:9.7, lng:-83.8, names:['costa rica']},
-  {id:'gt', lat:15.8, lng:-90.2, names:['guatemala']},
-  {id:'hn', lat:15.2, lng:-86.2, names:['honduras']},
-  {id:'ni', lat:12.9, lng:-85.2, names:['nicaragua']},
-  {id:'sv', lat:13.8, lng:-88.9, names:['el salvador']},
-  {id:'au', lat:-25.3, lng:133.8, names:['uc','australia']},
-  {id:'nz', lat:-41.0, lng:174.9, names:['new zealand']},
-  {id:'pg', lat:-6.3, lng:143.9, names:['papua new guinea']},
-  {id:'fj', lat:-17.7, lng:178.1, names:['fiji']}
+/* ---------------- geocode + climate (Open-Meteo, free, CORS-enabled) ---------------- */
+/* Known major ports/cities relevant to VN pharma shipping — checked before the free
+   geocoding API, which sometimes fails to match local/regional port names exactly. */
+const WORLD_COUNTRIES = [
+  {name:'Afghanistan', lat:34.1340, lon:66.5922},
+  {name:'Albania', lat:41.1417, lon:20.0611},
+  {name:'Algeria', lat:28.3510, lon:2.6558},
+  {name:'American Samoa', lat:-14.3057, lon:-170.7007},
+  {name:'Angola', lat:-12.1674, lon:17.6518},
+  {name:'Anguilla', lat:18.2229, lon:-63.0601},
+  {name:'Antigua and Barbuda', lat:17.0715, lon:-61.7853},
+  {name:'Argentina', lat:-35.6973, lon:-64.5324},
+  {name:'Armenia', lat:40.1784, lon:45.0549},
+  {name:'Aruba', lat:12.5156, lon:-69.9756},
+  {name:'Australia', lat:-25.6973, lon:134.0228},
+  {name:'Austria', lat:47.6319, lon:13.7978},
+  {name:'Azerbaijan', lat:40.3921, lon:48.6346},
+  {name:'Bahamas', lat:24.7216, lon:-78.0728},
+  {name:'Bahrain', lat:26.0480, lon:50.5407},
+  {name:'Bangladesh', lat:23.6737, lon:90.4321},
+  {name:'Barbados', lat:13.1832, lon:-59.5574},
+  {name:'Belarus', lat:53.4679, lon:27.9643},
+  {name:'Belgium', lat:50.6182, lon:4.6750},
+  {name:'Belize', lat:17.2425, lon:-88.6827},
+  {name:'Benin', lat:9.5030, lon:2.3057},
+  {name:'Bermuda', lat:32.3151, lon:-64.7459},
+  {name:'Bhutan', lat:27.4216, lon:90.4672},
+  {name:'Bolivia', lat:-16.7312, lon:-64.4521},
+  {name:'Bosnia and Herzegovina', lat:44.1442, lon:17.8347},
+  {name:'Botswana', lat:-22.2366, lon:23.8578},
+  {name:'Brazil', lat:-11.5246, lon:-54.3552},
+  {name:'British Virgin Islands', lat:18.4220, lon:-64.6241},
+  {name:'Brunei', lat:4.5432, lon:114.6431},
+  {name:'Bulgaria', lat:42.8204, lon:25.2517},
+  {name:'Burkina Faso', lat:12.1087, lon:-1.6933},
+  {name:'Burundi', lat:-3.2613, lon:29.8852},
+  {name:'Cabo Verde', lat:15.0764, lon:-23.6340},
+  {name:'Cambodia', lat:12.6992, lon:105.0397},
+  {name:'Cameroon', lat:6.2942, lon:12.9485},
+  {name:'Canada', lat:57.5505, lon:-98.4168},
+  {name:'Cayman Islands', lat:19.3112, lon:-81.2520},
+  {name:'Central African Republic', lat:6.3314, lon:20.5207},
+  {name:'Chad', lat:15.2835, lon:18.4271},
+  {name:'Chile', lat:-37.8294, lon:-70.7686},
+  {name:'China', lat:38.0733, lon:104.6911},
+  {name:'Colombia', lat:4.1878, lon:-72.6445},
+  {name:'Comoros', lat:-11.6589, lon:43.3483},
+  {name:'Congo', lat:-0.7294, lon:14.8797},
+  {name:'Congo DRC', lat:-3.3386, lon:23.4198},
+  {name:'Cook Islands', lat:-21.2226, lon:-159.7877},
+  {name:'Costa Rica', lat:9.8635, lon:-84.1467},
+  {name:"Cote d'Ivoire", lat:7.5368, lon:-5.5717},
+  {name:'Croatia', lat:44.9119, lon:16.6258},
+  {name:'Cuba', lat:21.4762, lon:-79.6982},
+  {name:'Cyprus', lat:35.1170, lon:33.3753},
+  {name:'Czech Republic', lat:49.7492, lon:15.3833},
+  {name:'Denmark', lat:56.0012, lon:9.3787},
+  {name:'Djibouti', lat:11.7502, lon:42.6135},
+  {name:'Dominica', lat:15.4293, lon:-61.3605},
+  {name:'Dominican Republic', lat:18.7795, lon:-70.4350},
+  {name:'Ecuador', lat:-1.5643, lon:-78.4630},
+  {name:'Egypt', lat:26.6052, lon:30.2401},
+  {name:'El Salvador', lat:13.7580, lon:-88.8591},
+  {name:'Equatorial Guinea', lat:1.5955, lon:10.4255},
+  {name:'Eritrea', lat:15.0055, lon:39.2672},
+  {name:'Estonia', lat:58.6481, lon:25.9169},
+  {name:'Eswatini', lat:-26.5625, lon:31.5107},
+  {name:'Ethiopia', lat:8.7294, lon:39.9149},
+  {name:'Falkland Islands', lat:-51.7590, lon:-58.7466},
+  {name:'Fiji', lat:-17.8225, lon:177.9814},
+  {name:'Finland', lat:65.0158, lon:25.6574},
+  {name:'France', lat:46.6424, lon:2.1940},
+  {name:'French Guiana', lat:3.8574, lon:-53.3223},
+  {name:'French Polynesia', lat:-17.6747, lon:-149.4004},
+  {name:'Gabon', lat:-0.6284, lon:11.8394},
+  {name:'Gambia', lat:13.4286, lon:-15.3834},
+  {name:'Georgia', lat:42.1799, lon:43.3789},
+  {name:'Germany', lat:51.0830, lon:10.4262},
+  {name:'Ghana', lat:7.9453, lon:-1.2192},
+  {name:'Gibraltar', lat:36.1402, lon:-5.3455},
+  {name:'Greece', lat:39.4201, lon:23.1104},
+  {name:'Greenland', lat:74.1685, lon:-42.0757},
+  {name:'Grenada', lat:12.1129, lon:-61.6794},
+  {name:'Guadeloupe', lat:16.2442, lon:-61.5438},
+  {name:'Guatemala', lat:15.8209, lon:-90.3122},
+  {name:'Guinea', lat:10.2560, lon:-10.9869},
+  {name:'Guinea-Bissau', lat:11.9801, lon:-14.9802},
+  {name:'Guyana', lat:4.6821, lon:-58.9135},
+  {name:'Haiti', lat:18.8835, lon:-72.8929},
+  {name:'Honduras', lat:14.7404, lon:-86.4925},
+  {name:'Hungary', lat:47.2253, lon:19.3962},
+  {name:'Iceland', lat:65.1236, lon:-19.0568},
+  {name:'India', lat:23.5863, lon:81.1730},
+  {name:'Indonesia', lat:0.1559, lon:113.9654},
+  {name:'Iran', lat:32.9060, lon:54.2371},
+  {name:'Iraq', lat:33.1051, lon:43.8325},
+  {name:'Ireland', lat:53.3049, lon:-8.2411},
+  {name:'Israel', lat:31.5135, lon:35.0279},
+  {name:'Italy', lat:42.9820, lon:12.7637},
+  {name:'Jamaica', lat:18.1221, lon:-77.3036},
+  {name:'Japan', lat:36.7674, lon:137.4693},
+  {name:'Jordan', lat:31.3871, lon:36.9573},
+  {name:'Kazakhstan', lat:47.6415, lon:66.3759},
+  {name:'Kenya', lat:0.6899, lon:37.9531},
+  {name:'Kuwait', lat:29.2814, lon:47.5631},
+  {name:'Kyrgyzstan', lat:41.3570, lon:74.1753},
+  {name:'Laos', lat:18.1173, lon:103.7638},
+  {name:'Latvia', lat:56.8139, lon:24.6937},
+  {name:'Lebanon', lat:33.9116, lon:35.8965},
+  {name:'Lesotho', lat:-29.6017, lon:28.2448},
+  {name:'Liberia', lat:6.5201, lon:-9.2590},
+  {name:'Libya', lat:27.2029, lon:17.9113},
+  {name:'Lithuania', lat:55.2944, lon:23.9460},
+  {name:'Luxembourg', lat:49.7752, lon:6.1032},
+  {name:'Madagascar', lat:-19.0416, lon:46.6849},
+  {name:'Malawi', lat:-13.1290, lon:34.2344},
+  {name:'Malaysia', lat:3.6717, lon:114.6333},
+  {name:'Maldives', lat:-0.6066, lon:73.1008},
+  {name:'Mali', lat:17.1681, lon:-4.3464},
+  {name:'Malta', lat:35.8905, lon:14.4419},
+  {name:'Martinique', lat:14.6427, lon:-61.0143},
+  {name:'Mauritania', lat:20.4667, lon:-10.4951},
+  {name:'Mauritius', lat:-20.2814, lon:57.5642},
+  {name:'Mexico', lat:23.8744, lon:-101.5540},
+  {name:'Moldova', lat:47.0726, lon:28.3911},
+  {name:'Mongolia', lat:47.0864, lon:103.3987},
+  {name:'Montenegro', lat:42.7369, lon:19.2951},
+  {name:'Montserrat', lat:16.7354, lon:-62.1869},
+  {name:'Morocco', lat:28.6876, lon:-8.8172},
+  {name:'Mozambique', lat:-17.5252, lon:35.2086},
+  {name:'Myanmar', lat:19.9012, lon:97.0889},
+  {name:'Namibia', lat:-21.9086, lon:18.1645},
+  {name:'Nepal', lat:28.3009, lon:84.1339},
+  {name:'Netherlands', lat:52.1341, lon:5.5541},
+  {name:'New Zealand', lat:-43.8277, lon:170.6904},
+  {name:'Nicaragua', lat:12.8936, lon:-85.0161},
+  {name:'Niger', lat:17.0811, lon:8.8686},
+  {name:'Nigeria', lat:9.6103, lon:8.1477},
+  {name:'Niue', lat:-19.0523, lon:-169.8688},
+  {name:'North Korea', lat:40.1920, lon:127.3380},
+  {name:'North Macedonia', lat:41.5940, lon:21.7100},
+  {name:'Norway', lat:64.9778, lon:16.6703},
+  {name:'Oman', lat:20.7243, lon:55.8411},
+  {name:'Pakistan', lat:30.1162, lon:69.0884},
+  {name:'Panama', lat:8.4395, lon:-80.1443},
+  {name:'Papua New Guinea', lat:-7.1569, lon:144.8349},
+  {name:'Paraguay', lat:-23.4219, lon:-58.3891},
+  {name:'Peru', lat:-8.5227, lon:-74.1142},
+  {name:'Philippines', lat:15.5865, lon:121.8221},
+  {name:'Pitcairn', lat:-24.3661, lon:-128.3150},
+  {name:'Poland', lat:52.0685, lon:19.4357},
+  {name:'Portugal', lat:39.6753, lon:-7.9337},
+  {name:'Puerto Rico', lat:18.2162, lon:-66.4943},
+  {name:'Qatar', lat:25.3185, lon:51.1979},
+  {name:'Romania', lat:45.8245, lon:25.0942},
+  {name:'Russia', lat:59.0394, lon:98.6705},
+  {name:'Rwanda', lat:-2.0147, lon:29.9194},
+  {name:'Saint Kitts and Nevis', lat:17.3147, lon:-62.7456},
+  {name:'Saint Lucia', lat:13.8957, lon:-60.9690},
+  {name:'Saint Vincent and the Grenadines', lat:13.2548, lon:-61.1938},
+  {name:'Samoa', lat:-13.6343, lon:-172.4411},
+  {name:'Sao Tome and Principe', lat:0.2274, lon:6.6062},
+  {name:'Saudi Arabia', lat:24.1360, lon:44.6010},
+  {name:'Senegal', lat:14.2289, lon:-14.6109},
+  {name:'Serbia', lat:44.0268, lon:20.8568},
+  {name:'Seychelles', lat:-4.6600, lon:55.4725},
+  {name:'Sierra Leone', lat:8.5613, lon:-11.7866},
+  {name:'Singapore', lat:1.3528, lon:103.8103},
+  {name:'Slovakia', lat:48.6981, lon:19.5810},
+  {name:'Slovenia', lat:46.1376, lon:14.8906},
+  {name:'Solomon Islands', lat:-9.6131, lon:160.1648},
+  {name:'Somalia', lat:6.5245, lon:45.4004},
+  {name:'South Africa', lat:-28.5536, lon:24.7525},
+  {name:'South Korea', lat:36.4024, lon:127.7622},
+  {name:'South Sudan', lat:7.6578, lon:30.3852},
+  {name:'Spain', lat:40.3650, lon:-3.6516},
+  {name:'Sri Lanka', lat:7.6966, lon:80.6693},
+  {name:'Sudan', lat:15.6706, lon:29.9515},
+  {name:'Suriname', lat:4.0987, lon:-55.8555},
+  {name:'Sweden', lat:62.7342, lon:17.0624},
+  {name:'Switzerland', lat:46.7368, lon:8.2869},
+  {name:'Syria', lat:35.0975, lon:38.5117},
+  {name:'Tajikistan', lat:38.5693, lon:70.9422},
+  {name:'Tanzania', lat:-6.3558, lon:34.8183},
+  {name:'Thailand', lat:13.6622, lon:101.0868},
+  {name:'Timor-Leste', lat:-8.8099, lon:125.9502},
+  {name:'Togo', lat:8.6607, lon:0.8991},
+  {name:'Tokelau', lat:-9.1952, lon:-171.8527},
+  {name:'Tonga', lat:-21.1593, lon:-175.2042},
+  {name:'Trinidad and Tobago', lat:10.4155, lon:-61.3724},
+  {name:'Tunisia', lat:34.0864, lon:9.6559},
+  {name:'Turkey', lat:38.9321, lon:35.5689},
+  {name:'Turkmenistan', lat:39.0607, lon:58.4577},
+  {name:'Turks and Caicos Islands', lat:21.7999, lon:-71.7406},
+  {name:'US Virgin Islands', lat:17.7380, lon:-64.7616},
+  {name:'Uganda', lat:1.2822, lon:32.3437},
+  {name:'Ukraine', lat:48.6575, lon:31.2738},
+  {name:'United Arab Emirates', lat:24.1825, lon:54.2792},
+  {name:'United Kingdom', lat:53.9784, lon:-2.8529},
+  {name:'United States', lat:38.8208, lon:-96.3316},
+  {name:'United States Minor Outlying Islands', lat:19.3020, lon:166.6380},
+  {name:'Uruguay', lat:-32.7820, lon:-56.0192},
+  {name:'Uzbekistan', lat:41.4879, lon:63.8548},
+  {name:'Vanuatu', lat:-15.1891, lon:166.8491},
+  {name:'Venezuela', lat:7.1483, lon:-66.3649},
+  {name:'Vietnam', lat:16.5173, lon:105.9134},
+  {name:'Wallis and Futuna', lat:-14.2834, lon:-178.1274},
+  {name:'Yemen', lat:16.0014, lon:47.4682},
+  {name:'Zambia', lat:-13.1628, lon:27.7552},
+  {name:'Zimbabwe', lat:-18.9270, lon:29.7178},
 ];
 
-function normalizeVN(str){
-  return (str||'').toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-    .replace(/đ/g,'d')
-    .replace(/[^a-z0-9\s]/g,' ')
-    .replace(/\s+/g,' ').trim();
-}
+const KNOWN_PORTS = [
+  /* --- specific ports/cities (checked first via longest-key-wins matching) --- */
+  {keys:['hai phong','cang hai phong','haiphong'], lat:20.8449, lon:106.6881, label:'Hải Phòng, Việt Nam'},
+  {keys:['cat lai','tp hcm','tp.hcm','ho chi minh','sai gon','saigon'], lat:10.7626, lon:106.7710, label:'Cát Lái, TP. Hồ Chí Minh, Việt Nam'},
+  {keys:['cai mep','vung tau','ba ria'], lat:10.5417, lon:107.0333, label:'Cái Mép, Bà Rịa - Vũng Tàu, Việt Nam'},
+  {keys:['da nang'], lat:16.0678, lon:108.2208, label:'Đà Nẵng, Việt Nam'},
+  {keys:['qui nhon','quy nhon'], lat:13.7830, lon:109.2196, label:'Quy Nhơn, Việt Nam'},
+  {keys:['can tho'], lat:10.0452, lon:105.7469, label:'Cần Thơ, Việt Nam'},
+  {keys:['phnom penh'], lat:11.5564, lon:104.9282, label:'Phnom Penh, Campuchia'},
+  {keys:['sihanoukville','preah sihanouk'], lat:10.6104, lon:103.5300, label:'Sihanoukville, Campuchia'},
+  {keys:['cambodia','campuchia','cam bot','kampuchea'], lat:12.5657, lon:104.9910, label:'Campuchia (trung tâm)'},
+  {keys:['vientiane'], lat:17.9757, lon:102.6331, label:'Vientiane, Lào'},
+  {keys:['laos','lao pdr'], lat:19.8563, lon:102.4955, label:'Lào (trung tâm)'},
+  {keys:['bangkok','laem chabang'], lat:13.0827, lon:100.8830, label:'Bangkok, Thái Lan'},
+  {keys:['singapore'], lat:1.3521, lon:103.8198, label:'Singapore'},
+  {keys:['manila'], lat:14.5995, lon:120.9842, label:'Manila, Philippines'},
+  {keys:['jakarta','tanjung priok'], lat:-6.1045, lon:106.8654, label:'Jakarta, Indonesia'},
+  {keys:['santiago'], lat:-33.4489, lon:-70.6693, label:'Santiago, Chile'},
+  {keys:['san antonio','valparaiso'], lat:-33.5928, lon:-71.6128, label:'San Antonio, Chile'},
+  {keys:['chile'], lat:-35.6751, lon:-71.5430, label:'Chile (trung tâm)'},
+  {keys:['los angeles','long beach'], lat:33.7550, lon:-118.2160, label:'Los Angeles / Long Beach, Hoa Kỳ'},
+  {keys:['rotterdam'], lat:51.9244, lon:4.4777, label:'Rotterdam, Hà Lan'},
+  {keys:['shanghai'], lat:31.2304, lon:121.4737, label:'Thượng Hải, Trung Quốc'},
+  {keys:['busan'], lat:35.1796, lon:129.0756, label:'Busan, Hàn Quốc'},
+  /* --- whole-country fallback centroids (~206 countries) --- */
+  {keys:['american samoa'], lat:-14.3057, lon:-170.7007, label:'American Samoa'},
+  {keys:['united states minor outlying islands'], lat:19.3020, lon:166.6380, label:'United States Minor Outlying Islands'},
+  {keys:['cook islands'], lat:-21.2226, lon:-159.7877, label:'Cook Islands'},
+  {keys:['french polynesia'], lat:-17.6747, lon:-149.4004, label:'French Polynesia'},
+  {keys:['niue'], lat:-19.0523, lon:-169.8688, label:'Niue'},
+  {keys:['pitcairn'], lat:-24.3661, lon:-128.3150, label:'Pitcairn'},
+  {keys:['samoa'], lat:-13.6343, lon:-172.4411, label:'Samoa'},
+  {keys:['tokelau'], lat:-9.1952, lon:-171.8527, label:'Tokelau'},
+  {keys:['tonga'], lat:-21.1593, lon:-175.2042, label:'Tonga'},
+  {keys:['wallis and futuna'], lat:-14.2834, lon:-178.1274, label:'Wallis and Futuna'},
+  {keys:['el salvador'], lat:13.7580, lon:-88.8591, label:'El Salvador'},
+  {keys:['guatemala'], lat:15.8209, lon:-90.3122, label:'Guatemala'},
+  {keys:['mexico'], lat:23.8744, lon:-101.5540, label:'Mexico'},
+  {keys:['canada'], lat:57.5505, lon:-98.4168, label:'Canada'},
+  {keys:['argentina'], lat:-35.6973, lon:-64.5324, label:'Argentina'},
+  {keys:['falkland islands'], lat:-51.7590, lon:-58.7466, label:'Falkland Islands'},
+  {keys:['chile'], lat:-37.8294, lon:-70.7686, label:'Chile'},
+  {keys:['ecuador'], lat:-1.5643, lon:-78.4630, label:'Ecuador'},
+  {keys:['peru'], lat:-8.5227, lon:-74.1142, label:'Peru'},
+  {keys:['bolivia'], lat:-16.7312, lon:-64.4521, label:'Bolivia'},
+  {keys:['brazil'], lat:-11.5246, lon:-54.3552, label:'Brazil'},
+  {keys:['paraguay'], lat:-23.4219, lon:-58.3891, label:'Paraguay'},
+  {keys:['uruguay'], lat:-32.7820, lon:-56.0192, label:'Uruguay'},
+  {keys:['fiji'], lat:-17.8225, lon:177.9814, label:'Fiji'},
+  {keys:['anguilla'], lat:18.2229, lon:-63.0601, label:'Anguilla'},
+  {keys:['antigua and barbuda'], lat:17.0715, lon:-61.7853, label:'Antigua and Barbuda'},
+  {keys:['aruba'], lat:12.5156, lon:-69.9756, label:'Aruba'},
+  {keys:['bahamas'], lat:24.7216, lon:-78.0728, label:'Bahamas'},
+  {keys:['barbados'], lat:13.1832, lon:-59.5574, label:'Barbados'},
+  {keys:['belize'], lat:17.2425, lon:-88.6827, label:'Belize'},
+  {keys:['bermuda'], lat:32.3151, lon:-64.7459, label:'Bermuda'},
+  {keys:['british virgin islands'], lat:18.4220, lon:-64.6241, label:'British Virgin Islands'},
+  {keys:['cayman islands'], lat:19.3112, lon:-81.2520, label:'Cayman Islands'},
+  {keys:['colombia'], lat:4.1878, lon:-72.6445, label:'Colombia'},
+  {keys:['costa rica'], lat:9.8635, lon:-84.1467, label:'Costa Rica'},
+  {keys:['cuba'], lat:21.4762, lon:-79.6982, label:'Cuba'},
+  {keys:['dominica'], lat:15.4293, lon:-61.3605, label:'Dominica'},
+  {keys:['dominican republic'], lat:18.7795, lon:-70.4350, label:'Dominican Republic'},
+  {keys:['french guiana'], lat:3.8574, lon:-53.3223, label:'French Guiana'},
+  {keys:['grenada'], lat:12.1129, lon:-61.6794, label:'Grenada'},
+  {keys:['guadeloupe'], lat:16.2442, lon:-61.5438, label:'Guadeloupe'},
+  {keys:['guyana'], lat:4.6821, lon:-58.9135, label:'Guyana'},
+  {keys:['haiti'], lat:18.8835, lon:-72.8929, label:'Haiti'},
+  {keys:['honduras'], lat:14.7404, lon:-86.4925, label:'Honduras'},
+  {keys:['jamaica'], lat:18.1221, lon:-77.3036, label:'Jamaica'},
+  {keys:['martinique'], lat:14.6427, lon:-61.0143, label:'Martinique'},
+  {keys:['montserrat'], lat:16.7354, lon:-62.1869, label:'Montserrat'},
+  {keys:['nicaragua'], lat:12.8936, lon:-85.0161, label:'Nicaragua'},
+  {keys:['panama'], lat:8.4395, lon:-80.1443, label:'Panama'},
+  {keys:['puerto rico'], lat:18.2162, lon:-66.4943, label:'Puerto Rico'},
+  {keys:['saint kitts and nevis'], lat:17.3147, lon:-62.7456, label:'Saint Kitts and Nevis'},
+  {keys:['saint lucia'], lat:13.8957, lon:-60.9690, label:'Saint Lucia'},
+  {keys:['saint vincent and the grenadines'], lat:13.2548, lon:-61.1938, label:'Saint Vincent and the Grenadines'},
+  {keys:['suriname'], lat:4.0987, lon:-55.8555, label:'Suriname'},
+  {keys:['trinidad and tobago'], lat:10.4155, lon:-61.3724, label:'Trinidad and Tobago'},
+  {keys:['turks and caicos islands'], lat:21.7999, lon:-71.7406, label:'Turks and Caicos Islands'},
+  {keys:['us virgin islands'], lat:17.7380, lon:-64.7616, label:'US Virgin Islands'},
+  {keys:['venezuela'], lat:7.1483, lon:-66.3649, label:'Venezuela'},
+  {keys:['burkina faso'], lat:12.1087, lon:-1.6933, label:'Burkina Faso'},
+  {keys:['cabo verde'], lat:15.0764, lon:-23.6340, label:'Cabo Verde'},
+  {keys:['cote divoire'], lat:7.5368, lon:-5.5717, label:"Cote d'Ivoire"},
+  {keys:['gambia'], lat:13.4286, lon:-15.3834, label:'Gambia'},
+  {keys:['ghana'], lat:7.9453, lon:-1.2192, label:'Ghana'},
+  {keys:['gibraltar'], lat:36.1402, lon:-5.3455, label:'Gibraltar'},
+  {keys:['guinea'], lat:10.2560, lon:-10.9869, label:'Guinea'},
+  {keys:['guineabissau'], lat:11.9801, lon:-14.9802, label:'Guinea-Bissau'},
+  {keys:['liberia'], lat:6.5201, lon:-9.2590, label:'Liberia'},
+  {keys:['mali'], lat:17.1681, lon:-4.3464, label:'Mali'},
+  {keys:['mauritania'], lat:20.4667, lon:-10.4951, label:'Mauritania'},
+  {keys:['morocco'], lat:28.6876, lon:-8.8172, label:'Morocco'},
+  {keys:['portugal'], lat:39.6753, lon:-7.9337, label:'Portugal'},
+  {keys:['senegal'], lat:14.2289, lon:-14.6109, label:'Senegal'},
+  {keys:['sierra leone'], lat:8.5613, lon:-11.7866, label:'Sierra Leone'},
+  {keys:['greenland'], lat:74.1685, lon:-42.0757, label:'Greenland'},
+  {keys:['ireland'], lat:53.3049, lon:-8.2411, label:'Ireland'},
+  {keys:['united kingdom'], lat:53.9784, lon:-2.8529, label:'United Kingdom'},
+  {keys:['iceland'], lat:65.1236, lon:-19.0568, label:'Iceland'},
+  {keys:['new zealand'], lat:-43.8277, lon:170.6904, label:'New Zealand'},
+  {keys:['angola'], lat:-12.1674, lon:17.6518, label:'Angola'},
+  {keys:['botswana'], lat:-22.2366, lon:23.8578, label:'Botswana'},
+  {keys:['burundi'], lat:-3.2613, lon:29.8852, label:'Burundi'},
+  {keys:['comoros'], lat:-11.6589, lon:43.3483, label:'Comoros'},
+  {keys:['congo'], lat:-0.7294, lon:14.8797, label:'Congo'},
+  {keys:['congo drc'], lat:-3.3386, lon:23.4198, label:'Congo DRC'},
+  {keys:['gabon'], lat:-0.6284, lon:11.8394, label:'Gabon'},
+  {keys:['kenya'], lat:0.6899, lon:37.9531, label:'Kenya'},
+  {keys:['lesotho'], lat:-29.6017, lon:28.2448, label:'Lesotho'},
+  {keys:['malawi'], lat:-13.1290, lon:34.2344, label:'Malawi'},
+  {keys:['mozambique'], lat:-17.5252, lon:35.2086, label:'Mozambique'},
+  {keys:['namibia'], lat:-21.9086, lon:18.1645, label:'Namibia'},
+  {keys:['rwanda'], lat:-2.0147, lon:29.9194, label:'Rwanda'},
+  {keys:['sao tome and principe'], lat:0.2274, lon:6.6062, label:'Sao Tome and Principe'},
+  {keys:['south africa'], lat:-28.5536, lon:24.7525, label:'South Africa'},
+  {keys:['eswatini'], lat:-26.5625, lon:31.5107, label:'Eswatini'},
+  {keys:['tanzania'], lat:-6.3558, lon:34.8183, label:'Tanzania'},
+  {keys:['zambia'], lat:-13.1628, lon:27.7552, label:'Zambia'},
+  {keys:['zimbabwe'], lat:-18.9270, lon:29.7178, label:'Zimbabwe'},
+  {keys:['madagascar'], lat:-19.0416, lon:46.6849, label:'Madagascar'},
+  {keys:['mauritius'], lat:-20.2814, lon:57.5642, label:'Mauritius'},
+  {keys:['seychelles'], lat:-4.6600, lon:55.4725, label:'Seychelles'},
+  {keys:['algeria'], lat:28.3510, lon:2.6558, label:'Algeria'},
+  {keys:['benin'], lat:9.5030, lon:2.3057, label:'Benin'},
+  {keys:['cameroon'], lat:6.2942, lon:12.9485, label:'Cameroon'},
+  {keys:['central african republic'], lat:6.3314, lon:20.5207, label:'Central African Republic'},
+  {keys:['chad'], lat:15.2835, lon:18.4271, label:'Chad'},
+  {keys:['equatorial guinea'], lat:1.5955, lon:10.4255, label:'Equatorial Guinea'},
+  {keys:['libya'], lat:27.2029, lon:17.9113, label:'Libya'},
+  {keys:['malta'], lat:35.8905, lon:14.4419, label:'Malta'},
+  {keys:['niger'], lat:17.0811, lon:8.8686, label:'Niger'},
+  {keys:['nigeria'], lat:9.6103, lon:8.1477, label:'Nigeria'},
+  {keys:['togo'], lat:8.6607, lon:0.8991, label:'Togo'},
+  {keys:['tunisia'], lat:34.0864, lon:9.6559, label:'Tunisia'},
+  {keys:['cyprus'], lat:35.1170, lon:33.3753, label:'Cyprus'},
+  {keys:['djibouti'], lat:11.7502, lon:42.6135, label:'Djibouti'},
+  {keys:['egypt'], lat:26.6052, lon:30.2401, label:'Egypt'},
+  {keys:['eritrea'], lat:15.0055, lon:39.2672, label:'Eritrea'},
+  {keys:['ethiopia'], lat:8.7294, lon:39.9149, label:'Ethiopia'},
+  {keys:['greece'], lat:39.4201, lon:23.1104, label:'Greece'},
+  {keys:['iraq'], lat:33.1051, lon:43.8325, label:'Iraq'},
+  {keys:['israel'], lat:31.5135, lon:35.0279, label:'Israel'},
+  {keys:['jordan'], lat:31.3871, lon:36.9573, label:'Jordan'},
+  {keys:['lebanon'], lat:33.9116, lon:35.8965, label:'Lebanon'},
+  {keys:['south sudan'], lat:7.6578, lon:30.3852, label:'South Sudan'},
+  {keys:['sudan'], lat:15.6706, lon:29.9515, label:'Sudan'},
+  {keys:['syria'], lat:35.0975, lon:38.5117, label:'Syria'},
+  {keys:['turkey'], lat:38.9321, lon:35.5689, label:'Turkey'},
+  {keys:['uganda'], lat:1.2822, lon:32.3437, label:'Uganda'},
+  {keys:['united states'], lat:38.8208, lon:-96.3316, label:'United States'},
+  {keys:['france'], lat:46.6424, lon:2.1940, label:'France'},
+  {keys:['switzerland'], lat:46.7368, lon:8.2869, label:'Switzerland'},
+  {keys:['belgium'], lat:50.6182, lon:4.6750, label:'Belgium'},
+  {keys:['germany'], lat:51.0830, lon:10.4262, label:'Germany'},
+  {keys:['luxembourg'], lat:49.7752, lon:6.1032, label:'Luxembourg'},
+  {keys:['netherlands'], lat:52.1341, lon:5.5541, label:'Netherlands'},
+  {keys:['albania'], lat:41.1417, lon:20.0611, label:'Albania'},
+  {keys:['austria'], lat:47.6319, lon:13.7978, label:'Austria'},
+  {keys:['bosnia and herzegovina'], lat:44.1442, lon:17.8347, label:'Bosnia and Herzegovina'},
+  {keys:['croatia'], lat:44.9119, lon:16.6258, label:'Croatia'},
+  {keys:['czech republic'], lat:49.7492, lon:15.3833, label:'Czech Republic'},
+  {keys:['denmark'], lat:56.0012, lon:9.3787, label:'Denmark'},
+  {keys:['hungary'], lat:47.2253, lon:19.3962, label:'Hungary'},
+  {keys:['italy'], lat:42.9820, lon:12.7637, label:'Italy'},
+  {keys:['montenegro'], lat:42.7369, lon:19.2951, label:'Montenegro'},
+  {keys:['poland'], lat:52.0685, lon:19.4357, label:'Poland'},
+  {keys:['serbia'], lat:44.0268, lon:20.8568, label:'Serbia'},
+  {keys:['slovakia'], lat:48.6981, lon:19.5810, label:'Slovakia'},
+  {keys:['slovenia'], lat:46.1376, lon:14.8906, label:'Slovenia'},
+  {keys:['north macedonia'], lat:41.5940, lon:21.7100, label:'North Macedonia'},
+  {keys:['norway'], lat:64.9778, lon:16.6703, label:'Norway'},
+  {keys:['sweden'], lat:62.7342, lon:17.0624, label:'Sweden'},
+  {keys:['belarus'], lat:53.4679, lon:27.9643, label:'Belarus'},
+  {keys:['bulgaria'], lat:42.8204, lon:25.2517, label:'Bulgaria'},
+  {keys:['estonia'], lat:58.6481, lon:25.9169, label:'Estonia'},
+  {keys:['finland'], lat:65.0158, lon:25.6574, label:'Finland'},
+  {keys:['georgia'], lat:42.1799, lon:43.3789, label:'Georgia'},
+  {keys:['latvia'], lat:56.8139, lon:24.6937, label:'Latvia'},
+  {keys:['lithuania'], lat:55.2944, lon:23.9460, label:'Lithuania'},
+  {keys:['moldova'], lat:47.0726, lon:28.3911, label:'Moldova'},
+  {keys:['romania'], lat:45.8245, lon:25.0942, label:'Romania'},
+  {keys:['ukraine'], lat:48.6575, lon:31.2738, label:'Ukraine'},
+  {keys:['afghanistan'], lat:34.1340, lon:66.5922, label:'Afghanistan'},
+  {keys:['bahrain'], lat:26.0480, lon:50.5407, label:'Bahrain'},
+  {keys:['india'], lat:23.5863, lon:81.1730, label:'India'},
+  {keys:['iran'], lat:32.9060, lon:54.2371, label:'Iran'},
+  {keys:['kuwait'], lat:29.2814, lon:47.5631, label:'Kuwait'},
+  {keys:['maldives'], lat:-0.6066, lon:73.1008, label:'Maldives'},
+  {keys:['nepal'], lat:28.3009, lon:84.1339, label:'Nepal'},
+  {keys:['oman'], lat:20.7243, lon:55.8411, label:'Oman'},
+  {keys:['pakistan'], lat:30.1162, lon:69.0884, label:'Pakistan'},
+  {keys:['qatar'], lat:25.3185, lon:51.1979, label:'Qatar'},
+  {keys:['saudi arabia'], lat:24.1360, lon:44.6010, label:'Saudi Arabia'},
+  {keys:['somalia'], lat:6.5245, lon:45.4004, label:'Somalia'},
+  {keys:['sri lanka'], lat:7.6966, lon:80.6693, label:'Sri Lanka'},
+  {keys:['tajikistan'], lat:38.5693, lon:70.9422, label:'Tajikistan'},
+  {keys:['turkmenistan'], lat:39.0607, lon:58.4577, label:'Turkmenistan'},
+  {keys:['united arab emirates'], lat:24.1825, lon:54.2792, label:'United Arab Emirates'},
+  {keys:['yemen'], lat:16.0014, lon:47.4682, label:'Yemen'},
+  {keys:['armenia'], lat:40.1784, lon:45.0549, label:'Armenia'},
+  {keys:['azerbaijan'], lat:40.3921, lon:48.6346, label:'Azerbaijan'},
+  {keys:['kazakhstan'], lat:47.6415, lon:66.3759, label:'Kazakhstan'},
+  {keys:['kyrgyzstan'], lat:41.3570, lon:74.1753, label:'Kyrgyzstan'},
+  {keys:['uzbekistan'], lat:41.4879, lon:63.8548, label:'Uzbekistan'},
+  {keys:['indonesia'], lat:0.1559, lon:113.9654, label:'Indonesia'},
+  {keys:['timorleste'], lat:-8.8099, lon:125.9502, label:'Timor-Leste'},
+  {keys:['australia'], lat:-25.6973, lon:134.0228, label:'Australia'},
+  {keys:['papua new guinea'], lat:-7.1569, lon:144.8349, label:'Papua New Guinea'},
+  {keys:['solomon islands'], lat:-9.6131, lon:160.1648, label:'Solomon Islands'},
+  {keys:['vanuatu'], lat:-15.1891, lon:166.8491, label:'Vanuatu'},
+  {keys:['cambodia'], lat:12.6992, lon:105.0397, label:'Cambodia'},
+  {keys:['laos'], lat:18.1173, lon:103.7638, label:'Laos'},
+  {keys:['malaysia'], lat:3.6717, lon:114.6333, label:'Malaysia'},
+  {keys:['myanmar'], lat:19.9012, lon:97.0889, label:'Myanmar'},
+  {keys:['singapore'], lat:1.3528, lon:103.8103, label:'Singapore'},
+  {keys:['thailand'], lat:13.6622, lon:101.0868, label:'Thailand'},
+  {keys:['vietnam','viet nam'], lat:16.5173, lon:105.9134, label:'Vietnam'},
+  {keys:['bangladesh'], lat:23.6737, lon:90.4321, label:'Bangladesh'},
+  {keys:['bhutan'], lat:27.4216, lon:90.4672, label:'Bhutan'},
+  {keys:['china'], lat:38.0733, lon:104.6911, label:'China'},
+  {keys:['brunei'], lat:4.5432, lon:114.6431, label:'Brunei'},
+  {keys:['philippines'], lat:15.5865, lon:121.8221, label:'Philippines'},
+  {keys:['south korea'], lat:36.4024, lon:127.7622, label:'South Korea'},
+  {keys:['mongolia'], lat:47.0864, lon:103.3987, label:'Mongolia'},
+  {keys:['north korea'], lat:40.1920, lon:127.3380, label:'North Korea'},
+  {keys:['japan'], lat:36.7674, lon:137.4693, label:'Japan'},
+  {keys:['russia'], lat:59.0394, lon:98.6705, label:'Russia'},
+  {keys:['spain'], lat:40.3650, lon:-3.6516, label:'Spain'},
+];
 
-function resolveCountry(text){
-  const n = normalizeVN(text);
-  if (!n) return null;
-  let best = null, bestLen = 0;
-  COUNTRIES.forEach(c => {
-    c.names.forEach(alias => {
-      const a = normalizeVN(alias);
-      if (n === a || n.includes(a) || a.includes(n)){
-        if (a.length > bestLen){ best = c; bestLen = a.length; }
+function lookupKnownPort(name){
+  const n = ' ' + norm(name).replace(/[''`]/g,'').replace(/[,.]/g,' ').replace(/\s+/g,' ').trim() + ' ';
+  let best = null;
+  for(const p of KNOWN_PORTS){
+    for(const k of p.keys){
+      if(n.includes(' '+k+' ') || n.trim()===k){
+        if(!best || k.length > best._k.length){ best = {lat:p.lat, lon:p.lon, label:p.label, _k:k}; }
       }
-    });
-  });
-  return best;
-}
-
-function haversine(lat1,lng1,lat2,lng2){
-  const R = 6371;
-  const dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
-  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
-  return R * 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
-
-function parseDestination(route){
-  const parts = route.split(/→|->|-|–|,/).map(s=>s.trim()).filter(Boolean);
-  const candidate = parts.length ? parts[parts.length-1] : route;
-  let country = resolveCountry(candidate);
-  if (!country) country = resolveCountry(route);
-  return { text: candidate, country };
-}
-
-// ---------- threshold (30/40/50°C) day analysis ----------
-function computeThresholdStats(pts){
-  let intervalMin = 60;
-  if (pts.length > 1) intervalMin = Math.max(1, Math.round((pts[1].t - pts[0].t)/60000));
-  const thresholds = [30,40,50];
-  const result = {};
-  thresholds.forEach(T => {
-    let hoursOver = 0, maxStreakPts = 0, curStreak = 0;
-    const daysWithExceed = new Set();
-    pts.forEach(p => {
-      if (p.temp > T){
-        hoursOver += intervalMin/60;
-        curStreak++;
-        if (curStreak > maxStreakPts) maxStreakPts = curStreak;
-        const d = new Date(p.t);
-        daysWithExceed.add(d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate());
-      } else {
-        curStreak = 0;
-      }
-    });
-    // longest run of consecutive calendar days present in daysWithExceed
-    const dayNums = Array.from(daysWithExceed).map(s => {
-      const [y,m,d] = s.split('-').map(Number);
-      return Math.floor(new Date(y,m-1,d).getTime()/86400000);
-    }).sort((a,b)=>a-b);
-    let maxConsecDays = dayNums.length ? 1 : 0, run = dayNums.length ? 1 : 0;
-    for (let i=1;i<dayNums.length;i++){
-      if (dayNums[i] === dayNums[i-1]+1){ run++; if (run>maxConsecDays) maxConsecDays = run; }
-      else run = 1;
     }
-    result[T] = {
-      hoursOver: Math.round(hoursOver*10)/10,
-      maxStreakHours: Math.round((maxStreakPts*intervalMin/60)*10)/10,
-      daysCount: daysWithExceed.size,
-      maxConsecDays
-    };
-  });
-  return result;
-}
-
-function renderThresholdTable(ts){
-  const tbody = document.getElementById('thresholdBody');
-  tbody.innerHTML = [30,40,50].map(T => {
-    const r = ts[T];
-    return `<tr><td>&gt; ${T}°C</td><td>${r.hoursOver}h</td><td>${r.maxStreakHours}h</td><td>${r.daysCount}</td><td>${r.maxConsecDays}</td></tr>`;
-  }).join('');
-}
-
-function renderStats(){
-  const s = computeStats(points);
-  statsCard.style.display = 'block';
-  document.getElementById('stMin').textContent = s.min.toFixed(1)+'°C';
-  document.getElementById('stMax').textContent = s.max.toFixed(1)+'°C';
-  document.getElementById('stAvg').textContent = s.avg.toFixed(1)+'°C';
-  document.getElementById('stMkt').textContent = s.mkt.toFixed(1)+'°C';
-  document.getElementById('stStart').textContent = fmtDate(s.start);
-  document.getElementById('stStop').textContent = fmtDate(s.stop);
-  document.getElementById('stDur').textContent = fmtDur(s.durMs);
-  document.getElementById('stN').textContent = s.n;
-  drawChart(s);
-  renderThresholdTable(computeThresholdStats(points));
-}
-
-// ---------- chart ----------
-function getRange(){
-  const preset = document.getElementById('rangePreset').value;
-  if (preset === 'custom'){
-    const low = parseFloat(document.getElementById('customLow').value);
-    const high = parseFloat(document.getElementById('customHigh').value);
-    if (isNaN(low) || isNaN(high)) return null;
-    return {low, high};
   }
-  const [low, high] = preset.split(',').map(Number);
-  return {low, high};
+  return best ? {lat:best.lat, lon:best.lon, label:best.label} : null;
 }
 
-function drawChart(){
-  const canvas = document.getElementById('chart');
+async function geocodeRaw(name){
+  const url = 'https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(name.trim()) + '&count=1&format=json';
+  const res = await fetch(url);
+  const data = await res.json();
+  if(data && data.results && data.results.length){
+    const r = data.results[0];
+    return { lat:r.latitude, lon:r.longitude, label:[r.name,r.admin1,r.country].filter(Boolean).join(', ') };
+  }
+  return null;
+}
+async function geocode(name){
+  if(!name || !name.trim()) return null;
+  const known = lookupKnownPort(name);
+  if(known) return known;
+
+  const cacheKey = 'geocode:' + norm(name);
+  const cached = await safeGet(cacheKey, false);
+  if(cached){ try{ return JSON.parse(cached); }catch(e){} }
+
+  try{
+    // Open-Meteo requires the part after a comma (country/admin) to match EXACTLY.
+    // "Hải Phòng, Việt Nam" fails because "Việt Nam" isn't the indexed English form,
+    // even though "Hải Phòng" alone matches fine (name matching is diacritic-insensitive).
+    let out = await geocodeRaw(name);
+    if(!out && name.includes(',')){
+      const firstPart = name.split(',')[0].trim();
+      if(firstPart) out = await geocodeRaw(firstPart);
+    }
+    if(!out){
+      const stripped = norm(name).split(',')[0].trim();
+      if(stripped && stripped !== norm(name)) out = await geocodeRaw(stripped);
+    }
+    if(out) await safeSet(cacheKey, JSON.stringify(out), false);
+    return out;
+  }catch(e){ console.error('geocode failed', e); return null; }
+}
+
+function pickYearForMonth(month){
+  const now = new Date();
+  const curM = now.getMonth()+1, curY = now.getFullYear();
+  return (month < curM) ? curY : curY - 1;
+}
+
+async function fetchMonthClimate(lat, lon, year, month){
+  const cacheKey = `climate:${lat.toFixed(2)}:${lon.toFixed(2)}:${year}:${month}`;
+  const cached = await safeGet(cacheKey, false);
+  if(cached){ try{ return JSON.parse(cached); }catch(e){} }
+  const mm = String(month).padStart(2,'0');
+  const lastDay = new Date(year, month, 0).getDate();
+  const start = `${year}-${mm}-01`, end = `${year}-${mm}-${String(lastDay).padStart(2,'0')}`;
+  try{
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${start}&end_date=${end}&daily=temperature_2m_max,temperature_2m_min,temperature_2m_mean&timezone=auto`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if(!data || !data.daily) return null;
+    const tmax = data.daily.temperature_2m_max || [];
+    const tmin = data.daily.temperature_2m_min || [];
+    const tmean = data.daily.temperature_2m_mean || [];
+    const out = {
+      year, month, days: tmax.length,
+      dates: data.daily.time || [],
+      tmax, tmin, tmean,
+      avgMax: tmax.reduce((a,b)=>a+b,0)/tmax.length,
+      avgMin: tmin.reduce((a,b)=>a+b,0)/tmin.length,
+      avgMean: tmean.reduce((a,b)=>a+b,0)/tmean.length,
+      hiMax: Math.max(...tmax),
+      loMin: Math.min(...tmin),
+      over30: tmax.filter(t=>t>30).length,
+      over35: tmax.filter(t=>t>35).length,
+      over40: tmax.filter(t=>t>40).length,
+    };
+    await safeSet(cacheKey, JSON.stringify(out), false);
+    return out;
+  }catch(e){ console.error('climate fetch failed', e); return null; }
+}
+
+/* ---------------- PDF parsing ---------------- */
+async function parsePdf(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  let fullText = '';
+  for(let p=1; p<=pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    fullText += content.items.map(it=>it.str).join(' ') + '\n';
+  }
+
+  // The "Alarm Statistics" section lists histogram bucket-edge timestamps immediately
+  // followed by bucket-edge temperatures (e.g. "...20:11:33 -1.0 C 1.6 C 4.2 C...").
+  // This can look exactly like a real "date time value" reading and pollute the parse.
+  // The real logged readings only start at the repeating "Date Time ... °C" table header
+  // on the following pages, so we cut everything before that away first.
+  const tableHeaderIdx = fullText.indexOf('Date Time');
+  const dataText = tableHeaderIdx >= 0 ? fullText.slice(tableHeaderIdx) : fullText;
+
+  // Authoritative logging window, read directly from the "Logging Summary" block
+  // ("Start Time: dd/mm/yyyy hh:mm:ss ... Stop Time: dd/mm/yyyy hh:mm:ss"). Any parsed
+  // reading outside this window (e.g. stray histogram bucket-edge timestamps elsewhere
+  // in the document) is discarded below, regardless of where in the text it was found.
+  let officialStart = null, officialStop = null;
+  const winMatch = fullText.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}:\d{2})\s*(?:\([^)]*\))?\s+(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}:\d{2})/);
+  if(winMatch){
+    const s = parseDMY(winMatch[1]), e = parseDMY(winMatch[2]);
+    if(s && e && e.getTime() > s.getTime()){ officialStart = s.getTime(); officialStop = e.getTime(); }
+  }
+
+  // 1) extract all timestamp+value pairs anywhere in the (trimmed) text, sort & dedupe by time
+  const re = /(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2}:\d{2})\s+(-?\d{1,3}\.\d)\b/g;
+  const found = new Map();
+  let m;
+  while((m = re.exec(dataText)) !== null){
+    const dateStr = m[1], timeStr = m[2], val = parseFloat(m[3]);
+    if(val < -60 || val > 90) continue; // sanity bounds
+    const dt = parseDMY(dateStr + ' ' + timeStr);
+    if(!dt) continue;
+    const key = dt.getTime();
+    if(!found.has(key)) found.set(key, val);
+  }
+  let points = Array.from(found.entries()).map(([t,c])=>({t, c})).sort((a,b)=>a.t-b.t);
+
+  if(officialStart !== null && officialStop !== null){
+    points = points.filter(p => p.t >= officialStart && p.t <= officialStop);
+  }
+
+  // sanity: if too few points parsed, bail with error
+  if(points.length < 5){
+    throw new Error('Không đọc được dữ liệu nhiệt độ dạng bảng trong file này. Hãy kiểm tra lại file PDF (cần đúng định dạng data logger dạng Date/Time/°C).');
+  }
+
+  // 2) device id best-effort
+  let deviceId = 'N/A';
+  const devMatch = fullText.match(/\b([A-Z]{1,3}\d{5,8})\b/);
+  if(devMatch) deviceId = devMatch[1];
+
+  const values = points.map(p=>p.c);
+  const min = Math.min(...values), max = Math.max(...values);
+  const avg = values.reduce((a,b)=>a+b,0)/values.length;
+  const start = officialStart !== null ? officialStart : points[0].t;
+  const stop = officialStop !== null ? officialStop : points[points.length-1].t;
+
+  // months spanned (calendar month numbers present in trip, 1-12, deduped)
+  const monthsSet = new Set();
+  points.forEach(p => monthsSet.add(new Date(p.t).getMonth()+1));
+
+  return {
+    fileName: file.name,
+    deviceId,
+    points, // [{t: epoch ms, c: number}]
+    min, max, avg,
+    start, stop,
+    months: Array.from(monthsSet).sort((a,b)=>a-b),
+    pointCount: points.length,
+  };
+}
+
+/* ---------------- thermal ribbon canvas ---------------- */
+function drawRibbon(canvas, points, globalMin=null, globalMax=null){
   const dpr = window.devicePixelRatio || 1;
-  const cssW = canvas.clientWidth || 600;
-  const cssH = 220;
-  canvas.width = cssW*dpr; canvas.height = cssH*dpr;
+  const w = canvas.clientWidth || 600, h = canvas.clientHeight || 46;
+  canvas.width = w*dpr; canvas.height = h*dpr;
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr,dpr);
-  ctx.clearRect(0,0,cssW,cssH);
+  const values = points.map(p=>p.c);
+  const min = globalMin!==null ? globalMin : Math.min(...values);
+  const max = globalMax!==null ? globalMax : Math.max(...values);
+  const range = Math.max(1, max-min);
 
-  const pad = {l:38,r:12,t:14,b:22};
-  const w = cssW-pad.l-pad.r, h = cssH-pad.t-pad.b;
-  const temps = points.map(p=>p.temp);
-  let tmin = Math.min(...temps), tmax = Math.max(...temps);
-  const range = getRange();
-  if (range){ tmin = Math.min(tmin, range.low); tmax = Math.max(tmax, range.high); }
-  const pad2 = (tmax-tmin)*0.1 || 1;
-  tmin -= pad2; tmax += pad2;
+  function colorFor(t){
+    // 0 -> blue (cold), .35 -> cyan, .65 -> amber, 1 -> red (hot)
+    const stops = [
+      [0.00, [46,111,224]],
+      [0.30, [91,217,232]],
+      [0.60, [242,166,90]],
+      [1.00, [255,110,110]],
+    ];
+    for(let i=0;i<stops.length-1;i++){
+      const [t0,c0]=stops[i], [t1,c1]=stops[i+1];
+      if(t>=t0 && t<=t1){
+        const f=(t-t0)/(t1-t0);
+        return `rgb(${Math.round(lerp(c0[0],c1[0],f))},${Math.round(lerp(c0[1],c1[1],f))},${Math.round(lerp(c0[2],c1[2],f))})`;
+      }
+    }
+    return 'rgb(255,110,110)';
+  }
 
-  const x = i => pad.l + (i/(points.length-1))*w;
-  const y = t => pad.t + h - ((t-tmin)/(tmax-tmin))*h;
+  const n = points.length;
+  for(let i=0;i<n-1;i++){
+    const x0 = (i/(n-1))*w, x1 = ((i+1)/(n-1))*w;
+    const tval = (points[i].c - min)/range;
+    ctx.fillStyle = colorFor(Math.max(0,Math.min(1,tval)));
+    ctx.fillRect(x0, 0, (x1-x0)+1, h);
+  }
+}
 
-  // threshold band
-  if (range){
-    ctx.fillStyle = 'rgba(15,139,141,0.10)';
-    const yTop = y(range.high), yBot = y(range.low);
-    ctx.fillRect(pad.l, yTop, w, yBot-yTop);
-    ctx.strokeStyle = '#0F8B8D'; ctx.setLineDash([3,3]); ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(pad.l,yTop); ctx.lineTo(pad.l+w,yTop); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(pad.l,yBot); ctx.lineTo(pad.l+w,yBot); ctx.stroke();
+/* ---------------- recommendation logic ---------------- */
+function computeDayStats(points){
+  // group hourly readings into per-calendar-day max, then count days over each
+  // threshold plus the longest run of CONSECUTIVE calendar days over that threshold.
+  const dayMax = new Map();
+  points.forEach(p=>{
+    const d = new Date(p.t);
+    const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const cur = dayMax.get(key);
+    if(cur===undefined || p.c>cur) dayMax.set(key, p.c);
+  });
+  const days = Array.from(dayMax.entries()).sort((a,b)=> a[0]<b[0] ? -1 : (a[0]>b[0]?1:0));
+  function countAndStreak(threshold){
+    let count=0, streak=0, maxStreak=0;
+    days.forEach(([,v])=>{
+      if(v>threshold){ count++; streak++; if(streak>maxStreak) maxStreak=streak; }
+      else streak=0;
+    });
+    return {count, maxStreak};
+  }
+  const c30=countAndStreak(30), c35=countAndStreak(35), c40=countAndStreak(40);
+  return {
+    totalDays: days.length,
+    over30: c30.count, streak30: c30.maxStreak,
+    over35: c35.count, streak35: c35.maxStreak,
+    over40: c40.count, streak40: c40.maxStreak,
+  };
+}
+
+function recommend(reqMin, reqMax, obsMin, obsMax){
+  const margin = 1.0;
+  const hasReq = (reqMin!==null && !isNaN(reqMin)) || (reqMax!==null && !isNaN(reqMax));
+  if(!hasReq) return {level:'unknown'};
+  let breachHigh = (reqMax!==null && !isNaN(reqMax)) ? obsMax > reqMax : false;
+  let breachLow  = (reqMin!==null && !isNaN(reqMin)) ? obsMin < reqMin : false;
+  let nearHigh = (reqMax!==null && !isNaN(reqMax)) ? (obsMax > reqMax - margin && !breachHigh) : false;
+  let nearLow  = (reqMin!==null && !isNaN(reqMin)) ? (obsMin < reqMin + margin && !breachLow) : false;
+
+  if(breachHigh || breachLow){
+    return {level:'reefer', breachHigh, breachLow};
+  }
+  if(nearHigh || nearLow){
+    return {level:'borderline', nearHigh, nearLow};
+  }
+  return {level:'standard'};
+}
+
+function verdictBlock(rec, obsMin, obsMax, reqMin, reqMax, sourceLabel){
+  const reqTxt = `${reqMin!==null&&!isNaN(reqMin)?reqMin+'°C':'—'} ~ ${reqMax!==null&&!isNaN(reqMax)?reqMax+'°C':'—'}`;
+  if(rec.level==='unknown'){
+    return `<div class="verdict borderline">
+      <div class="verdict-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></div>
+      <div><h2>Chưa nhập ngưỡng bảo quản</h2><p>Nhập nhiệt độ bảo quản yêu cầu để nhận khuyến nghị container. Dưới đây vẫn là dữ liệu nhiệt độ thực tế trên tuyến (${sourceLabel}): thấp nhất ${fmt1(obsMin)}°C — cao nhất ${fmt1(obsMax)}°C.</p></div>
+    </div>`;
+  }
+  if(rec.level==='reefer'){
+    const parts=[];
+    if(rec.breachHigh) parts.push(`nhiệt độ cao nhất ghi nhận ${fmt1(obsMax)}°C vượt ngưỡng tối đa cho phép`);
+    if(rec.breachLow) parts.push(`nhiệt độ thấp nhất ${fmt1(obsMin)}°C thấp hơn ngưỡng tối thiểu cho phép`);
+    return `<div class="verdict reefer">
+      <div class="verdict-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9L4.9 19.1"/></svg></div>
+      <div><h2>Nên dùng container LẠNH</h2><p>Theo ${sourceLabel}, ${parts.join(' và ')} (ngưỡng yêu cầu ${reqTxt}). Vận chuyển thường có nguy cơ vi phạm điều kiện bảo quản.</p></div>
+    </div>`;
+  }
+  if(rec.level==='borderline'){
+    return `<div class="verdict borderline">
+      <div class="verdict-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></div>
+      <div><h2>Cận ngưỡng — cân nhắc container lạnh</h2><p>Theo ${sourceLabel}, nhiệt độ tuyến (${fmt1(obsMin)}°C – ${fmt1(obsMax)}°C) nằm sát ngưỡng yêu cầu (${reqTxt}), biên an toàn dưới 1°C. Nên ưu tiên container lạnh hoặc giám sát chặt bằng data logger.</p></div>
+    </div>`;
+  }
+  return `<div class="verdict standard">
+      <div class="verdict-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <div><h2>Container THƯỜNG là đủ</h2><p>Theo ${sourceLabel}, nhiệt độ tuyến dự kiến (${fmt1(obsMin)}°C – ${fmt1(obsMax)}°C) nằm trong ngưỡng yêu cầu (${reqTxt}), có biên an toàn ≥1°C.</p></div>
+    </div>`;
+}
+
+/* ================= TAB SWITCHING ================= */
+document.getElementById('tabs').addEventListener('click', e=>{
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+  if(btn.dataset.tab==='library') renderLibrary();
+});
+
+/* populate destination country select */
+(function(){
+  const sel = document.getElementById('lk-dest');
+  WORLD_COUNTRIES.forEach(c=>{
+    const opt = document.createElement('option');
+    opt.value = c.name; opt.textContent = c.name;
+    opt.dataset.lat = c.lat; opt.dataset.lon = c.lon;
+    sel.appendChild(opt);
+  });
+})();
+
+/* ================= TRANSIT STOPS ================= */
+let transitSeq = 0;
+function addTransitRow(){
+  const id = 'transit-' + (transitSeq++);
+  const wrap = document.createElement('div');
+  wrap.className = 'transit-row';
+  wrap.id = id;
+  wrap.innerHTML = `
+    <div style="flex:2;">
+      <label class="mini">Tên cảng trung chuyển</label>
+      <input type="text" class="transit-name" placeholder="VD: Cái Mép, Việt Nam">
+    </div>
+    <div style="flex:1;">
+      <label class="mini">Ngày thứ mấy (tuỳ chọn)</label>
+      <input type="number" class="transit-offset" placeholder="Tự chia đều" min="0">
+    </div>
+    <div style="flex:1;">
+      <label class="mini">Số ngày lưu bãi</label>
+      <input type="number" class="transit-dwell" value="2" min="0">
+    </div>
+    <div>
+      <label class="mini">&nbsp;</label>
+      <button type="button" class="remove-transit" title="Xoá">✕</button>
+    </div>
+  `;
+  document.getElementById('transit-list').appendChild(wrap);
+  wrap.querySelector('.remove-transit').addEventListener('click', ()=>wrap.remove());
+}
+document.getElementById('btn-add-transit').addEventListener('click', addTransitRow);
+
+function getTransitStops(){
+  return Array.from(document.querySelectorAll('.transit-row')).map(row=>{
+    const name = row.querySelector('.transit-name').value.trim();
+    const offsetRaw = row.querySelector('.transit-offset').value;
+    const dwellRaw = row.querySelector('.transit-dwell').value;
+    return {
+      name,
+      offset: offsetRaw==='' ? null : parseFloat(offsetRaw),
+      dwell: dwellRaw==='' ? 0 : Math.max(0, parseFloat(dwellRaw)),
+    };
+  }).filter(t=>t.name);
+}
+
+/* ================= UPLOAD FLOW ================= */
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+dropzone.addEventListener('click', ()=>fileInput.click());
+['dragover'].forEach(ev=>dropzone.addEventListener(ev, e=>{e.preventDefault(); dropzone.classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>dropzone.addEventListener(ev, e=>{e.preventDefault(); dropzone.classList.remove('drag');}));
+dropzone.addEventListener('drop', e=>{
+  const files = Array.from(e.dataTransfer.files).filter(f=>f.type==='application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+  handleFiles(files);
+});
+fileInput.addEventListener('change', e=>{
+  handleFiles(Array.from(e.target.files));
+  fileInput.value = '';
+});
+
+function handleFiles(files){
+  files.forEach(processFile);
+}
+
+async function fileToBase64(file){
+  const buf = await file.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for(let i=0; i<bytes.length; i+=chunkSize){
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunkSize));
+  }
+  return btoa(binary);
+}
+function openPdfFromBase64(base64, fileName){
+  try{
+    const byteChars = atob(base64);
+    const byteNumbers = new Array(byteChars.length);
+    for(let i=0; i<byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], {type:'application/pdf'});
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  }catch(e){
+    console.error('open pdf failed', e);
+    toast('Không mở được file PDF gốc (có thể chưa được lưu khi tải lên).');
+  }
+}
+
+async function processFile(file){
+  const cardId = uid();
+  const list = document.getElementById('pending-list');
+  const card = document.createElement('div');
+  card.className = 'pending-card';
+  card.innerHTML = `
+    <div class="pending-head">
+      <span class="fname">${escapeHtml(file.name)}</span>
+      <span class="status-chip status-parsing" id="chip-${cardId}"><span class="spinner"></span> Đang đọc PDF…</span>
+    </div>
+    <div class="pending-body" id="body-${cardId}"></div>
+  `;
+  list.prepend(card);
+
+  try{
+    const parsed = await parsePdf(file);
+    document.getElementById('chip-'+cardId).outerHTML = `<span class="status-chip status-ok" id="chip-${cardId}">✓ Đã đọc ${parsed.pointCount} điểm dữ liệu</span>`;
+    renderPendingBody(cardId, file, parsed);
+  }catch(err){
+    document.getElementById('chip-'+cardId).outerHTML = `<span class="status-chip status-error">✕ Lỗi</span>`;
+    document.getElementById('body-'+cardId).innerHTML = `<p style="color:var(--danger);font-size:13.5px;">${escapeHtml(err.message || String(err))}</p>`;
+  }
+}
+
+function renderPendingBody(cardId, file, parsed){
+  const body = document.getElementById('body-'+cardId);
+  const startD = new Date(parsed.start), stopD = new Date(parsed.stop);
+  const tripDays = ((parsed.stop - parsed.start)/86400000).toFixed(1);
+  const countryOptions = WORLD_COUNTRIES.map(c=>`<option value="${escapeHtml(c.name)}" data-lat="${c.lat}" data-lon="${c.lon}">${escapeHtml(c.name)}</option>`).join('');
+  body.innerHTML = `
+    <div class="stat-strip">
+      <div class="stat-item"><b>${fmt1(parsed.max)}°C</b><span>Cao nhất</span></div>
+      <div class="stat-item"><b>${fmt1(parsed.min)}°C</b><span>Thấp nhất</span></div>
+      <div class="stat-item"><b>${fmt1(parsed.avg)}°C</b><span>Trung bình</span></div>
+      <div class="stat-item"><b>${tripDays}</b><span>Ngày hành trình</span></div>
+    </div>
+    <div class="ribbon-wrap"><canvas class="ribbon" id="ribbon-${cardId}"></canvas></div>
+    <div class="hint" style="margin-bottom:16px;">Từ ${startD.toLocaleString('vi-VN')} đến ${stopD.toLocaleString('vi-VN')} · Các tháng trong hành trình: ${parsed.months.map(m=>MONTH_NAMES[m]).join(', ')}</div>
+
+    <div class="grid-2">
+      <div class="field">
+        <label class="field-label">Cảng / nước đến</label>
+        <select id="meta-dest-${cardId}">
+          <option value="">— Chọn quốc gia —</option>
+          ${countryOptions}
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label">Loại hình vận chuyển</label>
+        <select id="meta-mode-${cardId}">
+          <option value="">— Chọn loại hình —</option>
+          <option value="AIR">AIR</option>
+          <option value="LCL">LCL</option>
+          <option value="FCL_COLD">FCL Lạnh</option>
+          <option value="FCL_STD">FCL Thường</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="save-${cardId}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+      Lưu vào kho dữ liệu
+    </button>
+  `;
+  requestAnimationFrame(()=>drawRibbon(document.getElementById('ribbon-'+cardId), parsed.points));
+
+  document.getElementById('save-'+cardId).addEventListener('click', async ()=>{
+    const btn = document.getElementById('save-'+cardId);
+    const destSelect = document.getElementById('meta-dest-'+cardId);
+    const dest = destSelect.value;
+    const modeSelect = document.getElementById('meta-mode-'+cardId);
+    const transportMode = modeSelect.value;
+    if(!dest){ toast('Chọn quốc gia đến trước đã.'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Đang lưu…';
+
+    const opt = destSelect.selectedOptions[0];
+    const destLat = parseFloat(opt.dataset.lat), destLon = parseFloat(opt.dataset.lon);
+    const origin = 'Việt Nam';
+    const og = await geocode(origin);
+
+    let pdfBase64 = null;
+    try{ pdfBase64 = await fileToBase64(file); }
+    catch(e){ console.error('pdf to base64 failed', e); }
+
+    const record = {
+      id: uid(),
+      fileName: file.name,
+      deviceId: parsed.deviceId,
+      origin, dest,
+      originLat: og?og.lat:null, originLon: og?og.lon:null,
+      destLat, destLon,
+      transportMode,
+      drug: '', reqMin: null, reqMax: null,
+      points: parsed.points,
+      min: parsed.min, max: parsed.max, avg: parsed.avg,
+      start: parsed.start, stop: parsed.stop,
+      months: parsed.months,
+      uploadedAt: Date.now(),
+      pdfBase64,
+    };
+    await saveShipment(record);
+    toast('Đã lưu "'+file.name+'" vào kho dữ liệu.');
+    btn.outerHTML = '<span class="status-chip status-saved">✓ Đã lưu vào kho dữ liệu</span>';
+  });
+}
+
+/* ================= LOOKUP FLOW ================= */
+document.getElementById('btn-run-lookup').addEventListener('click', runLookup);
+
+function drawJourneyChart(canvas, journey, reqMin, reqMax){
+  const { ambientMax, containerMax, waypoints, totalDays } = journey;
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || 600, h = canvas.clientHeight || 220;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+
+  const validVals = [...ambientMax, ...containerMax].filter(v=>v!=null);
+  if(!validVals.length) return;
+  const allVals = [...validVals];
+  if(reqMin!==null && !isNaN(reqMin)) allVals.push(reqMin);
+  if(reqMax!==null && !isNaN(reqMax)) allVals.push(reqMax);
+  let vmin = Math.min(...allVals), vmax = Math.max(...allVals);
+  const pad = (vmax-vmin)*0.15 || 2;
+  vmin -= pad; vmax += pad;
+
+  const n = ambientMax.length;
+  const leftPad=4, rightPad=4, topPad=10, botPad=28;
+  const plotW = w-leftPad-rightPad, plotH = h-topPad-botPad;
+  const xAt = i => leftPad + (n<=1?0:(i/(n-1))*plotW);
+  const yAt = v => topPad + plotH - ((v-vmin)/(vmax-vmin))*plotH;
+
+  if(reqMin!==null && !isNaN(reqMin) && reqMax!==null && !isNaN(reqMax)){
+    const yTop=yAt(reqMax), yBot=yAt(reqMin);
+    ctx.fillStyle='rgba(103,217,154,0.10)';
+    ctx.fillRect(leftPad, yTop, plotW, yBot-yTop);
+    ctx.strokeStyle='rgba(103,217,154,.3)'; ctx.setLineDash([3,3]); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(leftPad,yTop); ctx.lineTo(leftPad+plotW,yTop); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(leftPad,yBot); ctx.lineTo(leftPad+plotW,yBot); ctx.stroke();
     ctx.setLineDash([]);
   }
 
-  // axis
-  ctx.strokeStyle = '#C7CDBE'; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(pad.l,pad.t); ctx.lineTo(pad.l,pad.t+h); ctx.lineTo(pad.l+w,pad.t+h); ctx.stroke();
-  ctx.fillStyle = '#4B5A63'; ctx.font = '10px IBM Plex Mono, monospace';
-  ctx.fillText(tmax.toFixed(0)+'°', 4, pad.t+8);
-  ctx.fillText(tmin.toFixed(0)+'°', 4, pad.t+h);
-
-  // line
-  ctx.beginPath();
-  points.forEach((p,i)=>{
-    const px = x(i), py = y(p.temp);
-    if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  waypoints.forEach(wp=>{
+    const px = xAt(wp.offset);
+    ctx.strokeStyle = wp.type==='transit' ? 'rgba(242,166,90,.55)' : 'rgba(231,236,243,.2)';
+    if(wp.type==='transit') ctx.setLineDash([3,3]);
+    ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(px, topPad); ctx.lineTo(px, topPad+plotH); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = wp.type==='transit' ? '#F2A65A' : 'rgba(231,236,243,.75)';
+    ctx.font = '10px Inter, sans-serif';
+    ctx.textAlign = wp.offset < totalDays*0.12 ? 'left' : (wp.offset > totalDays*0.88 ? 'right' : 'center');
+    ctx.fillText((wp.name||'').split(',')[0].slice(0,16), px, topPad+plotH+15);
   });
-  ctx.strokeStyle = '#16202A'; ctx.lineWidth = 1.4; ctx.stroke();
 
-  // out-of-range points
-  if (range){
-    points.forEach((p,i)=>{
-      if (p.temp < range.low || p.temp > range.high){
-        ctx.fillStyle = (p.temp < range.low-2 || p.temp > range.high+2) ? '#A6321C' : '#B5651D';
-        ctx.beginPath(); ctx.arc(x(i), y(p.temp), 1.6, 0, Math.PI*2); ctx.fill();
+  function line(vals, color, width){
+    ctx.beginPath();
+    let started=false;
+    vals.forEach((v,i)=>{
+      if(v==null) return;
+      const px=xAt(i), py=yAt(v);
+      if(!started){ ctx.moveTo(px,py); started=true; } else ctx.lineTo(px,py);
+    });
+    ctx.strokeStyle=color; ctx.lineWidth=width; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.stroke();
+  }
+  line(ambientMax, '#F2A65A', 2);
+  line(containerMax, '#FF6E6E', 2.3);
+}
+
+function drawClimateChart(canvas, tmax, tmin, tmean, reqMin, reqMax){
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || 280, h = canvas.clientHeight || 100;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+
+  const allVals = [...tmax, ...tmin];
+  if(reqMin!==null && !isNaN(reqMin)) allVals.push(reqMin);
+  if(reqMax!==null && !isNaN(reqMax)) allVals.push(reqMax);
+  let vmin = Math.min(...allVals), vmax = Math.max(...allVals);
+  const pad = (vmax-vmin)*0.15 || 2;
+  vmin -= pad; vmax += pad;
+  const n = tmax.length;
+  const xAt = i => n<=1 ? 0 : (i/(n-1))*w;
+  const yAt = v => h - ((v-vmin)/(vmax-vmin))*h;
+
+  // requirement band (safe zone)
+  if(reqMin!==null && !isNaN(reqMin) && reqMax!==null && !isNaN(reqMax)){
+    const yTop = yAt(reqMax), yBot = yAt(reqMin);
+    ctx.fillStyle = 'rgba(103,217,154,0.10)';
+    ctx.fillRect(0, yTop, w, yBot-yTop);
+    ctx.strokeStyle = 'rgba(103,217,154,0.35)';
+    ctx.setLineDash([3,3]);
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0,yTop); ctx.lineTo(w,yTop); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,yBot); ctx.lineTo(w,yBot); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function line(vals, color, width){
+    ctx.beginPath();
+    vals.forEach((v,i)=>{ const px=xAt(i), py=yAt(v); if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); });
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin='round'; ctx.stroke();
+  }
+  line(tmean, 'rgba(231,236,243,.4)', 1);
+  line(tmin, '#5BD9E8', 1.6);
+  line(tmax, '#FF8A65', 1.6);
+}
+
+async function runLookup(){
+  const destSelect = document.getElementById('lk-dest');
+  const dest = destSelect.value;
+  const etdRaw = document.getElementById('lk-etd').value;
+  const etaRaw = document.getElementById('lk-eta').value;
+  const origin = 'Việt Nam';
+  const drug = '', reqMin = null, reqMax = null;
+
+  const resultsEl = document.getElementById('lookup-results');
+  if(!dest){
+    toast('Chọn quốc gia đến trước đã.');
+    return;
+  }
+  if(!etdRaw){
+    toast('Chọn ngày đi (ETD) trước đã.');
+    return;
+  }
+  const etd = new Date(etdRaw + 'T00:00:00');
+  const eta = etaRaw ? new Date(etaRaw + 'T00:00:00') : null;
+  const month = etd.getMonth()+1;
+  const days = eta ? Math.max(0, Math.round((eta-etd)/86400000)) : 14;
+
+  const btn = document.getElementById('btn-run-lookup');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Đang tra cứu…';
+
+  resultsEl.innerHTML = `<div class="empty"><span class="spinner" style="width:20px;height:20px;"></span><div style="margin-top:10px;">Đang tìm dữ liệu logger và khí hậu lịch sử…</div></div>`;
+
+  try{
+    // ---- 1. resolve endpoints: origin is always Vietnam; destination comes straight
+    //         from the dropdown's lat/lon (no geocoding call needed, always exact) ----
+    const og = await geocode(origin);
+    const destOpt = destSelect.selectedOptions[0];
+    const ds = { lat: parseFloat(destOpt.dataset.lat), lon: parseFloat(destOpt.dataset.lon), label: dest };
+
+    // ---- 2. match stored shipments: require BOTH ends to be relevant (text match OR
+    //         within a plausible geographic radius) — a matching origin alone is not
+    //         enough if the destination is on the other side of the planet. ----
+    const idx = await loadIndex();
+    const nOrigin = norm(origin), nDest = norm(dest);
+    const NEAR_KM = 300, REGION_KM = 6000;
+    const exact = [], reference = [];
+    idx.forEach(rec=>{
+      const rOrigin = norm(rec.origin||''), rDest = norm(rec.dest||'');
+      const originTextMatch = rOrigin && (rOrigin.includes(nOrigin) || nOrigin.includes(rOrigin));
+      const destTextMatch = rDest && (rDest.includes(nDest) || nDest.includes(rDest));
+      let originDist=null, destDist=null;
+      if(og && rec.originLat!=null && rec.originLon!=null) originDist = haversine(og.lat,og.lon,rec.originLat,rec.originLon);
+      if(ds && rec.destLat!=null && rec.destLon!=null) destDist = haversine(ds.lat,ds.lon,rec.destLat,rec.destLon);
+
+      const originNear = originTextMatch || (originDist!==null && originDist<=NEAR_KM);
+      const destNear = destTextMatch || (destDist!==null && destDist<=NEAR_KM);
+      const originRegion = originNear || (originDist!==null && originDist<=REGION_KM);
+      const destRegion = destNear || (destDist!==null && destDist<=REGION_KM);
+      const monthMatch = !month || (rec.months||[]).includes(month);
+
+      if(originNear && destNear && monthMatch){
+        exact.push({...rec, originDist, destDist});
+      }else if(originRegion && destRegion){
+        reference.push({...rec, originDist, destDist});
       }
     });
-  }
-}
-window.addEventListener('resize', () => { if (points.length) drawChart(); });
+    reference.sort((a,b)=>((a.originDist||0)+(a.destDist||0)) - ((b.originDist||0)+(b.destDist||0)));
 
-// ---------- upload UI wiring ----------
-const dropzone = document.getElementById('dropzone');
-const fileInput = document.getElementById('fileInput');
-dropzone.addEventListener('click', ()=> fileInput.click());
-fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
-['dragenter','dragover'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('drag'); }));
-['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('drag'); }));
-dropzone.addEventListener('drop', e => { if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+    await Promise.all([...exact, ...reference].map(async r=>{
+      const full = await getShipment(r.id);
+      if(full && full.points) r.dayStats = computeDayStats(full.points);
+    }));
 
-document.getElementById('manualToggle').addEventListener('click', () => {
-  const ta = document.getElementById('manualInput');
-  const wrap = document.getElementById('manualParseBtnWrap');
-  const show = ta.style.display === 'none';
-  ta.style.display = show ? 'block' : 'none';
-  wrap.style.display = show ? 'block' : 'none';
-});
-document.getElementById('manualParseBtn').addEventListener('click', () => {
-  const txt = document.getElementById('manualInput').value;
-  if (txt.trim()) ingestText(txt, 'dữ liệu dán');
-});
+    // ---- 3. build day-by-day journey: origin -> transit stops -> destination ----
+    let journey = null, climateError = null;
+    const transitStops = getTransitStops();
+    const offsetTransit = 3, offsetDwell = 8, offsetMinC = 1; // default container-vs-ambient deltas
+    const totalDays = days > 0 ? days : 14;
 
-document.getElementById('rangePreset').addEventListener('change', e => {
-  document.getElementById('customRangeRow').style.display = e.target.value === 'custom' ? 'flex' : 'none';
-  if (points.length) drawChart();
-});
-['customLow','customHigh'].forEach(id => document.getElementById(id).addEventListener('input', ()=>{ if(points.length) drawChart(); }));
+    if(og && ds){
+      const transitGeo = await Promise.all(transitStops.map(t=>geocode(t.name)));
+      const rawWaypoints = [
+        {type:'origin', name: origin, lat:og.lat, lon:og.lon, offset:0, dwell:0},
+        ...transitStops.map((t,i)=>({
+          type:'transit', name: t.name,
+          lat: transitGeo[i]?transitGeo[i].lat:null, lon: transitGeo[i]?transitGeo[i].lon:null,
+          offset: t.offset, dwell: t.dwell,
+        })).filter(w=>w.lat!=null),
+        {type:'dest', name: dest, lat:ds.lat, lon:ds.lon, offset: totalDays, dwell:0},
+      ];
+      const unspecified = rawWaypoints.filter(w=>w.type==='transit' && w.offset===null);
+      unspecified.forEach((w,i)=>{ w.offset = Math.round(((i+1)/(unspecified.length+1)) * totalDays); });
+      rawWaypoints.forEach(w=>{ w.offset = Math.max(0, Math.min(totalDays, w.offset)); });
+      const waypoints = rawWaypoints.sort((a,b)=>a.offset-b.offset);
 
-// ---------- verdict logic ----------
-function computeVerdict(stats, range){
-  const outPoints = points.filter(p => p.temp < range.low || p.temp > range.high);
-  const outPct = (outPoints.length / points.length) * 100;
-  let intervalMin = 60;
-  if (points.length > 1) intervalMin = Math.max(1, Math.round((points[1].t - points[0].t)/60000));
-  const outHours = (outPoints.length * intervalMin) / 60;
-  let maxExcursion = 0;
-  outPoints.forEach(p => {
-    const dev = p.temp < range.low ? (range.low - p.temp) : (p.temp - range.high);
-    if (dev > maxExcursion) maxExcursion = dev;
-  });
+      const depDate = etd;
 
-  let level, title, sub;
-  if (outPoints.length === 0){
-    level = 'ok';
-    title = 'Cont thường đủ dùng';
-    sub = 'Toàn bộ hành trình nằm trong ngưỡng yêu cầu';
-  } else if (outPct <= 5 && maxExcursion <= 2){
-    level = 'warn';
-    title = 'Cont thường — cần giám sát';
-    sub = 'Có lệch nhẹ, mức độ thấp';
-  } else {
-    level = 'danger';
-    title = 'Cần cont lạnh (reefer)';
-    sub = 'Vượt ngưỡng đáng kể hoặc kéo dài';
-  }
+      await Promise.all(waypoints.map(async w=>{
+        const wDate = new Date(depDate.getTime() + w.offset*86400000);
+        const m = wDate.getMonth()+1;
+        const y = pickYearForMonth(m);
+        w.clim = await fetchMonthClimate(w.lat, w.lon, y, m);
+        w.month = m; w.yearUsed = y;
+      }));
 
-  const reasons = [];
-  reasons.push(`Ngưỡng yêu cầu của sản phẩm: <b>${range.low}–${range.high}°C</b>. Nhiệt độ thực đo dao động <b>${stats.min.toFixed(1)}–${stats.max.toFixed(1)}°C</b>.`);
-  if (outPoints.length === 0){
-    reasons.push('Không ghi nhận điểm đo nào vượt ngưỡng trong suốt hành trình.');
-  } else {
-    reasons.push(`<b>${outPoints.length}</b> / ${points.length} điểm đo (${outPct.toFixed(1)}%) nằm ngoài ngưỡng, tương đương khoảng <b>${outHours.toFixed(1)} giờ</b> vượt ngưỡng.`);
-    reasons.push(`Mức lệch lớn nhất so với ngưỡng: <b>${maxExcursion.toFixed(1)}°C</b>.`);
-  }
-  reasons.push(`MKT (nhiệt động học trung bình) toàn hành trình: <b>${stats.mkt.toFixed(1)}°C</b> — phản ánh tác động nhiệt tích luỹ, nên so với khuyến cáo bảo quản của nhà sản xuất dược phẩm.`);
-  if (level !== 'ok'){
-    reasons.push('Khuyến nghị mang tính tham khảo dựa trên dữ liệu logger; quyết định cuối cùng nên đối chiếu với yêu cầu bảo quản cụ thể ghi trên nhãn/hồ sơ sản phẩm.');
-  }
+      const dayDates=[], ambientMax=[], ambientMin=[], containerMax=[], containerMin=[];
+      for(let d=0; d<=totalDays; d++){
+        let L = waypoints[0], R = waypoints[waypoints.length-1];
+        for(let i=0;i<waypoints.length-1;i++){
+          if(d >= waypoints[i].offset && d <= waypoints[i+1].offset){ L = waypoints[i]; R = waypoints[i+1]; break; }
+        }
+        const span = (R.offset - L.offset) || 1;
+        const wR = (R===L) ? 0 : (d - L.offset)/span;
+        const wL = 1 - wR;
 
-  return { level, title, sub, reasons, outPct, outHours, maxExcursion };
-}
+        const sample = (w, arr) => (!w || !w.clim || !arr || !arr.length) ? null : arr[((d % arr.length)+arr.length)%arr.length];
+        const lMax = sample(L, L.clim&&L.clim.tmax), rMax = sample(R, R.clim&&R.clim.tmax);
+        const lMin = sample(L, L.clim&&L.clim.tmin), rMin = sample(R, R.clim&&R.clim.tmin);
+        const amMax = (lMax!=null && rMax!=null) ? (wL*lMax+wR*rMax) : (lMax!=null?lMax:rMax);
+        const amMin = (lMin!=null && rMin!=null) ? (wL*lMin+wR*rMin) : (lMin!=null?lMin:rMin);
 
-function renderVerdict(v){
-  verdictCard.style.display = 'block';
-  const stamp = document.getElementById('stampEl');
-  stamp.className = 'stamp' + (v.level==='ok' ? '' : ' '+v.level);
-  stamp.innerHTML = v.title + '<small>' + v.sub + '</small>';
-  const ul = document.getElementById('reasonsEl');
-  ul.innerHTML = v.reasons.map(r => '<li>'+r+'</li>').join('');
-}
+        let inDwell = false;
+        waypoints.forEach(w=>{ if(w.dwell>0 && d>=w.offset && d<w.offset+w.dwell) inDwell=true; });
+        const bonus = inDwell ? offsetDwell : offsetTransit;
 
-// ---------- route suggestion from history ----------
-let historyCache = [];
-document.getElementById('routeInput').addEventListener('input', async (e) => {
-  const q = e.target.value.trim().toLowerCase();
-  const banner = document.getElementById('suggestBanner');
-  if (!q){ banner.style.display='none'; return; }
-  const matches = historyCache.filter(h => h.route && h.route.toLowerCase().includes(q));
-  if (matches.length){
-    const verdictCounts = {};
-    matches.forEach(m => verdictCounts[m.verdictTitle] = (verdictCounts[m.verdictTitle]||0)+1);
-    const top = Object.entries(verdictCounts).sort((a,b)=>b[1]-a[1])[0];
-    banner.style.display = 'block';
-    banner.textContent = `Tuyến này từng ghi nhận ${matches.length} lô trước đây. Khuyến nghị phổ biến nhất: "${top[0]}" (${top[1]}/${matches.length} lần).`;
-  } else {
-    banner.style.display = 'none';
-  }
-});
+        ambientMax.push(amMax); ambientMin.push(amMin);
+        containerMax.push(amMax!=null ? amMax+bonus : null);
+        containerMin.push(amMin!=null ? amMin+offsetMinC : null);
+        dayDates.push(new Date(depDate.getTime() + d*86400000));
+      }
 
-// ---------- destination search ----------
-function renderDestSearch(){
-  const q = document.getElementById('destSearchInput').value.trim();
-  const out = document.getElementById('destSearchResult');
-  if (!q){ out.innerHTML = ''; return; }
-  const qn = normalizeVN(q);
-  const queryCountry = resolveCountry(q);
-
-  const exact = historyCache.filter(h =>
-    normalizeVN(h.route).includes(qn) ||
-    normalizeVN(h.destText||'').includes(qn) ||
-    (queryCountry && h.destCountryId === queryCountry.id)
-  );
-
-  let nearby = [];
-  if (queryCountry){
-    const exactIds = new Set(exact.map(h=>h.id));
-    nearby = historyCache
-      .filter(h => !exactIds.has(h.id) && h.destCountryId && h.destLat != null)
-      .map(h => ({ h, dist: haversine(queryCountry.lat, queryCountry.lng, h.destLat, h.destLng) }))
-      .sort((a,b) => a.dist - b.dist)
-      .slice(0, 6);
-  }
-
-  if (!exact.length && !nearby.length){
-    out.innerHTML = '<div class="empty">' + (queryCountry
-      ? 'Chưa có lô hàng nào được lưu tới khu vực gần "' + escapeHtml(q) + '".'
-      : 'Không nhận diện được điểm đến này, và không có kết quả khớp trực tiếp. Thử một tên quốc gia khác.') + '</div>';
-    return;
-  }
-
-  let html = '';
-  if (exact.length){
-    html += '<div style="font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);margin:10px 0 6px;">Khớp trực tiếp</div>';
-    html += renderShipRows(exact);
-  }
-  if (nearby.length){
-    html += '<div style="font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);margin:14px 0 6px;">Tuyến gần khu vực điểm đến (theo khoảng cách)</div>';
-    html += '<table><thead><tr><th>Khoảng cách</th><th>Tuyến</th><th>Điểm đến ghi nhận</th><th>Min/Max</th><th>Ngưỡng</th><th>Khuyến nghị</th></tr></thead><tbody>';
-    nearby.forEach(({h,dist}) => {
-      html += `<tr><td>${Math.round(dist).toLocaleString('vi-VN')} km</td><td>${escapeHtml(h.route)}</td><td>${escapeHtml(h.destText||'—')}</td>
-        <td>${h.min.toFixed(1)} / ${h.max.toFixed(1)}°C</td><td>${h.rangeLow}–${h.rangeHigh}°C</td>
-        <td><span class="chip ${verdictChipClass(h.verdictLevel)}">${escapeHtml(h.verdictTitle)}</span></td></tr>`;
-    });
-    html += '</tbody></table>';
-  }
-  out.innerHTML = html;
-}
-
-function renderShipRows(list){
-  let html = '<table><thead><tr><th>Ngày lưu</th><th>Tuyến</th><th>Min/Max</th><th>&gt;30°C</th><th>&gt;40°C</th><th>&gt;50°C</th><th>Khuyến nghị</th></tr></thead><tbody>';
-  list.forEach(h => {
-    const t = h.thresholds || {};
-    html += `<tr><td>${fmtDate(h.savedAt)}</td><td>${escapeHtml(h.route)}</td><td>${h.min.toFixed(1)} / ${h.max.toFixed(1)}°C</td>
-      <td>${t[30]?t[30].hoursOver+'h / '+t[30].daysCount+'ng':'—'}</td>
-      <td>${t[40]?t[40].hoursOver+'h / '+t[40].daysCount+'ng':'—'}</td>
-      <td>${t[50]?t[50].hoursOver+'h / '+t[50].daysCount+'ng':'—'}</td>
-      <td><span class="chip ${verdictChipClass(h.verdictLevel)}">${escapeHtml(h.verdictTitle)}</span></td></tr>`;
-  });
-  html += '</tbody></table>';
-  return html;
-}
-
-document.getElementById('destSearchBtn').addEventListener('click', renderDestSearch);
-document.getElementById('destSearchInput').addEventListener('keydown', e => { if (e.key === 'Enter') renderDestSearch(); });
-
-// ---------- analyze & save ----------
-analyzeBtn.addEventListener('click', async () => {
-  if (!points.length) return;
-  const range = getRange();
-  if (!range){ setStatus('Nhập đủ ngưỡng nhiệt độ tuỳ chỉnh trước khi phân tích.', 'err'); return; }
-  const stats = computeStats(points);
-  const verdict = computeVerdict(stats, range);
-  renderVerdict(verdict);
-  drawChart();
-
-  const route = document.getElementById('routeInput').value.trim() || '(chưa đặt tên tuyến)';
-  const product = document.getElementById('productInput').value.trim();
-  const dest = parseDestination(route);
-  const thresholds = computeThresholdStats(points);
-  const record = {
-    id: 'ship_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
-    savedAt: Date.now(),
-    route, product,
-    destText: dest.text,
-    destCountryId: dest.country ? dest.country.id : null,
-    destLat: dest.country ? dest.country.lat : null,
-    destLng: dest.country ? dest.country.lng : null,
-    deviceId: meta.deviceId,
-    rangeLow: range.low, rangeHigh: range.high,
-    min: stats.min, max: stats.max, avg: stats.avg, mkt: stats.mkt,
-    start: stats.start, stop: stats.stop, n: stats.n,
-    verdictLevel: verdict.level, verdictTitle: verdict.title,
-    thresholds
-  };
-  try{
-    const res = await fetch(SUPABASE_URL + '/rest/v1/shipments', {
-      method: 'POST',
-      headers: sbHeaders({ 'Prefer': 'return=minimal' }),
-      body: JSON.stringify(toDbRow(record))
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + await res.text());
-    setStatus('Đã lưu lô hàng vào lịch sử.', 'ok');
-    loadHistory();
-  } catch(err){
-    console.error(err);
-    setStatus('Phân tích xong nhưng không lưu được vào lịch sử (kiểm tra cấu hình backend / kết nối mạng).', 'err');
-  }
-});
-
-// ---------- history ----------
-function verdictChipClass(level){
-  return level === 'ok' ? 'ok' : level === 'warn' ? 'warn' : 'danger';
-}
-
-async function loadHistory(){
-  const wrap = document.getElementById('historyWrap');
-  wrap.innerHTML = '<div class="empty">Đang tải…</div>';
-  if (!IS_CONFIGURED){
-    wrap.innerHTML = '<div class="empty">Chưa cấu hình backend — xem cảnh báo phía trên đầu trang.</div>';
-    historyCache = [];
-    return;
-  }
-  try{
-    const res = await fetch(SUPABASE_URL + '/rest/v1/shipments?select=*&order=saved_at.desc', {
-      headers: sbHeaders()
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const rows = await res.json();
-    const records = rows.map(fromDbRow);
-    historyCache = records;
-    if (!records.length){
-      wrap.innerHTML = '<div class="empty">Chưa có lô hàng nào được lưu. Phân tích một lô để bắt đầu lịch sử.</div>';
-      return;
+      journey = { waypoints, dayDates, ambientMax, ambientMin, containerMax, containerMin, totalDays };
+    }else if(!og || !ds){
+      climateError = 'Không định vị được toạ độ cho tuyến này. Hãy chọn lại quốc gia đến.';
     }
-    renderHistory(records);
-  } catch(err){
-    console.error(err);
-    wrap.innerHTML = '<div class="empty">Không tải được lịch sử từ backend. Kiểm tra kết nối mạng hoặc cấu hình Supabase.</div>';
+
+    renderLookupResults({origin, dest, month, days, drug, reqMin, reqMax, exact, reference, journey, climateError, og, ds});
+  }catch(e){
+    console.error(e);
+    resultsEl.innerHTML = `<div class="empty">Có lỗi khi tra cứu: ${escapeHtml(e.message||String(e))}</div>`;
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg> Tìm khuyến nghị';
   }
 }
 
-function renderHistory(records){
-  const wrap = document.getElementById('historyWrap');
-  const filterVal = document.getElementById('historyFilter').value.trim().toLowerCase();
-  const filtered = filterVal ? records.filter(r =>
-    (r.route||'').toLowerCase().includes(filterVal) || (r.product||'').toLowerCase().includes(filterVal)
-  ) : records;
+function renderLookupResults(ctx){
+  const { origin, dest, month, days, drug, reqMin, reqMax, exact, reference, journey, climateError } = ctx;
+  const resultsEl = document.getElementById('lookup-results');
+  let html = '';
 
-  if (!filtered.length){
-    wrap.innerHTML = '<div class="empty">Không có kết quả phù hợp.</div>';
+  // ---- compute journey-based stats (container estimate drives the recommendation) ----
+  let jStats = null;
+  if(journey){
+    const cMax = journey.containerMax.filter(v=>v!=null);
+    const cMin = journey.containerMin.filter(v=>v!=null);
+    const aMax = journey.ambientMax.filter(v=>v!=null);
+    const aMin = journey.ambientMin.filter(v=>v!=null);
+    if(cMax.length && cMin.length){
+      jStats = {
+        contMax: Math.max(...cMax), contMin: Math.min(...cMin),
+        ambMax: Math.max(...aMax), ambMin: Math.min(...aMin),
+        over30: journey.containerMax.filter(v=>v!=null&&v>30).length,
+        over35: journey.containerMax.filter(v=>v!=null&&v>35).length,
+        over40: journey.containerMax.filter(v=>v!=null&&v>40).length,
+        totalDays: journey.totalDays,
+      };
+    }
+  }
+
+  // ---- overall banner: prefer exact real-data match, else journey/container estimate ----
+  let bannerHtml = '';
+  if(exact.length){
+    const worstMin = Math.min(...exact.map(r=>r.min));
+    const worstMax = Math.max(...exact.map(r=>r.max));
+    const rec = recommend(reqMin, reqMax, worstMin, worstMax);
+    bannerHtml = verdictBlock(rec, worstMin, worstMax, reqMin, reqMax, `${exact.length} lô data logger thực tế đã lưu cho tuyến này`);
+  }else if(jStats){
+    const rec = recommend(reqMin, reqMax, jStats.contMin, jStats.contMax);
+    bannerHtml = verdictBlock(rec, jStats.contMin, jStats.contMax, reqMin, reqMax, 'dự đoán nhiệt độ trong container theo hành trình (chưa có data logger thực tế trùng khớp)');
+  }
+  if(!bannerHtml){
+    bannerHtml = `<div class="verdict borderline"><div class="verdict-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></div><div><h2>Chưa đủ dữ liệu để khuyến nghị</h2><p>${climateError || 'Chưa có data logger phù hợp và chưa xác định được toạ độ khí hậu. Hãy kiểm tra lại tên cảng hoặc chọn tháng khởi hành.'}</p></div></div>`;
+  }
+  html += bannerHtml;
+
+  // ---- section: real data logger matches ----
+  html += `<div class="section-label"><span class="dot"></span><h3>Dữ liệu logger thực tế</h3><small>${exact.length} khớp tuyến+tháng · ${reference.length} tham khảo gần khu vực</small></div>`;
+  if(!exact.length && !reference.length){
+    html += `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg><div>Chưa có data logger nào khớp hoặc gần khu vực tuyến ${escapeHtml(origin)} → ${escapeHtml(dest)}. Hãy dựa vào dự đoán khí hậu bên dưới, hoặc tải thêm data logger cho tuyến này.</div></div>`;
+  }else{
+    [...exact.map(r=>({r,ex:true})), ...reference.map(r=>({r,ex:false}))].forEach(({r,ex})=>{
+      const tripDays = ((r.stop-r.start)/86400000).toFixed(0);
+      let distNote = '';
+      if(!ex){
+        const parts = [];
+        if(r.originDist!=null) parts.push('cảng đi cách ~'+Math.round(r.originDist)+'km');
+        if(r.destDist!=null) parts.push('cảng đến cách ~'+Math.round(r.destDist)+'km');
+        if(parts.length) distNote = `<div class="hint" style="margin-top:6px;">${parts.join(' · ')} so với tuyến bạn đang tra — dùng để tham khảo, không phải dữ liệu cùng tuyến.</div>`;
+      }
+      html += `<div class="match-card">
+        <div class="match-head">
+          <div>
+            <div class="match-route">${escapeHtml(r.origin||'?')}<span class="arrow">→</span>${escapeHtml(r.dest||'?')}</div>
+            <div class="match-meta">${new Date(r.start).toLocaleDateString('vi-VN')} – ${new Date(r.stop).toLocaleDateString('vi-VN')} · ${tripDays} ngày ${r.transportMode?(' · '+transportModeLabel(r.transportMode)):''} · ${escapeHtml(r.fileName)}</div>
+          </div>
+          <span class="tag ${ex?'tag-exact':'tag-ref'}">${ex?'Khớp tuyến':'Tham khảo gần khu vực'}</span>
+        </div>
+        <div class="stat-strip" style="margin-top:14px;margin-bottom:6px;">
+          <div class="stat-item"><b>${fmt1(r.max)}°C</b><span>Cao nhất</span></div>
+          <div class="stat-item"><b>${fmt1(r.min)}°C</b><span>Thấp nhất</span></div>
+          <div class="stat-item"><b>${fmt1(r.avg)}°C</b><span>Trung bình</span></div>
+        </div>
+        ${r.dayStats ? `<div class="leg-grid" style="grid-template-columns:repeat(3,1fr);margin:10px 0 4px;">
+          <div class="leg-card" style="padding:11px 13px;">
+            <div class="leg-row" style="border-top:none;"><span>Ngày &gt;30°C</span><b>${r.dayStats.over30}/${r.dayStats.totalDays}</b></div>
+            <div class="leg-row"><span>Liên tục dài nhất</span><b>${r.dayStats.streak30} ngày</b></div>
+          </div>
+          <div class="leg-card" style="padding:11px 13px;">
+            <div class="leg-row" style="border-top:none;"><span>Ngày &gt;35°C</span><b>${r.dayStats.over35}/${r.dayStats.totalDays}</b></div>
+            <div class="leg-row"><span>Liên tục dài nhất</span><b>${r.dayStats.streak35} ngày</b></div>
+          </div>
+          <div class="leg-card" style="padding:11px 13px;">
+            <div class="leg-row" style="border-top:none;"><span>Ngày &gt;40°C</span><b>${r.dayStats.over40}/${r.dayStats.totalDays}</b></div>
+            <div class="leg-row"><span>Liên tục dài nhất</span><b>${r.dayStats.streak40} ngày</b></div>
+          </div>
+        </div>` : ''}
+        ${distNote}
+        <button class="btn btn-ghost btn-sm" onclick="openDetail('${r.id}')" style="margin-top:10px;">Xem chi tiết &amp; biểu đồ</button>
+      </div>`;
+    });
+  }
+
+  // ---- section: journey climate + container estimate chart ----
+  html += `<div class="section-label"><span class="dot" style="background:var(--amber);box-shadow:0 0 8px var(--amber);"></span><h3>Dự đoán nhiệt độ theo hành trình</h3><small>Nguồn: khí hậu lịch sử Open-Meteo + ước tính chênh lệch container</small></div>`;
+  if(climateError){
+    html += `<div class="empty">${escapeHtml(climateError)}</div>`;
+  }else if(!month){
+    html += `<div class="empty">Chọn tháng khởi hành để xem dự đoán theo hành trình.</div>`;
+  }else if(journey && jStats){
+    html += `<div class="journey-chart-card">
+      <canvas id="journey-chart" style="width:100%;height:220px;display:block;"></canvas>
+      <div class="journey-legend">
+        <span><i style="background:#F2A65A"></i> Nhiệt độ ngoài trời (đỉnh/ngày)</span>
+        <span><i style="background:#FF6E6E"></i> Nhiệt độ trong container (ước tính)</span>
+        <span><i style="background:var(--safe);opacity:.5;"></i> Vùng ngưỡng bảo quản yêu cầu</span>
+        <span style="color:var(--amber)">┊ vạch cam = cảng trung chuyển</span>
+      </div>
+    </div>
+    <div class="journey-stats">
+      <div class="journey-stat ${jStats.contMax > (reqMax??999) ? 'warn':''}"><b>${fmt1(jStats.contMax)}°C</b><span>Cao nhất trong cont</span></div>
+      <div class="journey-stat"><b>${fmt1(jStats.contMin)}°C</b><span>Thấp nhất trong cont</span></div>
+      <div class="journey-stat"><b>${fmt1(jStats.ambMax)}°C</b><span>Cao nhất ngoài trời</span></div>
+      <div class="journey-stat"><b>${fmt1(jStats.ambMin)}°C</b><span>Thấp nhất ngoài trời</span></div>
+      <div class="journey-stat ${jStats.over30>0?'warn':''}"><b>${jStats.over30}/${jStats.totalDays+1}</b><span>Ngày cont &gt;30°C</span></div>
+      <div class="journey-stat ${jStats.over35>0?'warn':''}"><b>${jStats.over35}/${jStats.totalDays+1}</b><span>Ngày cont &gt;35°C</span></div>
+      <div class="journey-stat ${jStats.over40>0?'warn':''}"><b>${jStats.over40}/${jStats.totalDays+1}</b><span>Ngày cont &gt;40°C</span></div>
+    </div>
+    <div class="footnote">* Đường "ngoài trời" lấy nhiệt độ đỉnh trong ngày theo dữ liệu khí hậu lịch sử (nội suy dọc theo các điểm: cảng đi → cảng trung chuyển → cảng đến, năm gần nhất có đủ dữ liệu). Đường "trong container" = ngoài trời + độ chênh m khai báo ở trên (chênh nhiều hơn trong những ngày lưu bãi tại cảng trung chuyển). Đây là ước tính kỹ thuật, không phải số đo thật — ưu tiên dùng data logger thực tế khi có, và nên hiệu chỉnh lại độ chênh dựa trên kinh nghiệm/dữ liệu logger thật của m theo thời gian.</div>`;
+  }else{
+    html += `<div class="empty">Không đủ dữ liệu khí hậu cho hành trình này.</div>`;
+  }
+
+  resultsEl.innerHTML = html;
+  if(journey && jStats){
+    requestAnimationFrame(()=>{
+      const canvas = document.getElementById('journey-chart');
+      if(canvas) drawJourneyChart(canvas, journey, reqMin, reqMax);
+    });
+  }
+}
+
+/* ================= LIBRARY ================= */
+function transportModeLabel(m){
+  return {AIR:'✈ AIR', LCL:'📦 LCL', FCL_COLD:'❄ FCL Lạnh', FCL_STD:'🚛 FCL Thường'}[m] || '';
+}
+
+async function renderLibrary(){
+  const el = document.getElementById('library-list');
+  const idx = await loadIndex();
+  if(!idx.length){
+    el.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg><div>Chưa có dữ liệu nào. Sang tab "Tải lên dữ liệu" để bắt đầu.</div></div>`;
     return;
   }
-  let html = '<table><thead><tr><th>Ngày lưu</th><th>Tuyến</th><th>Điểm đến</th><th>Sản phẩm</th><th>Ngưỡng</th><th>Min/Max</th><th>MKT</th><th>&gt;30°C</th><th>&gt;40°C</th><th>&gt;50°C</th><th>Khuyến nghị</th><th></th></tr></thead><tbody>';
-  filtered.forEach(r => {
-    const t = r.thresholds || {};
-    html += `<tr>
-      <td>${fmtDate(r.savedAt)}</td>
-      <td>${escapeHtml(r.route)}</td>
-      <td>${escapeHtml(r.destText||'—')}${r.destCountryId ? '' : ' <span style="color:var(--ink-soft);font-size:10px;">(chưa nhận diện)</span>'}</td>
-      <td>${escapeHtml(r.product||'—')}</td>
-      <td>${r.rangeLow}–${r.rangeHigh}°C</td>
-      <td>${r.min.toFixed(1)} / ${r.max.toFixed(1)}°C</td>
-      <td>${r.mkt.toFixed(1)}°C</td>
-      <td>${t[30]?t[30].hoursOver+'h/'+t[30].daysCount+'ng':'—'}</td>
-      <td>${t[40]?t[40].hoursOver+'h/'+t[40].daysCount+'ng':'—'}</td>
-      <td>${t[50]?t[50].hoursOver+'h/'+t[50].daysCount+'ng':'—'}</td>
-      <td><span class="chip ${verdictChipClass(r.verdictLevel)}">${escapeHtml(r.verdictTitle)}</span></td>
-      <td><button class="del" data-id="${r.id}">xoá</button></td>
-    </tr>`;
+
+  // group by destination country (normalized), keep the most recent raw label for display
+  const groups = new Map();
+  idx.forEach(r=>{
+    const key = norm(r.dest || 'khac');
+    if(!groups.has(key)) groups.set(key, {label: r.dest || 'Khác', items: []});
+    groups.get(key).items.push(r);
   });
-  html += '</tbody></table>';
-  wrap.innerHTML = html;
-  wrap.querySelectorAll('.del').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      try{
-        const res = await fetch(SUPABASE_URL + '/rest/v1/shipments?id=eq.' + encodeURIComponent(btn.getAttribute('data-id')), {
-          method: 'DELETE',
-          headers: sbHeaders()
-        });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-      } catch(err){
-        console.error(err);
-        alert('Không xoá được — kiểm tra kết nối mạng / cấu hình backend.');
-      }
-      loadHistory();
-    });
-  });
+  const groupList = Array.from(groups.values());
+  groupList.forEach(g=>g.items.sort((a,b)=>b.uploadedAt-a.uploadedAt));
+  groupList.sort((a,b)=> Math.max(...b.items.map(x=>x.uploadedAt)) - Math.max(...a.items.map(x=>x.uploadedAt)));
+
+  el.innerHTML = `<div class="lib-grid">` + groupList.map(g=>{
+    const allMax = g.items.map(r=>r.max), allMin = g.items.map(r=>r.min);
+    const modeCounts = {};
+    g.items.forEach(r=>{ const m=r.transportMode||'—'; modeCounts[m]=(modeCounts[m]||0)+1; });
+    const modeSummary = Object.entries(modeCounts).map(([m,c])=>`${m==='—'?'Chưa gắn loại':transportModeLabel(m)} ×${c}`).join(' · ');
+    return `<div class="lib-card" style="cursor:pointer;" onclick="openCountryGroup('${escapeHtml(norm(g.label)).replace(/'/g,"\\'")}')">
+      <div class="route">${escapeHtml(g.label)}</div>
+      <div class="period">${g.items.length} lô data logger · ${modeSummary}</div>
+      <div class="stat-strip" style="gap:16px;">
+        <div class="stat-item"><b>${fmt1(Math.max(...allMax))}°</b><span>Max toàn bộ</span></div>
+        <div class="stat-item"><b>${fmt1(Math.min(...allMin))}°</b><span>Min toàn bộ</span></div>
+      </div>
+      <div class="lib-foot">
+        <button class="btn btn-ghost btn-sm">Xem tất cả lô →</button>
+      </div>
+    </div>`;
+  }).join('') + `</div>`;
 }
 
-function escapeHtml(s){
-  return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
+window.openCountryGroup = async function(groupKey){
+  const idx = await loadIndex();
+  const items = idx.filter(r=>norm(r.dest||'khac')===groupKey).sort((a,b)=>b.uploadedAt-a.uploadedAt);
+  if(!items.length) return;
+  const label = items[0].dest || 'Khác';
 
-document.getElementById('historyFilter').addEventListener('input', () => renderHistory(historyCache));
-document.getElementById('refreshHistoryBtn').addEventListener('click', loadHistory);
+  const modeOrder = ['AIR','LCL','FCL_COLD','FCL_STD'];
+  const byMode = {};
+  items.forEach(r=>{ const m = r.transportMode || 'OTHER'; (byMode[m]=byMode[m]||[]).push(r); });
+  const modeKeys = [...modeOrder.filter(m=>byMode[m]), ...Object.keys(byMode).filter(m=>!modeOrder.includes(m))];
 
-loadHistory();
+  function rowHtml(r){
+    const tripDays = ((r.stop-r.start)/86400000).toFixed(0);
+    return `<div class="match-card" style="margin-bottom:10px;">
+      <div class="match-head">
+        <div>
+          <div class="match-route">${escapeHtml(r.origin||'Việt Nam')}<span class="arrow">→</span>${escapeHtml(r.dest||'?')}</div>
+          <div class="match-meta">${new Date(r.start).toLocaleDateString('vi-VN')} – ${new Date(r.stop).toLocaleDateString('vi-VN')} · ${tripDays} ngày · ${escapeHtml(r.fileName)}</div>
+        </div>
+      </div>
+      <div class="stat-strip" style="margin-top:12px;margin-bottom:4px;">
+        <div class="stat-item"><b>${fmt1(r.max)}°C</b><span>Cao nhất</span></div>
+        <div class="stat-item"><b>${fmt1(r.min)}°C</b><span>Thấp nhất</span></div>
+        <div class="stat-item"><b>${fmt1(r.avg)}°C</b><span>Trung bình</span></div>
+      </div>
+      <div class="lib-foot" style="margin-top:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="openDetail('${r.id}')">Xem chi tiết &amp; biểu đồ</button>
+        <button class="btn btn-danger btn-sm" onclick="removeShipmentFromGroup('${r.id}','${groupKey.replace(/'/g,"\\'")}')">Xoá</button>
+      </div>
+    </div>`;
+  }
+
+  const modal = document.getElementById('modal-content');
+  modal.innerHTML = `
+    <button class="modal-close" onclick="document.getElementById('modal-bg').classList.remove('active')">✕</button>
+    <h2 style="font-family:var(--font-display);margin:0 0 4px;">${escapeHtml(label)}</h2>
+    <div class="hint" style="margin-bottom:18px;">${items.length} lô data logger đã lưu cho quốc gia này</div>
+    ${modeKeys.map(m=>`
+      <div class="section-label" style="margin-top:22px;">
+        <span class="dot" style="background:${m==='FCL_COLD'?'var(--ice)':m==='AIR'?'var(--amber)':'var(--text-dim)'}"></span>
+        <h3>${m==='OTHER'?'Chưa gắn loại hình':transportModeLabel(m)}</h3>
+        <small>${byMode[m].length} lô</small>
+      </div>
+      ${byMode[m].map(rowHtml).join('')}
+    `).join('')}
+  `;
+  document.getElementById('modal-bg').classList.add('active');
+};
+
+window.removeShipmentFromGroup = async function(id, groupKey){
+  if(!confirm('Xoá lô dữ liệu này khỏi kho? Không thể hoàn tác.')) return;
+  await deleteShipment(id);
+  toast('Đã xoá.');
+  renderLibrary();
+  const idx = await loadIndex();
+  const remaining = idx.some(r=>norm(r.dest||'khac')===groupKey);
+  if(remaining) openCountryGroup(groupKey);
+  else document.getElementById('modal-bg').classList.remove('active');
+};
+
+window.removeShipment = async function(id){
+  if(!confirm('Xoá lô dữ liệu này khỏi kho? Không thể hoàn tác.')) return;
+  await deleteShipment(id);
+  toast('Đã xoá.');
+  renderLibrary();
+};
+
+window.openDetail = async function(id){
+  const r = await getShipment(id);
+  if(!r){ toast('Không tìm thấy dữ liệu.'); return; }
+  const modalBg = document.getElementById('modal-bg');
+  const modal = document.getElementById('modal-content');
+  const tripDays = ((r.stop-r.start)/86400000).toFixed(1);
+  modal.innerHTML = `
+    <button class="modal-close" onclick="document.getElementById('modal-bg').classList.remove('active')">✕</button>
+    <h2 style="font-family:var(--font-display);margin:0 0 4px;">${escapeHtml(r.origin||'?')} → ${escapeHtml(r.dest||'?')}</h2>
+    <div class="hint" style="margin-bottom:16px;">${escapeHtml(r.fileName)} · Device ${escapeHtml(r.deviceId||'N/A')} · ${tripDays} ngày</div>
+    <div class="ribbon-wrap"><canvas class="ribbon" id="modal-ribbon"></canvas></div>
+    <div class="stat-strip">
+      <div class="stat-item"><b>${fmt1(r.max)}°C</b><span>Cao nhất</span></div>
+      <div class="stat-item"><b>${fmt1(r.min)}°C</b><span>Thấp nhất</span></div>
+      <div class="stat-item"><b>${fmt1(r.avg)}°C</b><span>Trung bình</span></div>
+      <div class="stat-item"><b>${r.points.length}</b><span>Điểm dữ liệu</span></div>
+    </div>
+    ${r.drug?`<div class="hint">Thuốc / lô hàng: ${escapeHtml(r.drug)}</div>`:''}
+    ${(r.reqMin!=null||r.reqMax!=null)?`<div class="hint">Ngưỡng yêu cầu: ${r.reqMin!=null?r.reqMin+'°C':'—'} ~ ${r.reqMax!=null?r.reqMax+'°C':'—'}</div>`:''}
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      ${r.pdfBase64
+        ? `<button class="btn btn-primary btn-sm" id="btn-open-pdf"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg> Mở file PDF gốc</button>`
+        : `<span class="hint">(File PDF gốc chưa được lưu — lô này tải lên trước khi có tính năng này)</span>`}
+    </div>
+    <div style="max-height:320px;overflow:auto;margin-top:14px;border:1px solid var(--border-soft);border-radius:9px;">
+      <table class="data-table">
+        <thead><tr><th>Thời gian</th><th>Nhiệt độ (°C)</th></tr></thead>
+        <tbody>
+          ${r.points.map(p=>`<tr><td>${new Date(p.t).toLocaleString('vi-VN')}</td><td>${p.c.toFixed(1)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+  modalBg.classList.add('active');
+  requestAnimationFrame(()=>drawRibbon(document.getElementById('modal-ribbon'), r.points));
+  if(r.pdfBase64){
+    const btnPdf = document.getElementById('btn-open-pdf');
+    if(btnPdf) btnPdf.addEventListener('click', ()=>openPdfFromBase64(r.pdfBase64, r.fileName));
+  }
+};
+document.getElementById('modal-bg').addEventListener('click', e=>{
+  if(e.target.id==='modal-bg') e.currentTarget.classList.remove('active');
+});
+
+/* init */
+renderLibrary();
 </script>
 </body>
 </html>
