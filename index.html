@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -8,6 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <style>
   :root{
     --bg:#0A1420;
@@ -251,11 +253,41 @@
   .journey-stat.warn b{color:var(--danger);}
 
   .footnote{font-size:11.5px;color:var(--text-dim);line-height:1.6;margin-top:10px;}
+
+  .login-gate{
+    position:fixed;inset:0;z-index:500;display:none;
+    align-items:center;justify-content:center;padding:20px;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(91,217,232,.10), transparent 60%),
+      var(--bg);
+  }
+  .login-gate.active{display:flex;}
+  .login-gate-card{
+    width:100%;max-width:380px;
+    background:linear-gradient(180deg, var(--surface-2), var(--surface));
+    border:1px solid var(--border-soft);border-radius:var(--radius);
+    padding:32px 28px;
+  }
 </style>
 </head>
 <body>
 
-<div class="topbar">
+<div class="login-gate" id="login-gate">
+  <div class="login-gate-card">
+    <div class="brand-mark" style="margin:0 auto 18px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#04222b" stroke-width="2"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+    </div>
+    <h2 style="font-family:var(--font-display);text-align:center;margin:0 0 6px;">TUYẾN LẠNH</h2>
+    <p class="hint" style="text-align:center;margin-bottom:24px;">Đăng nhập bằng tài khoản được cấp để dùng chung dữ liệu với team.</p>
+    <div class="field"><label class="field-label">Email</label><input type="text" id="gate-email" placeholder="ten@congty.com"></div>
+    <div class="field"><label class="field-label">Mật khẩu</label><input type="password" id="gate-pass" placeholder="••••••••"></div>
+    <div id="gate-error" class="hint" style="color:var(--danger);display:none;margin-bottom:10px;"></div>
+    <button class="btn btn-primary btn-block" id="gate-submit">Đăng nhập</button>
+    <p class="hint" style="text-align:center;margin-top:16px;">Chưa có tài khoản? Liên hệ quản trị viên để được cấp.</p>
+  </div>
+</div>
+
+<div class="topbar" id="app-topbar">
   <div class="topbar-inner">
     <div class="brand">
       <div class="brand-mark">
@@ -263,8 +295,9 @@
       </div>
       <div class="brand-text">
         <b>TUYẾN LẠNH</b>
-        <span>COLD‑CHAIN ROUTE ADVISOR</span>
+        <span id="sync-status">COLD‑CHAIN ROUTE ADVISOR</span>
       </div>
+      <button id="admin-login-btn" class="btn btn-ghost btn-sm" style="margin-left:14px;">🔒 Chưa đăng nhập</button>
     </div>
     <div class="tabs" id="tabs">
       <button class="tab-btn active" data-tab="lookup">
@@ -283,7 +316,7 @@
   </div>
 </div>
 
-<div class="wrap">
+<div class="wrap" id="app-wrap">
 
   <!-- ================= LOOKUP TAB ================= -->
   <div class="panel active" id="panel-lookup">
@@ -293,9 +326,7 @@
     <div class="card">
       <div class="field">
         <label class="field-label">Cảng / nước đến</label>
-        <select id="lk-dest">
-          <option value="">— Chọn quốc gia —</option>
-        </select>
+        <input type="text" id="lk-dest" list="country-datalist" placeholder="Gõ tên quốc gia để tìm...">
       </div>
 
       <div class="grid-2">
@@ -344,6 +375,10 @@
   <div class="panel" id="panel-library">
     <h1 class="page-title">Kho dữ liệu đã lưu</h1>
     <p class="page-sub">Toàn bộ lô data logger đã tải lên. Dữ liệu này được dùng làm căn cứ thực tế khi tra cứu khuyến nghị.</p>
+    <button class="btn btn-ghost btn-sm" id="btn-backup" style="margin-bottom:18px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Tải backup toàn bộ dữ liệu về máy
+    </button>
     <div id="library-list"></div>
   </div>
 
@@ -353,6 +388,7 @@
   <div class="modal" id="modal-content"></div>
 </div>
 <div class="toast" id="toast"></div>
+<datalist id="country-datalist"></datalist>
 
 <script>
 /* =========================================================================
@@ -390,10 +426,62 @@ function parseDMY(str){
   return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]);
 }
 
+/* ==========================================================================
+   FIREBASE CONFIG — dán config Firebase của bạn vào đây để bật kho dữ liệu
+   DÙNG CHUNG cho mọi người truy cập trang web này.
+   Xem hướng dẫn lấy config tại: https://console.firebase.google.com
+   Nếu để nguyên placeholder (chưa dán config thật), app tự động dùng
+   IndexedDB cục bộ trên từng máy (không dùng chung được) như trước.
+   ========================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBf4FLHJVkn27N7oJWCRlJ_0v_hi_yT5SY",
+  authDomain: "data-logger-8af48.firebaseapp.com",
+  projectId: "data-logger-8af48",
+  storageBucket: "data-logger-8af48.firebasestorage.app",
+  messagingSenderId: "240099162931",
+  appId: "1:240099162931:web:58e3baaf05722b51049c46"
+};
+/* Email của tài khoản admin duy nhất được phép XOÁ dữ liệu.
+   Phải khớp đúng với email đặt trong Firestore Rules. */
+const ADMIN_EMAIL = "ADMIN_EMAIL_CUA_M";
+
+const HAS_FIREBASE = (typeof firebase !== 'undefined') && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
+let fsDb = null;
+let fsAuth = null;
+let isLoggedIn = false;
+let isAdmin = false;
+if(HAS_FIREBASE){
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    fsDb = firebase.firestore();
+    fsAuth = firebase.auth();
+    fsAuth.onAuthStateChanged(user=>{
+      isLoggedIn = !!user;
+      isAdmin = !!user && user.email === ADMIN_EMAIL;
+      updateAdminUI();
+      updateGate();
+      if(isLoggedIn) renderLibrary();
+    });
+  }catch(e){ console.error('Firebase init failed', e); }
+}
+const FS_COLLECTION = 'coldroute_shared';
+async function fsGet(key){
+  const doc = await fsDb.collection(FS_COLLECTION).doc(key).get();
+  return doc.exists ? doc.data().value : null;
+}
+async function fsSet(key, value){
+  await fsDb.collection(FS_COLLECTION).doc(key).set({ value, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  return true;
+}
+async function fsDelete(key){
+  await fsDb.collection(FS_COLLECTION).doc(key).delete();
+  return true;
+}
+
 /* ---------------- storage helpers ---------------- */
-/* Works both inside Claude.ai (window.storage) AND as a standalone downloaded file
-   opened in any regular browser (falls back to IndexedDB, which persists locally
-   per-origin regardless of where the file is hosted/opened from). */
+/* Priority: Firebase Firestore (real shared storage for everyone on this page)
+   > window.storage (when previewed inside Claude.ai)
+   > IndexedDB (local-only fallback, per browser/device). */
 const HAS_CLAUDE_STORAGE = (typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function');
 
 const IDB_NAME = 'coldroute-db', IDB_VERSION = 1, IDB_STORE = 'kv';
@@ -440,46 +528,82 @@ async function idbDelete(key){
 let _storageBroken = false;
 async function safeGet(key, shared=false){
   try{
-    if(HAS_CLAUDE_STORAGE){
+    if(HAS_FIREBASE){
+      return await fsGet(key);
+    }else if(HAS_CLAUDE_STORAGE){
       const r = await window.storage.get(key, shared);
       return r ? r.value : null;
     }else{
       const v = await idbGet(key);
       return (v===null||v===undefined) ? null : v;
     }
-  }catch(e){ return null; }
+  }catch(e){ console.error('storage get failed', key, e); return null; }
 }
 async function safeSet(key, value, shared=false){
   try{
+    if(HAS_FIREBASE) return await fsSet(key, value);
     if(HAS_CLAUDE_STORAGE) return await window.storage.set(key, value, shared);
     await idbSet(key, value);
     return true;
   }catch(e){
     console.error('storage set failed', key, e);
-    if(!_storageBroken){ _storageBroken = true; toast('Không lưu được dữ liệu vào trình duyệt (có thể do chế độ ẩn danh / trình duyệt chặn lưu trữ). Thử mở bằng tab thường.'); }
+    if(!_storageBroken){
+      _storageBroken = true;
+      toast(HAS_FIREBASE
+        ? 'Không lưu được dữ liệu lên Firebase (kiểm tra lại config/quyền Firestore Rules).'
+        : 'Không lưu được dữ liệu vào trình duyệt (có thể do chế độ ẩn danh / trình duyệt chặn lưu trữ). Thử mở bằng tab thường.');
+    }
     return null;
   }
 }
 async function safeDelete(key, shared=false){
   try{
+    if(HAS_FIREBASE) return await fsDelete(key);
     if(HAS_CLAUDE_STORAGE) return await window.storage.delete(key, shared);
     await idbDelete(key);
     return true;
-  }catch(e){ return null; }
+  }catch(e){ console.error('storage delete failed', key, e); return null; }
 }
 
+/* Metadata listing: on Firebase, each shipment gets its OWN document inside a
+   dedicated collection (no shared array, no size ceiling, scales to any count).
+   Without Firebase (local/personal fallback), keep the old single-array-key
+   approach since that use case won't realistically reach thousands of entries. */
+const META_COLLECTION = 'shipments_meta';
+
 async function loadIndex(){
+  if(HAS_FIREBASE){
+    try{
+      const snap = await fsDb.collection(META_COLLECTION).get();
+      return snap.docs.map(d=>d.data());
+    }catch(e){ console.error('loadIndex (firestore) failed', e); return []; }
+  }
   const raw = await safeGet('shipment-index', false);
   if(!raw) return [];
   try{ return JSON.parse(raw); }catch(e){ return []; }
 }
-async function saveIndex(idx){
+async function saveIndexEntry(meta){
+  if(HAS_FIREBASE){
+    try{ await fsDb.collection(META_COLLECTION).doc(meta.id).set(meta); return true; }
+    catch(e){ console.error('saveIndexEntry (firestore) failed', e); return null; }
+  }
+  const idx = await loadIndex();
+  idx.push(meta);
   await safeSet('shipment-index', JSON.stringify(idx), false);
+  return true;
+}
+async function deleteIndexEntry(id){
+  if(HAS_FIREBASE){
+    try{ await fsDb.collection(META_COLLECTION).doc(id).delete(); return true; }
+    catch(e){ console.error('deleteIndexEntry (firestore) failed', e); return null; }
+  }
+  const idx = (await loadIndex()).filter(x=>x.id!==id);
+  await safeSet('shipment-index', JSON.stringify(idx), false);
+  return true;
 }
 async function saveShipment(record){
   await safeSet('shipment:'+record.id, JSON.stringify(record), false);
-  const idx = await loadIndex();
-  idx.push({
+  await saveIndexEntry({
     id: record.id, fileName: record.fileName,
     origin: record.origin, dest: record.dest,
     originLat: record.originLat, originLon: record.originLon,
@@ -490,15 +614,13 @@ async function saveShipment(record){
     min: record.min, max: record.max, avg: record.avg,
     months: record.months, uploadedAt: record.uploadedAt
   });
-  await saveIndex(idx);
 }
 async function getShipment(id){
   const raw = await safeGet('shipment:'+id, false);
   return raw ? JSON.parse(raw) : null;
 }
 async function deleteShipment(id){
-  const idx = (await loadIndex()).filter(x=>x.id!==id);
-  await saveIndex(idx);
+  await deleteIndexEntry(id);
   await safeDelete('shipment:'+id, false);
 }
 
@@ -1241,16 +1363,22 @@ document.getElementById('tabs').addEventListener('click', e=>{
   if(btn.dataset.tab==='library') renderLibrary();
 });
 
-/* populate destination country select */
+/* populate shared country datalist + lookup map */
+const COUNTRY_BY_NAME = {};
 (function(){
-  const sel = document.getElementById('lk-dest');
+  const dl = document.getElementById('country-datalist');
   WORLD_COUNTRIES.forEach(c=>{
+    COUNTRY_BY_NAME[c.name] = c;
     const opt = document.createElement('option');
-    opt.value = c.name; opt.textContent = c.name;
-    opt.dataset.lat = c.lat; opt.dataset.lon = c.lon;
-    sel.appendChild(opt);
+    opt.value = c.name;
+    dl.appendChild(opt);
   });
 })();
+function resolveCountryInput(inputEl){
+  const val = inputEl.value.trim();
+  const hit = COUNTRY_BY_NAME[val];
+  return hit ? { name: val, lat: hit.lat, lon: hit.lon } : null;
+}
 
 /* ================= TRANSIT STOPS ================= */
 let transitSeq = 0;
@@ -1338,6 +1466,11 @@ function openPdfFromBase64(base64, fileName){
     toast('Không mở được file PDF gốc (có thể chưa được lưu khi tải lên).');
   }
 }
+window.openPdfById = async function(id){
+  const full = await getShipment(id);
+  if(!full || !full.pdfBase64){ toast('Lô này chưa có file PDF gốc được lưu.'); return; }
+  openPdfFromBase64(full.pdfBase64, full.fileName);
+};
 
 async function processFile(file){
   const cardId = uid();
@@ -1367,7 +1500,6 @@ function renderPendingBody(cardId, file, parsed){
   const body = document.getElementById('body-'+cardId);
   const startD = new Date(parsed.start), stopD = new Date(parsed.stop);
   const tripDays = ((parsed.stop - parsed.start)/86400000).toFixed(1);
-  const countryOptions = WORLD_COUNTRIES.map(c=>`<option value="${escapeHtml(c.name)}" data-lat="${c.lat}" data-lon="${c.lon}">${escapeHtml(c.name)}</option>`).join('');
   body.innerHTML = `
     <div class="stat-strip">
       <div class="stat-item"><b>${fmt1(parsed.max)}°C</b><span>Cao nhất</span></div>
@@ -1381,10 +1513,7 @@ function renderPendingBody(cardId, file, parsed){
     <div class="grid-2">
       <div class="field">
         <label class="field-label">Cảng / nước đến</label>
-        <select id="meta-dest-${cardId}">
-          <option value="">— Chọn quốc gia —</option>
-          ${countryOptions}
-        </select>
+        <input type="text" id="meta-dest-${cardId}" list="country-datalist" placeholder="Gõ tên quốc gia để tìm...">
       </div>
       <div class="field">
         <label class="field-label">Loại hình vận chuyển</label>
@@ -1406,17 +1535,17 @@ function renderPendingBody(cardId, file, parsed){
 
   document.getElementById('save-'+cardId).addEventListener('click', async ()=>{
     const btn = document.getElementById('save-'+cardId);
-    const destSelect = document.getElementById('meta-dest-'+cardId);
-    const dest = destSelect.value;
+    const destInput = document.getElementById('meta-dest-'+cardId);
+    const destCountry = resolveCountryInput(destInput);
     const modeSelect = document.getElementById('meta-mode-'+cardId);
     const transportMode = modeSelect.value;
-    if(!dest){ toast('Chọn quốc gia đến trước đã.'); return; }
+    if(!destCountry){ toast('Gõ tên quốc gia rồi chọn đúng tên trong danh sách gợi ý nhé.'); return; }
+    const dest = destCountry.name;
 
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Đang lưu…';
 
-    const opt = destSelect.selectedOptions[0];
-    const destLat = parseFloat(opt.dataset.lat), destLon = parseFloat(opt.dataset.lon);
+    const destLat = destCountry.lat, destLon = destCountry.lon;
     const origin = 'Việt Nam';
     const og = await geocode(origin);
 
@@ -1449,6 +1578,18 @@ function renderPendingBody(cardId, file, parsed){
 /* ================= LOOKUP FLOW ================= */
 document.getElementById('btn-run-lookup').addEventListener('click', runLookup);
 
+function niceStep(range, targetCount){
+  const rough = range/targetCount;
+  const mag = Math.pow(10, Math.floor(Math.log10(rough || 1)));
+  const norm = rough/mag;
+  let step;
+  if(norm < 1.5) step = 1;
+  else if(norm < 3) step = 2;
+  else if(norm < 7) step = 5;
+  else step = 10;
+  return step*mag;
+}
+
 function drawJourneyChart(canvas, journey, reqMin, reqMax){
   const { ambientMax, containerMax, waypoints, totalDays } = journey;
   const dpr = window.devicePixelRatio || 1;
@@ -1464,14 +1605,30 @@ function drawJourneyChart(canvas, journey, reqMin, reqMax){
   if(reqMin!==null && !isNaN(reqMin)) allVals.push(reqMin);
   if(reqMax!==null && !isNaN(reqMax)) allVals.push(reqMax);
   let vmin = Math.min(...allVals), vmax = Math.max(...allVals);
-  const pad = (vmax-vmin)*0.15 || 2;
+  const pad = (vmax-vmin)*0.22 || 2;
   vmin -= pad; vmax += pad;
 
   const n = ambientMax.length;
-  const leftPad=4, rightPad=4, topPad=10, botPad=28;
+  const leftPad=38, rightPad=8, topPad=14, botPad=28;
   const plotW = w-leftPad-rightPad, plotH = h-topPad-botPad;
   const xAt = i => leftPad + (n<=1?0:(i/(n-1))*plotW);
   const yAt = v => topPad + plotH - ((v-vmin)/(vmax-vmin))*plotH;
+
+  // Y-axis gridlines with numeric labels
+  const step = niceStep(vmax-vmin, 4);
+  const gridStart = Math.ceil(vmin/step)*step;
+  ctx.font = '10px "IBM Plex Mono", monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for(let g=gridStart; g<=vmax; g+=step){
+    const py = yAt(g);
+    ctx.strokeStyle = 'rgba(231,236,243,.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(leftPad, py); ctx.lineTo(leftPad+plotW, py); ctx.stroke();
+    ctx.fillStyle = 'rgba(140,160,188,.8)';
+    ctx.fillText(Math.round(g)+'°', leftPad-6, py);
+  }
+  ctx.textBaseline = 'alphabetic';
 
   if(reqMin!==null && !isNaN(reqMin) && reqMax!==null && !isNaN(reqMax)){
     const yTop=yAt(reqMax), yBot=yAt(reqMin);
@@ -1508,6 +1665,24 @@ function drawJourneyChart(canvas, journey, reqMin, reqMax){
   }
   line(ambientMax, '#F2A65A', 2);
   line(containerMax, '#FF6E6E', 2.3);
+
+  // numeric value labels at each waypoint, for both lines
+  ctx.font = '600 10px "IBM Plex Mono", monospace';
+  waypoints.forEach(wp=>{
+    const idx = Math.max(0, Math.min(n-1, wp.offset));
+    const px = xAt(idx);
+    const align = wp.offset < totalDays*0.08 ? 'left' : (wp.offset > totalDays*0.92 ? 'right' : 'center');
+    ctx.textAlign = align;
+    const cVal = containerMax[idx], aVal = ambientMax[idx];
+    if(cVal!=null){
+      ctx.fillStyle = '#FF6E6E';
+      ctx.fillText(cVal.toFixed(1)+'°', px, yAt(cVal)-8);
+    }
+    if(aVal!=null){
+      ctx.fillStyle = '#F2A65A';
+      ctx.fillText(aVal.toFixed(1)+'°', px, yAt(aVal)+16);
+    }
+  });
 }
 
 function drawClimateChart(canvas, tmax, tmin, tmean, reqMin, reqMax){
@@ -1552,18 +1727,19 @@ function drawClimateChart(canvas, tmax, tmin, tmean, reqMin, reqMax){
 }
 
 async function runLookup(){
-  const destSelect = document.getElementById('lk-dest');
-  const dest = destSelect.value;
+  const destInput = document.getElementById('lk-dest');
+  const destCountry = resolveCountryInput(destInput);
   const etdRaw = document.getElementById('lk-etd').value;
   const etaRaw = document.getElementById('lk-eta').value;
   const origin = 'Việt Nam';
   const drug = '', reqMin = null, reqMax = null;
 
   const resultsEl = document.getElementById('lookup-results');
-  if(!dest){
-    toast('Chọn quốc gia đến trước đã.');
+  if(!destCountry){
+    toast('Gõ tên quốc gia rồi chọn đúng tên trong danh sách gợi ý nhé.');
     return;
   }
+  const dest = destCountry.name;
   if(!etdRaw){
     toast('Chọn ngày đi (ETD) trước đã.');
     return;
@@ -1581,17 +1757,16 @@ async function runLookup(){
 
   try{
     // ---- 1. resolve endpoints: origin is always Vietnam; destination comes straight
-    //         from the dropdown's lat/lon (no geocoding call needed, always exact) ----
+    //         from the resolved country lookup (no geocoding call needed, always exact) ----
     const og = await geocode(origin);
-    const destOpt = destSelect.selectedOptions[0];
-    const ds = { lat: parseFloat(destOpt.dataset.lat), lon: parseFloat(destOpt.dataset.lon), label: dest };
+    const ds = { lat: destCountry.lat, lon: destCountry.lon, label: dest };
 
     // ---- 2. match stored shipments: require BOTH ends to be relevant (text match OR
     //         within a plausible geographic radius) — a matching origin alone is not
     //         enough if the destination is on the other side of the planet. ----
     const idx = await loadIndex();
     const nOrigin = norm(origin), nDest = norm(dest);
-    const NEAR_KM = 300, REGION_KM = 6000;
+    const NEAR_KM = 300, REGION_KM = 3000;
     const exact = [], reference = [];
     idx.forEach(rec=>{
       const rOrigin = norm(rec.origin||''), rDest = norm(rec.dest||'');
@@ -1618,6 +1793,7 @@ async function runLookup(){
     await Promise.all([...exact, ...reference].map(async r=>{
       const full = await getShipment(r.id);
       if(full && full.points) r.dayStats = computeDayStats(full.points);
+      r.hasPdf = !!(full && full.pdfBase64);
     }));
 
     // ---- 3. build day-by-day journey: origin -> transit stops -> destination ----
@@ -1775,7 +1951,10 @@ function renderLookupResults(ctx){
           </div>
         </div>` : ''}
         ${distNote}
-        <button class="btn btn-ghost btn-sm" onclick="openDetail('${r.id}')" style="margin-top:10px;">Xem chi tiết &amp; biểu đồ</button>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button class="btn btn-ghost btn-sm" onclick="openDetail('${r.id}')">Xem chi tiết &amp; biểu đồ</button>
+          ${r.hasPdf ? `<button class="btn btn-ghost btn-sm" onclick="openPdfById('${r.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg> Xem file PDF</button>` : ''}
+        </div>
       </div>`;
     });
   }
@@ -1823,6 +2002,45 @@ function renderLookupResults(ctx){
 function transportModeLabel(m){
   return {AIR:'✈ AIR', LCL:'📦 LCL', FCL_COLD:'❄ FCL Lạnh', FCL_STD:'🚛 FCL Thường'}[m] || '';
 }
+
+document.getElementById('btn-backup').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btn-backup');
+  const idx = await loadIndex();
+  if(!idx.length){ toast('Chưa có dữ liệu nào để backup.'); return; }
+  btn.disabled = true;
+  const originalHtml = btn.innerHTML;
+  try{
+    const records = [];
+    for(let i=0; i<idx.length; i++){
+      btn.innerHTML = `<span class="spinner"></span> Đang tải ${i+1}/${idx.length}…`;
+      const full = await getShipment(idx[i].id);
+      if(full) records.push(full);
+    }
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      appVersion: 'tuyen-lanh-v1',
+      count: records.length,
+      shipments: records,
+    };
+    const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dateStr = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `tuyen-lanh-backup-${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast(`Đã tải backup ${records.length} lô dữ liệu về máy.`);
+  }catch(e){
+    console.error('backup failed', e);
+    toast('Có lỗi khi tạo file backup.');
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
+});
 
 async function renderLibrary(){
   const el = document.getElementById('library-list');
@@ -1889,7 +2107,7 @@ window.openCountryGroup = async function(groupKey){
       </div>
       <div class="lib-foot" style="margin-top:8px;">
         <button class="btn btn-ghost btn-sm" onclick="openDetail('${r.id}')">Xem chi tiết &amp; biểu đồ</button>
-        <button class="btn btn-danger btn-sm" onclick="removeShipmentFromGroup('${r.id}','${groupKey.replace(/'/g,"\\'")}')">Xoá</button>
+        ${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="removeShipmentFromGroup('${r.id}','${groupKey.replace(/'/g,"\\'")}')">Xoá</button>` : ''}
       </div>
     </div>`;
   }
@@ -1912,6 +2130,7 @@ window.openCountryGroup = async function(groupKey){
 };
 
 window.removeShipmentFromGroup = async function(id, groupKey){
+  if(!isAdmin){ toast('Chỉ tài khoản admin mới xoá được. Bấm "Đăng nhập admin" ở góc trên trước.'); return; }
   if(!confirm('Xoá lô dữ liệu này khỏi kho? Không thể hoàn tác.')) return;
   await deleteShipment(id);
   toast('Đã xoá.');
@@ -1921,6 +2140,59 @@ window.removeShipmentFromGroup = async function(id, groupKey){
   if(remaining) openCountryGroup(groupKey);
   else document.getElementById('modal-bg').classList.remove('active');
 };
+
+function updateAdminUI(){
+  const btn = document.getElementById('admin-login-btn');
+  if(!btn) return;
+  if(isLoggedIn){
+    btn.textContent = (isAdmin ? '🔓 Admin' : '👤 ') + ' (' + (fsAuth.currentUser ? fsAuth.currentUser.email : '') + ') · Đăng xuất';
+    btn.onclick = async ()=>{ await fsAuth.signOut(); toast('Đã đăng xuất.'); };
+  }else{
+    btn.textContent = '🔒 Chưa đăng nhập';
+    btn.onclick = null;
+  }
+}
+
+function updateGate(){
+  const gate = document.getElementById('login-gate');
+  const topbar = document.getElementById('app-topbar');
+  const wrap = document.getElementById('app-wrap');
+  if(!HAS_FIREBASE || isLoggedIn){
+    gate.classList.remove('active');
+    topbar.style.display = '';
+    wrap.style.display = '';
+  }else{
+    gate.classList.add('active');
+    topbar.style.display = 'none';
+    wrap.style.display = 'none';
+  }
+}
+
+document.getElementById('gate-submit').addEventListener('click', async ()=>{
+  const email = document.getElementById('gate-email').value.trim();
+  const pass = document.getElementById('gate-pass').value;
+  const errEl = document.getElementById('gate-error');
+  errEl.style.display = 'none';
+  try{
+    await fsAuth.signInWithEmailAndPassword(email, pass);
+  }catch(e){
+    console.error('login error', e.code, e.message);
+    const FRIENDLY = {
+      'auth/wrong-password': 'Sai mật khẩu.',
+      'auth/invalid-credential': 'Sai email hoặc mật khẩu.',
+      'auth/user-not-found': 'Không tìm thấy tài khoản với email này. Kiểm tra lại đúng chữ (không dấu cách thừa).',
+      'auth/invalid-email': 'Email không đúng định dạng.',
+      'auth/user-disabled': 'Tài khoản này đã bị vô hiệu hoá (Disable) trong Firebase.',
+      'auth/too-many-requests': 'Đăng nhập sai quá nhiều lần, Firebase tạm khoá thử lại sau vài phút.',
+      'auth/network-request-failed': 'Lỗi mạng, kiểm tra lại kết nối internet.',
+    };
+    errEl.textContent = (FRIENDLY[e.code] || (e.code + ': ' + e.message)) + ' [' + (e.code||'no-code') + ']';
+    errEl.style.display = 'block';
+  }
+});
+document.getElementById('gate-pass').addEventListener('keydown', e=>{
+  if(e.key==='Enter') document.getElementById('gate-submit').click();
+});
 
 window.removeShipment = async function(id){
   if(!confirm('Xoá lô dữ liệu này khỏi kho? Không thể hoàn tác.')) return;
@@ -1974,7 +2246,20 @@ document.getElementById('modal-bg').addEventListener('click', e=>{
 });
 
 /* init */
-renderLibrary();
+(function(){
+  const el = document.getElementById('sync-status');
+  if(HAS_FIREBASE){
+    el.textContent = '🔗 ĐỒNG BỘ CHUNG (FIREBASE)';
+    el.style.color = 'var(--safe)';
+    updateGate();
+  }else{
+    el.textContent = '💾 LƯU CỤC BỘ (CHƯA DÙNG CHUNG)';
+    el.style.color = 'var(--amber)';
+    document.getElementById('admin-login-btn').style.display = 'none';
+  }
+  updateAdminUI();
+})();
+if(!HAS_FIREBASE) renderLibrary();
 </script>
 </body>
 </html>
