@@ -1,0 +1,2725 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TUYẾN LẠNH — Cố vấn chuỗi lạnh dược phẩm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<style>
+  :root{
+    --bg:#0A1420;
+    --surface:#0F1B2C;
+    --surface-2:#152238;
+    --surface-3:#1B2C46;
+    --border:#243652;
+    --border-soft:#1B2A42;
+    --text:#E7ECF3;
+    --text-muted:#8CA0BC;
+    --text-dim:#5D7290;
+    --ice:#5BD9E8;
+    --ice-dim:#2C8FA0;
+    --ice-glow:rgba(91,217,232,.15);
+    --amber:#F2A65A;
+    --danger:#FF6E6E;
+    --danger-dim:rgba(255,110,110,.12);
+    --safe:#67D99A;
+    --safe-dim:rgba(103,217,154,.12);
+    --warn-dim:rgba(242,166,90,.12);
+    --radius:14px;
+    --radius-sm:9px;
+    --font-display:'Space Grotesk',sans-serif;
+    --font-body:'Inter',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(91,217,232,.08), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(242,166,90,.05), transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--ice);color:#04202a;}
+  a{color:var(--ice);}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:8px;}
+
+  /* ---------- Header ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:40;
+    background:rgba(10,20,32,.85);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border-soft);
+  }
+  .topbar-inner{
+    max-width:1180px;margin:0 auto;padding:16px 24px;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand-mark{
+    width:38px;height:38px;border-radius:10px;
+    background:linear-gradient(135deg,var(--ice) 0%, var(--ice-dim) 55%, #1c5c68 100%);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 1px rgba(91,217,232,.25), 0 4px 18px -4px rgba(91,217,232,.5);
+    flex-shrink:0;
+  }
+  .brand-mark svg{width:20px;height:20px;}
+  .brand-text{display:flex;flex-direction:column;line-height:1.05;}
+  .brand-text b{font-family:var(--font-display);font-size:18px;letter-spacing:.02em;font-weight:700;}
+  .brand-text span{font-size:11px;color:var(--text-dim);font-family:var(--font-mono);letter-spacing:.03em;}
+  .tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border-soft);padding:4px;border-radius:11px;}
+  .tab-btn{
+    border:none;background:transparent;color:var(--text-muted);
+    padding:9px 16px;border-radius:8px;font-size:13.5px;font-weight:600;
+    display:flex;align-items:center;gap:7px;white-space:nowrap;
+    transition:.15s;
+  }
+  .tab-btn svg{width:15px;height:15px;opacity:.8;}
+  .tab-btn.active{background:var(--surface-3);color:var(--text);box-shadow:inset 0 0 0 1px var(--border);}
+  .tab-btn:not(.active):hover{color:var(--text);}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:32px 24px 80px;}
+  .panel{display:none;}
+  .panel.active{display:block;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+  h1.page-title{font-family:var(--font-display);font-size:26px;margin:0 0 6px;font-weight:700;}
+  p.page-sub{color:var(--text-muted);font-size:14.5px;margin:0 0 28px;max-width:640px;line-height:1.55;}
+
+  .card{
+    background:linear-gradient(180deg, var(--surface-2), var(--surface));
+    border:1px solid var(--border-soft);
+    border-radius:var(--radius);
+    padding:22px;
+  }
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  @media(max-width:760px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+
+  label.field-label{display:block;font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;letter-spacing:.02em;text-transform:uppercase;}
+  input[type=text],input[type=number],input[type=month],select,textarea{
+    width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);
+    padding:10px 12px;border-radius:9px;font-size:14px;outline:none;transition:.15s;
+  }
+  input:focus,select:focus,textarea:focus{border-color:var(--ice-dim);box-shadow:0 0 0 3px var(--ice-glow);}
+  input::placeholder{color:var(--text-dim);}
+  .field{margin-bottom:14px;}
+  .field-row{display:flex;gap:10px;}
+  .field-row > *{flex:1;}
+  .hint{font-size:12px;color:var(--text-dim);margin-top:5px;line-height:1.4;}
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    padding:11px 20px;border-radius:9px;border:1px solid transparent;
+    font-size:14px;font-weight:600;transition:.15s;
+  }
+  .btn-primary{background:linear-gradient(180deg,#6EE3F0,var(--ice-dim));color:#04222b;box-shadow:0 4px 14px -4px rgba(91,217,232,.5);}
+  .btn-primary:hover{filter:brightness(1.08);}
+  .btn-primary:disabled{opacity:.5;cursor:not-allowed;filter:none;}
+  .btn-ghost{background:var(--surface-3);color:var(--text);border-color:var(--border);}
+  .btn-ghost:hover{border-color:var(--ice-dim);}
+  .btn-danger{background:transparent;color:var(--danger);border-color:rgba(255,110,110,.35);}
+  .btn-danger:hover{background:var(--danger-dim);}
+  .btn-sm{padding:7px 13px;font-size:12.5px;}
+  .btn-block{width:100%;}
+
+  /* ---------- Upload dropzone ---------- */
+  .dropzone{
+    border:1.5px dashed var(--border);border-radius:var(--radius);
+    padding:38px 20px;text-align:center;background:var(--surface);
+    transition:.15s;cursor:pointer;
+  }
+  .dropzone:hover,.dropzone.drag{border-color:var(--ice-dim);background:var(--ice-glow);}
+  .dropzone svg{width:34px;height:34px;color:var(--ice);margin-bottom:10px;}
+  .dropzone b{display:block;font-size:15px;margin-bottom:4px;}
+  .dropzone span{font-size:12.5px;color:var(--text-dim);}
+
+  .pending-card{border:1px solid var(--border-soft);border-radius:var(--radius);background:var(--surface);margin-top:18px;overflow:hidden;}
+  .pending-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border-soft);gap:12px;flex-wrap:wrap;}
+  .pending-head .fname{font-family:var(--font-mono);font-size:13px;color:var(--text-muted);}
+  .pending-body{padding:18px;}
+  .status-chip{font-size:11px;font-weight:700;padding:4px 9px;border-radius:99px;letter-spacing:.03em;text-transform:uppercase;}
+  .status-parsing{background:var(--warn-dim);color:var(--amber);}
+  .status-ok{background:var(--safe-dim);color:var(--safe);}
+  .status-error{background:var(--danger-dim);color:var(--danger);}
+  .status-saved{background:var(--ice-glow);color:var(--ice);}
+
+  .stat-strip{display:flex;gap:22px;flex-wrap:wrap;margin:14px 0 18px;}
+  .stat-item b{display:block;font-family:var(--font-mono);font-size:19px;}
+  .stat-item span{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.03em;}
+
+  canvas.ribbon{display:block;width:100%;height:46px;border-radius:7px;}
+  .ribbon-wrap{border:1px solid var(--border-soft);border-radius:9px;padding:6px;background:var(--bg);margin-bottom:16px;}
+
+  /* ---------- Result cards ---------- */
+  .section-label{display:flex;align-items:center;gap:10px;margin:34px 0 14px;}
+  .section-label .dot{width:7px;height:7px;border-radius:99px;background:var(--ice);box-shadow:0 0 8px var(--ice);}
+  .section-label h3{font-family:var(--font-display);font-size:15.5px;margin:0;font-weight:600;}
+  .section-label small{color:var(--text-dim);font-size:12px;font-family:var(--font-mono);}
+
+  .verdict{
+    border-radius:var(--radius);padding:22px 24px;border:1px solid;
+    display:flex;align-items:center;gap:18px;margin-bottom:22px;
+  }
+  .verdict.reefer{background:var(--danger-dim);border-color:rgba(255,110,110,.3);}
+  .verdict.standard{background:var(--safe-dim);border-color:rgba(103,217,154,.3);}
+  .verdict.borderline{background:var(--warn-dim);border-color:rgba(242,166,90,.3);}
+  .verdict-icon{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(255,255,255,.06);}
+  .verdict-icon svg{width:24px;height:24px;}
+  .verdict h2{font-family:var(--font-display);font-size:20px;margin:0 0 4px;}
+  .verdict p{margin:0;font-size:13.5px;color:var(--text-muted);line-height:1.5;}
+  .verdict.reefer .verdict-icon svg{color:var(--danger);}
+  .verdict.standard .verdict-icon svg{color:var(--safe);}
+  .verdict.borderline .verdict-icon svg{color:var(--amber);}
+
+  .match-card{border:1px solid var(--border-soft);background:var(--surface);border-radius:var(--radius);padding:18px 20px;margin-bottom:12px;}
+  .match-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .match-route{font-family:var(--font-display);font-size:15px;font-weight:600;}
+  .match-route .arrow{color:var(--ice);margin:0 6px;}
+  .match-meta{font-size:12px;color:var(--text-dim);font-family:var(--font-mono);margin-top:3px;}
+  .tag{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:.03em;}
+  .tag-exact{background:var(--safe-dim);color:var(--safe);}
+  .tag-ref{background:var(--warn-dim);color:var(--amber);}
+
+  .leg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0;}
+  @media(max-width:760px){.leg-grid{grid-template-columns:1fr;}}
+  .leg-card{background:var(--surface);border:1px solid var(--border-soft);border-radius:12px;padding:15px;}
+  .leg-card .leg-name{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--text-dim);margin-bottom:2px;}
+  .leg-card .leg-month{font-family:var(--font-mono);font-size:12.5px;color:var(--ice);margin-bottom:12px;}
+  .leg-row{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;border-top:1px solid var(--border-soft);}
+  .leg-row:first-of-type{border-top:none;}
+  .leg-row b{font-family:var(--font-mono);}
+
+  .empty{
+    text-align:center;padding:50px 20px;color:var(--text-dim);
+    border:1px dashed var(--border);border-radius:var(--radius);
+  }
+  .empty svg{width:32px;height:32px;margin-bottom:10px;opacity:.5;}
+
+  .lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-top:20px;}
+  .lib-card{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--radius);padding:18px;transition:.15s;}
+  .lib-card:hover{border-color:var(--ice-dim);}
+  .lib-card .route{font-family:var(--font-display);font-weight:600;font-size:14.5px;margin-bottom:2px;}
+  .lib-card .period{font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);margin-bottom:12px;}
+  .lib-foot{display:flex;justify-content:space-between;align-items:center;margin-top:14px;}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(4,10,18,.7);backdrop-filter:blur(3px);z-index:100;display:none;align-items:center;justify-content:center;padding:20px;}
+  .modal-bg.active{display:flex;}
+  .modal{background:var(--surface-2);border:1px solid var(--border);border-radius:16px;max-width:760px;width:100%;max-height:85vh;overflow:auto;padding:26px;}
+  .modal-close{float:right;background:var(--surface-3);border:1px solid var(--border);color:var(--text-muted);width:30px;height:30px;border-radius:8px;}
+
+  table.data-table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:12px;margin-top:12px;}
+  table.data-table th{text-align:left;color:var(--text-dim);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface-2);}
+  table.data-table td{padding:5px 8px;border-bottom:1px solid var(--border-soft);}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface-3);border:1px solid var(--border);padding:12px 20px;border-radius:10px;font-size:13.5px;box-shadow:0 10px 30px -6px rgba(0,0,0,.5);z-index:200;opacity:0;transition:.25s;pointer-events:none;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .quick-presets{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .preset-btn{font-size:12px;padding:6px 11px;border-radius:99px;background:var(--surface);border:1px solid var(--border);color:var(--text-muted);}
+  .preset-btn:hover{border-color:var(--ice-dim);color:var(--text);}
+  .preset-btn.active{background:var(--ice-glow);border-color:var(--ice-dim);color:var(--ice);}
+
+  .spinner{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.25);border-top-color:currentColor;animation:spin .7s linear infinite;display:inline-block;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .transit-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;}
+  .transit-row input[type=text]{flex:2;}
+  .transit-row input[type=number]{flex:1;}
+  .transit-row .remove-transit{flex:0 0 auto;width:38px;height:38px;border-radius:9px;background:var(--surface);border:1px solid var(--border);color:var(--text-dim);}
+  .transit-row .remove-transit:hover{color:var(--danger);border-color:rgba(255,110,110,.35);}
+  .transit-row label.mini{display:block;font-size:10.5px;color:var(--text-dim);margin-bottom:4px;}
+
+  .journey-chart-card{border:1px solid var(--border-soft);background:var(--surface);border-radius:var(--radius);padding:20px;margin-bottom:14px;}
+  .journey-legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);margin-top:10px;}
+  .journey-legend span{display:inline-flex;align-items:center;gap:6px;}
+  .journey-legend i{width:14px;height:3px;border-radius:2px;display:inline-block;}
+  .journey-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:18px;}
+  .journey-stat{background:var(--bg);border:1px solid var(--border-soft);border-radius:10px;padding:12px 14px;}
+  .journey-stat b{display:block;font-family:var(--font-mono);font-size:17px;}
+  .journey-stat span{font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.03em;}
+  .journey-stat.warn b{color:var(--danger);}
+
+  .footnote{font-size:11.5px;color:var(--text-dim);line-height:1.6;margin-top:10px;}
+
+  .login-gate{
+    position:fixed;inset:0;z-index:500;display:none;
+    align-items:center;justify-content:center;padding:20px;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(91,217,232,.10), transparent 60%),
+      var(--bg);
+  }
+  .login-gate.active{display:flex;}
+  .login-gate-card{
+    width:100%;max-width:380px;
+    background:linear-gradient(180deg, var(--surface-2), var(--surface));
+    border:1px solid var(--border-soft);border-radius:var(--radius);
+    padding:32px 28px;
+  }
+</style>
+</head>
+<body>
+
+<div class="login-gate" id="login-gate">
+  <div class="login-gate-card">
+    <div class="brand-mark" style="margin:0 auto 18px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#04222b" stroke-width="2"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+    </div>
+    <h2 style="font-family:var(--font-display);text-align:center;margin:0 0 6px;">TUYẾN LẠNH</h2>
+    <p class="hint" style="text-align:center;margin-bottom:24px;">Đăng nhập bằng tài khoản được cấp để dùng chung dữ liệu với team.</p>
+    <div class="field"><label class="field-label">Email</label><input type="text" id="gate-email" placeholder="ten@congty.com"></div>
+    <div class="field"><label class="field-label">Mật khẩu</label><input type="password" id="gate-pass" placeholder="••••••••"></div>
+    <div id="gate-error" class="hint" style="color:var(--danger);display:none;margin-bottom:10px;"></div>
+    <button class="btn btn-primary btn-block" id="gate-submit">Đăng nhập</button>
+    <p class="hint" style="text-align:center;margin-top:16px;">Chưa có tài khoản? Liên hệ quản trị viên để được cấp.</p>
+  </div>
+</div>
+
+<div class="topbar" id="app-topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#04222b" stroke-width="2"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+      </div>
+      <div class="brand-text">
+        <b>TUYẾN LẠNH</b>
+        <span id="sync-status">COLD‑CHAIN ROUTE ADVISOR</span>
+      </div>
+      <button id="admin-login-btn" class="btn btn-ghost btn-sm" style="margin-left:14px;">🔒 Chưa đăng nhập</button>
+    </div>
+    <div class="tabs" id="tabs">
+      <button class="tab-btn active" data-tab="lookup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        Tra cứu &amp; khuyến nghị
+      </button>
+      <button class="tab-btn" data-tab="upload">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+        Tải lên dữ liệu
+      </button>
+      <button class="tab-btn" data-tab="library">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg>
+        Kho dữ liệu
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap" id="app-wrap">
+
+  <!-- ================= LOOKUP TAB ================= -->
+  <div class="panel active" id="panel-lookup">
+    <h1 class="page-title">Tra cứu tuyến &amp; khuyến nghị container</h1>
+    <p class="page-sub">Chọn quốc gia đến, ngày đi/ngày đến và cảng trung chuyển (nếu có). Hệ thống sẽ tìm dữ liệu data logger thực tế bạn đã tải lên cho tuyến gần giống, đồng thời luôn ước tính thêm theo dữ liệu khí hậu lịch sử.</p>
+
+    <div class="card">
+      <div class="field">
+        <label class="field-label">Cảng / nước đến</label>
+        <input type="text" id="lk-dest" list="country-datalist" placeholder="Gõ tên quốc gia để tìm...">
+      </div>
+
+      <div class="field">
+        <label class="field-label">Phương thức vận chuyển</label>
+        <div class="quick-presets" id="lk-mode-presets">
+          <button type="button" class="preset-btn active" data-mode="SEA">🚢 Đường biển (SEA)</button>
+          <button type="button" class="preset-btn" data-mode="AIR">✈ Đường hàng không (AIR)</button>
+        </div>
+        <div class="hint">Nhiệt độ trong container tàu biển và khoang hàng máy bay khác nhau nhiều — chọn đúng để ước tính chính xác hơn.</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="field">
+          <label class="field-label">ETD (ngày đi)</label>
+          <input type="date" id="lk-etd">
+        </div>
+        <div class="field">
+          <label class="field-label">ETA (ngày đến)</label>
+          <input type="date" id="lk-eta">
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Cảng trung chuyển (transit) — tuỳ chọn</label>
+        <div class="hint" style="margin-bottom:10px;">Thêm các cảng tàu ghé/chuyển tải giữa đường, VD Cái Mép trước khi qua Campuchia. Khu vực này thường là nơi container lưu bãi lâu, dễ bị nóng nhất. Để trống "Ngày thứ mấy" — app sẽ tự ước tính dựa theo khoảng cách địa lý thật (không cần biết chính xác lịch tàu).</div>
+        <div id="transit-list"></div>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-add-transit" style="margin-top:4px;">+ Thêm cảng trung chuyển</button>
+      </div>
+
+      <button class="btn btn-primary btn-block" id="btn-run-lookup">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        Tìm khuyến nghị
+      </button>
+    </div>
+
+    <div id="lookup-results"></div>
+  </div>
+
+  <!-- ================= UPLOAD TAB ================= -->
+  <div class="panel" id="panel-upload">
+    <h1 class="page-title">Tải lên dữ liệu data logger</h1>
+    <p class="page-sub">Tải file PDF xuất từ data logger (Tempaction OR / Shockactions...). Hệ thống tự đọc bảng nhiệt độ — bạn chỉ cần chọn nước đến và loại hình vận chuyển rồi lưu (cảng đi mặc định là Việt Nam). Dữ liệu được giữ trong trình duyệt này để dùng lại về sau.</p>
+
+    <div class="dropzone" id="dropzone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+      <b>Kéo thả file PDF vào đây, hoặc bấm để chọn</b>
+      <span>Hỗ trợ nhiều file cùng lúc · chỉ .pdf</span>
+      <input type="file" id="file-input" accept="application/pdf" multiple style="display:none">
+    </div>
+
+    <div id="pending-list"></div>
+  </div>
+
+  <!-- ================= LIBRARY TAB ================= -->
+  <div class="panel" id="panel-library">
+    <h1 class="page-title">Kho dữ liệu đã lưu</h1>
+    <p class="page-sub">Toàn bộ lô data logger đã tải lên. Dữ liệu này được dùng làm căn cứ thực tế khi tra cứu khuyến nghị.</p>
+    <button class="btn btn-ghost btn-sm" id="btn-backup" style="margin-bottom:18px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Tải backup toàn bộ dữ liệu về máy
+    </button>
+    <div id="library-list"></div>
+  </div>
+
+</div>
+
+<div class="modal-bg" id="modal-bg">
+  <div class="modal" id="modal-content"></div>
+</div>
+<div class="toast" id="toast"></div>
+<datalist id="country-datalist"></datalist>
+<datalist id="port-datalist"></datalist>
+
+<script>
+/* =========================================================================
+   TUYẾN LẠNH — Cold-chain route advisor
+   Single-file app. Storage: window.storage (personal, per-user).
+   ========================================================================= */
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const MONTH_NAMES = ['','Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
+
+/* ---------------- utils ---------------- */
+function uid(){ return 's_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function norm(s){ return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+function escapeHtml(s){ return (s||'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmt1(n){ return (n===null||n===undefined||isNaN(n)) ? '—' : n.toFixed(1); }
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._h);
+  toast._h = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+function haversine(lat1,lon1,lat2,lon2){
+  const R=6371, toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function lerp(a,b,t){ return a+(b-a)*t; }
+function parseDMY(str){
+  // "15/05/2026" "19:11:33" -> Date
+  const m = str.match(/(\d{2})\/(\d{2})\/(\d{4})[ T]?(\d{2}):(\d{2}):(\d{2})/);
+  if(!m) return null;
+  return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]);
+}
+
+/* ==========================================================================
+   FIREBASE CONFIG — dán config Firebase của bạn vào đây để bật kho dữ liệu
+   DÙNG CHUNG cho mọi người truy cập trang web này.
+   Xem hướng dẫn lấy config tại: https://console.firebase.google.com
+   Nếu để nguyên placeholder (chưa dán config thật), app tự động dùng
+   IndexedDB cục bộ trên từng máy (không dùng chung được) như trước.
+   ========================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyA5HXFZ7jMC9z79fyD-G-YS4ZGur7FTz0g",
+  authDomain: "data-logger-8af48.firebaseapp.com",
+  projectId: "data-logger-8af48",
+  storageBucket: "data-logger-8af48.firebasestorage.app",
+  messagingSenderId: "240099162931",
+  appId: "1:240099162931:web:58e3baaf05722b51049c46"
+};
+/* Email của tài khoản admin duy nhất được phép XOÁ dữ liệu.
+   Phải khớp đúng với email đặt trong Firestore Rules. */
+const ADMIN_EMAIL = "expdocs2.cpc1hn@gmail.com";
+
+const HAS_FIREBASE = (typeof firebase !== 'undefined') && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
+let fsDb = null;
+let fsAuth = null;
+let isLoggedIn = false;
+let isAdmin = false;
+if(HAS_FIREBASE){
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    fsDb = firebase.firestore();
+    fsAuth = firebase.auth();
+    fsAuth.onAuthStateChanged(user=>{
+      isLoggedIn = !!user;
+      isAdmin = !!user && user.email === ADMIN_EMAIL;
+      updateAdminUI();
+      updateGate();
+      if(isLoggedIn) renderLibrary();
+    });
+  }catch(e){ console.error('Firebase init failed', e); }
+}
+const FS_COLLECTION = 'coldroute_shared';
+async function fsGet(key){
+  const doc = await fsDb.collection(FS_COLLECTION).doc(key).get();
+  return doc.exists ? doc.data().value : null;
+}
+async function fsSet(key, value){
+  await fsDb.collection(FS_COLLECTION).doc(key).set({ value, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  return true;
+}
+async function fsDelete(key){
+  await fsDb.collection(FS_COLLECTION).doc(key).delete();
+  return true;
+}
+
+/* ---------------- storage helpers ---------------- */
+/* Priority: Firebase Firestore (real shared storage for everyone on this page)
+   > window.storage (when previewed inside Claude.ai)
+   > IndexedDB (local-only fallback, per browser/device). */
+const HAS_CLAUDE_STORAGE = (typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function');
+
+const IDB_NAME = 'coldroute-db', IDB_VERSION = 1, IDB_STORE = 'kv';
+let _idbPromise = null;
+function openIDB(){
+  if(_idbPromise) return _idbPromise;
+  _idbPromise = new Promise((resolve, reject)=>{
+    if(!('indexedDB' in window)){ reject(new Error('IndexedDB không khả dụng trên trình duyệt này')); return; }
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = ()=>{ req.result.createObjectStore(IDB_STORE); };
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+  return _idbPromise;
+}
+async function idbGet(key){
+  const db = await openIDB();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(IDB_STORE,'readonly');
+    const req = tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess = ()=>resolve(req.result===undefined ? null : req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+async function idbSet(key, value){
+  const db = await openIDB();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).put(value, key);
+    tx.oncomplete = ()=>resolve(true);
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+async function idbDelete(key){
+  const db = await openIDB();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).delete(key);
+    tx.oncomplete = ()=>resolve(true);
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+
+let _storageBroken = false;
+async function safeGet(key, shared=false){
+  try{
+    if(HAS_FIREBASE){
+      return await fsGet(key);
+    }else if(HAS_CLAUDE_STORAGE){
+      const r = await window.storage.get(key, shared);
+      return r ? r.value : null;
+    }else{
+      const v = await idbGet(key);
+      return (v===null||v===undefined) ? null : v;
+    }
+  }catch(e){ console.error('storage get failed', key, e); return null; }
+}
+async function safeSet(key, value, shared=false){
+  try{
+    if(HAS_FIREBASE) return await fsSet(key, value);
+    if(HAS_CLAUDE_STORAGE) return await window.storage.set(key, value, shared);
+    await idbSet(key, value);
+    return true;
+  }catch(e){
+    console.error('storage set failed', key, e);
+    if(!_storageBroken){
+      _storageBroken = true;
+      toast(HAS_FIREBASE
+        ? 'Không lưu được dữ liệu lên Firebase (kiểm tra lại config/quyền Firestore Rules).'
+        : 'Không lưu được dữ liệu vào trình duyệt (có thể do chế độ ẩn danh / trình duyệt chặn lưu trữ). Thử mở bằng tab thường.');
+    }
+    return null;
+  }
+}
+async function safeDelete(key, shared=false){
+  try{
+    if(HAS_FIREBASE) return await fsDelete(key);
+    if(HAS_CLAUDE_STORAGE) return await window.storage.delete(key, shared);
+    await idbDelete(key);
+    return true;
+  }catch(e){ console.error('storage delete failed', key, e); return null; }
+}
+
+/* Metadata listing: on Firebase, each shipment gets its OWN document inside a
+   dedicated collection (no shared array, no size ceiling, scales to any count).
+   Without Firebase (local/personal fallback), keep the old single-array-key
+   approach since that use case won't realistically reach thousands of entries. */
+const META_COLLECTION = 'shipments_meta';
+
+async function loadIndex(){
+  if(HAS_FIREBASE){
+    try{
+      const snap = await fsDb.collection(META_COLLECTION).get();
+      return snap.docs.map(d=>d.data());
+    }catch(e){ console.error('loadIndex (firestore) failed', e); return []; }
+  }
+  const raw = await safeGet('shipment-index', false);
+  if(!raw) return [];
+  try{ return JSON.parse(raw); }catch(e){ return []; }
+}
+async function saveIndexEntry(meta){
+  if(HAS_FIREBASE){
+    try{ await fsDb.collection(META_COLLECTION).doc(meta.id).set(meta); return true; }
+    catch(e){ console.error('saveIndexEntry (firestore) failed', e); return null; }
+  }
+  const idx = await loadIndex();
+  idx.push(meta);
+  await safeSet('shipment-index', JSON.stringify(idx), false);
+  return true;
+}
+async function deleteIndexEntry(id){
+  if(HAS_FIREBASE){
+    try{ await fsDb.collection(META_COLLECTION).doc(id).delete(); return true; }
+    catch(e){ console.error('deleteIndexEntry (firestore) failed', e); return null; }
+  }
+  const idx = (await loadIndex()).filter(x=>x.id!==id);
+  await safeSet('shipment-index', JSON.stringify(idx), false);
+  return true;
+}
+async function saveShipment(record){
+  await safeSet('shipment:'+record.id, JSON.stringify(record), false);
+  await saveIndexEntry({
+    id: record.id, fileName: record.fileName,
+    origin: record.origin, dest: record.dest, destPort: record.destPort,
+    originLat: record.originLat, originLon: record.originLon,
+    destLat: record.destLat, destLon: record.destLon,
+    drug: record.drug, reqMin: record.reqMin, reqMax: record.reqMax,
+    deviceId: record.deviceId, transportMode: record.transportMode,
+    start: record.start, stop: record.stop,
+    min: record.min, max: record.max, avg: record.avg,
+    months: record.months, uploadedAt: record.uploadedAt
+  });
+}
+async function getShipment(id){
+  const raw = await safeGet('shipment:'+id, false);
+  return raw ? JSON.parse(raw) : null;
+}
+async function deleteShipment(id){
+  await deleteIndexEntry(id);
+  await safeDelete('shipment:'+id, false);
+}
+
+/* ---------------- geocode + climate (Open-Meteo, free, CORS-enabled) ---------------- */
+/* Known major ports/cities relevant to VN pharma shipping — checked before the free
+   geocoding API, which sometimes fails to match local/regional port names exactly. */
+const WORLD_COUNTRIES = [
+  {name:'Afghanistan', lat:34.1340, lon:66.5922},
+  {name:'Albania', lat:41.1417, lon:20.0611},
+  {name:'Algeria', lat:28.3510, lon:2.6558},
+  {name:'American Samoa', lat:-14.3057, lon:-170.7007},
+  {name:'Angola', lat:-12.1674, lon:17.6518},
+  {name:'Anguilla', lat:18.2229, lon:-63.0601},
+  {name:'Antigua and Barbuda', lat:17.0715, lon:-61.7853},
+  {name:'Argentina', lat:-35.6973, lon:-64.5324},
+  {name:'Armenia', lat:40.1784, lon:45.0549},
+  {name:'Aruba', lat:12.5156, lon:-69.9756},
+  {name:'Australia', lat:-25.6973, lon:134.0228},
+  {name:'Austria', lat:47.6319, lon:13.7978},
+  {name:'Azerbaijan', lat:40.3921, lon:48.6346},
+  {name:'Bahamas', lat:24.7216, lon:-78.0728},
+  {name:'Bahrain', lat:26.0480, lon:50.5407},
+  {name:'Bangladesh', lat:23.6737, lon:90.4321},
+  {name:'Barbados', lat:13.1832, lon:-59.5574},
+  {name:'Belarus', lat:53.4679, lon:27.9643},
+  {name:'Belgium', lat:50.6182, lon:4.6750},
+  {name:'Belize', lat:17.2425, lon:-88.6827},
+  {name:'Benin', lat:9.5030, lon:2.3057},
+  {name:'Bermuda', lat:32.3151, lon:-64.7459},
+  {name:'Bhutan', lat:27.4216, lon:90.4672},
+  {name:'Bolivia', lat:-16.7312, lon:-64.4521},
+  {name:'Bosnia and Herzegovina', lat:44.1442, lon:17.8347},
+  {name:'Botswana', lat:-22.2366, lon:23.8578},
+  {name:'Brazil', lat:-11.5246, lon:-54.3552},
+  {name:'British Virgin Islands', lat:18.4220, lon:-64.6241},
+  {name:'Brunei', lat:4.5432, lon:114.6431},
+  {name:'Bulgaria', lat:42.8204, lon:25.2517},
+  {name:'Burkina Faso', lat:12.1087, lon:-1.6933},
+  {name:'Burundi', lat:-3.2613, lon:29.8852},
+  {name:'Cabo Verde', lat:15.0764, lon:-23.6340},
+  {name:'Cambodia', lat:12.6992, lon:105.0397},
+  {name:'Cameroon', lat:6.2942, lon:12.9485},
+  {name:'Canada', lat:57.5505, lon:-98.4168},
+  {name:'Cayman Islands', lat:19.3112, lon:-81.2520},
+  {name:'Central African Republic', lat:6.3314, lon:20.5207},
+  {name:'Chad', lat:15.2835, lon:18.4271},
+  {name:'Chile', lat:-37.8294, lon:-70.7686},
+  {name:'China', lat:38.0733, lon:104.6911},
+  {name:'Colombia', lat:4.1878, lon:-72.6445},
+  {name:'Comoros', lat:-11.6589, lon:43.3483},
+  {name:'Congo', lat:-0.7294, lon:14.8797},
+  {name:'Congo DRC', lat:-3.3386, lon:23.4198},
+  {name:'Cook Islands', lat:-21.2226, lon:-159.7877},
+  {name:'Costa Rica', lat:9.8635, lon:-84.1467},
+  {name:"Cote d'Ivoire", lat:7.5368, lon:-5.5717},
+  {name:'Croatia', lat:44.9119, lon:16.6258},
+  {name:'Cuba', lat:21.4762, lon:-79.6982},
+  {name:'Cyprus', lat:35.1170, lon:33.3753},
+  {name:'Czech Republic', lat:49.7492, lon:15.3833},
+  {name:'Denmark', lat:56.0012, lon:9.3787},
+  {name:'Djibouti', lat:11.7502, lon:42.6135},
+  {name:'Dominica', lat:15.4293, lon:-61.3605},
+  {name:'Dominican Republic', lat:18.7795, lon:-70.4350},
+  {name:'Ecuador', lat:-1.5643, lon:-78.4630},
+  {name:'Egypt', lat:26.6052, lon:30.2401},
+  {name:'El Salvador', lat:13.7580, lon:-88.8591},
+  {name:'Equatorial Guinea', lat:1.5955, lon:10.4255},
+  {name:'Eritrea', lat:15.0055, lon:39.2672},
+  {name:'Estonia', lat:58.6481, lon:25.9169},
+  {name:'Eswatini', lat:-26.5625, lon:31.5107},
+  {name:'Ethiopia', lat:8.7294, lon:39.9149},
+  {name:'Falkland Islands', lat:-51.7590, lon:-58.7466},
+  {name:'Fiji', lat:-17.8225, lon:177.9814},
+  {name:'Finland', lat:65.0158, lon:25.6574},
+  {name:'France', lat:46.6424, lon:2.1940},
+  {name:'French Guiana', lat:3.8574, lon:-53.3223},
+  {name:'French Polynesia', lat:-17.6747, lon:-149.4004},
+  {name:'Gabon', lat:-0.6284, lon:11.8394},
+  {name:'Gambia', lat:13.4286, lon:-15.3834},
+  {name:'Georgia', lat:42.1799, lon:43.3789},
+  {name:'Germany', lat:51.0830, lon:10.4262},
+  {name:'Ghana', lat:7.9453, lon:-1.2192},
+  {name:'Gibraltar', lat:36.1402, lon:-5.3455},
+  {name:'Greece', lat:39.4201, lon:23.1104},
+  {name:'Greenland', lat:74.1685, lon:-42.0757},
+  {name:'Grenada', lat:12.1129, lon:-61.6794},
+  {name:'Guadeloupe', lat:16.2442, lon:-61.5438},
+  {name:'Guatemala', lat:15.8209, lon:-90.3122},
+  {name:'Guinea', lat:10.2560, lon:-10.9869},
+  {name:'Guinea-Bissau', lat:11.9801, lon:-14.9802},
+  {name:'Guyana', lat:4.6821, lon:-58.9135},
+  {name:'Haiti', lat:18.8835, lon:-72.8929},
+  {name:'Honduras', lat:14.7404, lon:-86.4925},
+  {name:'Hungary', lat:47.2253, lon:19.3962},
+  {name:'Iceland', lat:65.1236, lon:-19.0568},
+  {name:'India', lat:23.5863, lon:81.1730},
+  {name:'Indonesia', lat:0.1559, lon:113.9654},
+  {name:'Iran', lat:32.9060, lon:54.2371},
+  {name:'Iraq', lat:33.1051, lon:43.8325},
+  {name:'Ireland', lat:53.3049, lon:-8.2411},
+  {name:'Israel', lat:31.5135, lon:35.0279},
+  {name:'Italy', lat:42.9820, lon:12.7637},
+  {name:'Jamaica', lat:18.1221, lon:-77.3036},
+  {name:'Japan', lat:36.7674, lon:137.4693},
+  {name:'Jordan', lat:31.3871, lon:36.9573},
+  {name:'Kazakhstan', lat:47.6415, lon:66.3759},
+  {name:'Kenya', lat:0.6899, lon:37.9531},
+  {name:'Kuwait', lat:29.2814, lon:47.5631},
+  {name:'Kyrgyzstan', lat:41.3570, lon:74.1753},
+  {name:'Laos', lat:18.1173, lon:103.7638},
+  {name:'Latvia', lat:56.8139, lon:24.6937},
+  {name:'Lebanon', lat:33.9116, lon:35.8965},
+  {name:'Lesotho', lat:-29.6017, lon:28.2448},
+  {name:'Liberia', lat:6.5201, lon:-9.2590},
+  {name:'Libya', lat:27.2029, lon:17.9113},
+  {name:'Lithuania', lat:55.2944, lon:23.9460},
+  {name:'Luxembourg', lat:49.7752, lon:6.1032},
+  {name:'Madagascar', lat:-19.0416, lon:46.6849},
+  {name:'Malawi', lat:-13.1290, lon:34.2344},
+  {name:'Malaysia', lat:3.6717, lon:114.6333},
+  {name:'Maldives', lat:-0.6066, lon:73.1008},
+  {name:'Mali', lat:17.1681, lon:-4.3464},
+  {name:'Malta', lat:35.8905, lon:14.4419},
+  {name:'Martinique', lat:14.6427, lon:-61.0143},
+  {name:'Mauritania', lat:20.4667, lon:-10.4951},
+  {name:'Mauritius', lat:-20.2814, lon:57.5642},
+  {name:'Mexico', lat:23.8744, lon:-101.5540},
+  {name:'Moldova', lat:47.0726, lon:28.3911},
+  {name:'Mongolia', lat:47.0864, lon:103.3987},
+  {name:'Montenegro', lat:42.7369, lon:19.2951},
+  {name:'Montserrat', lat:16.7354, lon:-62.1869},
+  {name:'Morocco', lat:28.6876, lon:-8.8172},
+  {name:'Mozambique', lat:-17.5252, lon:35.2086},
+  {name:'Myanmar', lat:19.9012, lon:97.0889},
+  {name:'Namibia', lat:-21.9086, lon:18.1645},
+  {name:'Nepal', lat:28.3009, lon:84.1339},
+  {name:'Netherlands', lat:52.1341, lon:5.5541},
+  {name:'New Zealand', lat:-43.8277, lon:170.6904},
+  {name:'Nicaragua', lat:12.8936, lon:-85.0161},
+  {name:'Niger', lat:17.0811, lon:8.8686},
+  {name:'Nigeria', lat:9.6103, lon:8.1477},
+  {name:'Niue', lat:-19.0523, lon:-169.8688},
+  {name:'North Korea', lat:40.1920, lon:127.3380},
+  {name:'North Macedonia', lat:41.5940, lon:21.7100},
+  {name:'Norway', lat:64.9778, lon:16.6703},
+  {name:'Oman', lat:20.7243, lon:55.8411},
+  {name:'Pakistan', lat:30.1162, lon:69.0884},
+  {name:'Panama', lat:8.4395, lon:-80.1443},
+  {name:'Papua New Guinea', lat:-7.1569, lon:144.8349},
+  {name:'Paraguay', lat:-23.4219, lon:-58.3891},
+  {name:'Peru', lat:-8.5227, lon:-74.1142},
+  {name:'Philippines', lat:15.5865, lon:121.8221},
+  {name:'Pitcairn', lat:-24.3661, lon:-128.3150},
+  {name:'Poland', lat:52.0685, lon:19.4357},
+  {name:'Portugal', lat:39.6753, lon:-7.9337},
+  {name:'Puerto Rico', lat:18.2162, lon:-66.4943},
+  {name:'Qatar', lat:25.3185, lon:51.1979},
+  {name:'Romania', lat:45.8245, lon:25.0942},
+  {name:'Russia', lat:59.0394, lon:98.6705},
+  {name:'Rwanda', lat:-2.0147, lon:29.9194},
+  {name:'Saint Kitts and Nevis', lat:17.3147, lon:-62.7456},
+  {name:'Saint Lucia', lat:13.8957, lon:-60.9690},
+  {name:'Saint Vincent and the Grenadines', lat:13.2548, lon:-61.1938},
+  {name:'Samoa', lat:-13.6343, lon:-172.4411},
+  {name:'Sao Tome and Principe', lat:0.2274, lon:6.6062},
+  {name:'Saudi Arabia', lat:24.1360, lon:44.6010},
+  {name:'Senegal', lat:14.2289, lon:-14.6109},
+  {name:'Serbia', lat:44.0268, lon:20.8568},
+  {name:'Seychelles', lat:-4.6600, lon:55.4725},
+  {name:'Sierra Leone', lat:8.5613, lon:-11.7866},
+  {name:'Singapore', lat:1.3528, lon:103.8103},
+  {name:'Slovakia', lat:48.6981, lon:19.5810},
+  {name:'Slovenia', lat:46.1376, lon:14.8906},
+  {name:'Solomon Islands', lat:-9.6131, lon:160.1648},
+  {name:'Somalia', lat:6.5245, lon:45.4004},
+  {name:'South Africa', lat:-28.5536, lon:24.7525},
+  {name:'South Korea', lat:36.4024, lon:127.7622},
+  {name:'South Sudan', lat:7.6578, lon:30.3852},
+  {name:'Spain', lat:40.3650, lon:-3.6516},
+  {name:'Sri Lanka', lat:7.6966, lon:80.6693},
+  {name:'Sudan', lat:15.6706, lon:29.9515},
+  {name:'Suriname', lat:4.0987, lon:-55.8555},
+  {name:'Sweden', lat:62.7342, lon:17.0624},
+  {name:'Switzerland', lat:46.7368, lon:8.2869},
+  {name:'Syria', lat:35.0975, lon:38.5117},
+  {name:'Tajikistan', lat:38.5693, lon:70.9422},
+  {name:'Taiwan', lat:25.0330, lon:121.5654},
+  {name:'Tanzania', lat:-6.3558, lon:34.8183},
+  {name:'Thailand', lat:13.6622, lon:101.0868},
+  {name:'Timor-Leste', lat:-8.8099, lon:125.9502},
+  {name:'Togo', lat:8.6607, lon:0.8991},
+  {name:'Tokelau', lat:-9.1952, lon:-171.8527},
+  {name:'Tonga', lat:-21.1593, lon:-175.2042},
+  {name:'Trinidad and Tobago', lat:10.4155, lon:-61.3724},
+  {name:'Tunisia', lat:34.0864, lon:9.6559},
+  {name:'Turkey', lat:38.9321, lon:35.5689},
+  {name:'Turkmenistan', lat:39.0607, lon:58.4577},
+  {name:'Turks and Caicos Islands', lat:21.7999, lon:-71.7406},
+  {name:'US Virgin Islands', lat:17.7380, lon:-64.7616},
+  {name:'Uganda', lat:1.2822, lon:32.3437},
+  {name:'Ukraine', lat:48.6575, lon:31.2738},
+  {name:'United Arab Emirates', lat:24.1825, lon:54.2792},
+  {name:'United Kingdom', lat:53.9784, lon:-2.8529},
+  {name:'United States', lat:38.8208, lon:-96.3316},
+  {name:'United States Minor Outlying Islands', lat:19.3020, lon:166.6380},
+  {name:'Uruguay', lat:-32.7820, lon:-56.0192},
+  {name:'Uzbekistan', lat:41.4879, lon:63.8548},
+  {name:'Vanuatu', lat:-15.1891, lon:166.8491},
+  {name:'Venezuela', lat:7.1483, lon:-66.3649},
+  {name:'Vietnam', lat:16.5173, lon:105.9134},
+  {name:'Wallis and Futuna', lat:-14.2834, lon:-178.1274},
+  {name:'Yemen', lat:16.0014, lon:47.4682},
+  {name:'Zambia', lat:-13.1628, lon:27.7552},
+  {name:'Zimbabwe', lat:-18.9270, lon:29.7178},
+];
+
+const KNOWN_PORTS = [
+  /* --- specific ports/cities (checked first via longest-key-wins matching) --- */
+  {keys:['hai phong','cang hai phong','haiphong'], lat:20.8449, lon:106.6881, label:'Hải Phòng, Việt Nam'},
+  {keys:['cat lai','tp hcm','tp.hcm','ho chi minh','sai gon','saigon'], lat:10.7626, lon:106.7710, label:'Cát Lái, TP. Hồ Chí Minh, Việt Nam'},
+  {keys:['cai mep','vung tau','ba ria'], lat:10.5417, lon:107.0333, label:'Cái Mép, Bà Rịa - Vũng Tàu, Việt Nam'},
+  {keys:['da nang'], lat:16.0678, lon:108.2208, label:'Đà Nẵng, Việt Nam'},
+  {keys:['qui nhon','quy nhon'], lat:13.7830, lon:109.2196, label:'Quy Nhơn, Việt Nam'},
+  {keys:['can tho'], lat:10.0452, lon:105.7469, label:'Cần Thơ, Việt Nam'},
+  {keys:['phnom penh'], lat:11.5564, lon:104.9282, label:'Phnom Penh, Campuchia'},
+  {keys:['sihanoukville','preah sihanouk'], lat:10.6104, lon:103.5300, label:'Sihanoukville, Campuchia'},
+  {keys:['cambodia','campuchia','cam bot','kampuchea'], lat:12.5657, lon:104.9910, label:'Campuchia (trung tâm)'},
+  {keys:['vientiane'], lat:17.9757, lon:102.6331, label:'Vientiane, Lào'},
+  {keys:['laos','lao pdr'], lat:19.8563, lon:102.4955, label:'Lào (trung tâm)'},
+  {keys:['bangkok','laem chabang'], lat:13.0827, lon:100.8830, label:'Bangkok, Thái Lan'},
+  {keys:['singapore'], lat:1.3521, lon:103.8198, label:'Singapore'},
+  {keys:['hong kong','hongkong'], lat:22.3193, lon:114.1694, label:'Hong Kong'},
+  {keys:['macau','macao'], lat:22.1987, lon:113.5439, label:'Macau'},
+  {keys:['taiwan','dai loan','taipei'], lat:25.0330, lon:121.5654, label:'Đài Loan (Taipei)'},
+  {keys:['kaohsiung'], lat:22.6273, lon:120.3014, label:'Kaohsiung, Đài Loan'},
+  {keys:['dubai'], lat:25.2048, lon:55.2708, label:'Dubai, UAE'},
+  {keys:['colombo'], lat:6.9271, lon:79.8612, label:'Colombo, Sri Lanka'},
+  {keys:['tanjung pelepas'], lat:1.3624, lon:103.5507, label:'Tanjung Pelepas, Malaysia'},
+  {keys:['port klang','klang'], lat:3.0044, lon:101.3931, label:'Port Klang, Malaysia'},
+  {keys:['manila'], lat:14.5995, lon:120.9842, label:'Manila, Philippines'},
+  {keys:['jakarta','tanjung priok'], lat:-6.1045, lon:106.8654, label:'Jakarta, Indonesia'},
+  {keys:['santiago'], lat:-33.4489, lon:-70.6693, label:'Santiago, Chile'},
+  {keys:['san antonio','valparaiso'], lat:-33.5928, lon:-71.6128, label:'San Antonio, Chile'},
+  {keys:['chile'], lat:-35.6751, lon:-71.5430, label:'Chile (trung tâm)'},
+  {keys:['los angeles','long beach'], lat:33.7550, lon:-118.2160, label:'Los Angeles / Long Beach, Hoa Kỳ'},
+  {keys:['rotterdam'], lat:51.9244, lon:4.4777, label:'Rotterdam, Hà Lan'},
+  {keys:['shanghai'], lat:31.2304, lon:121.4737, label:'Thượng Hải, Trung Quốc'},
+  {keys:['busan'], lat:35.1796, lon:129.0756, label:'Busan, Hàn Quốc'},
+  /* --- whole-country fallback centroids (~206 countries) --- */
+  {keys:['american samoa'], lat:-14.3057, lon:-170.7007, label:'American Samoa'},
+  {keys:['united states minor outlying islands'], lat:19.3020, lon:166.6380, label:'United States Minor Outlying Islands'},
+  {keys:['cook islands'], lat:-21.2226, lon:-159.7877, label:'Cook Islands'},
+  {keys:['french polynesia'], lat:-17.6747, lon:-149.4004, label:'French Polynesia'},
+  {keys:['niue'], lat:-19.0523, lon:-169.8688, label:'Niue'},
+  {keys:['pitcairn'], lat:-24.3661, lon:-128.3150, label:'Pitcairn'},
+  {keys:['samoa'], lat:-13.6343, lon:-172.4411, label:'Samoa'},
+  {keys:['tokelau'], lat:-9.1952, lon:-171.8527, label:'Tokelau'},
+  {keys:['tonga'], lat:-21.1593, lon:-175.2042, label:'Tonga'},
+  {keys:['wallis and futuna'], lat:-14.2834, lon:-178.1274, label:'Wallis and Futuna'},
+  {keys:['el salvador'], lat:13.7580, lon:-88.8591, label:'El Salvador'},
+  {keys:['guatemala'], lat:15.8209, lon:-90.3122, label:'Guatemala'},
+  {keys:['mexico'], lat:23.8744, lon:-101.5540, label:'Mexico'},
+  {keys:['canada'], lat:57.5505, lon:-98.4168, label:'Canada'},
+  {keys:['argentina'], lat:-35.6973, lon:-64.5324, label:'Argentina'},
+  {keys:['falkland islands'], lat:-51.7590, lon:-58.7466, label:'Falkland Islands'},
+  {keys:['chile'], lat:-37.8294, lon:-70.7686, label:'Chile'},
+  {keys:['ecuador'], lat:-1.5643, lon:-78.4630, label:'Ecuador'},
+  {keys:['peru'], lat:-8.5227, lon:-74.1142, label:'Peru'},
+  {keys:['bolivia'], lat:-16.7312, lon:-64.4521, label:'Bolivia'},
+  {keys:['brazil'], lat:-11.5246, lon:-54.3552, label:'Brazil'},
+  {keys:['paraguay'], lat:-23.4219, lon:-58.3891, label:'Paraguay'},
+  {keys:['uruguay'], lat:-32.7820, lon:-56.0192, label:'Uruguay'},
+  {keys:['fiji'], lat:-17.8225, lon:177.9814, label:'Fiji'},
+  {keys:['anguilla'], lat:18.2229, lon:-63.0601, label:'Anguilla'},
+  {keys:['antigua and barbuda'], lat:17.0715, lon:-61.7853, label:'Antigua and Barbuda'},
+  {keys:['aruba'], lat:12.5156, lon:-69.9756, label:'Aruba'},
+  {keys:['bahamas'], lat:24.7216, lon:-78.0728, label:'Bahamas'},
+  {keys:['barbados'], lat:13.1832, lon:-59.5574, label:'Barbados'},
+  {keys:['belize'], lat:17.2425, lon:-88.6827, label:'Belize'},
+  {keys:['bermuda'], lat:32.3151, lon:-64.7459, label:'Bermuda'},
+  {keys:['british virgin islands'], lat:18.4220, lon:-64.6241, label:'British Virgin Islands'},
+  {keys:['cayman islands'], lat:19.3112, lon:-81.2520, label:'Cayman Islands'},
+  {keys:['colombia'], lat:4.1878, lon:-72.6445, label:'Colombia'},
+  {keys:['costa rica'], lat:9.8635, lon:-84.1467, label:'Costa Rica'},
+  {keys:['cuba'], lat:21.4762, lon:-79.6982, label:'Cuba'},
+  {keys:['dominica'], lat:15.4293, lon:-61.3605, label:'Dominica'},
+  {keys:['dominican republic'], lat:18.7795, lon:-70.4350, label:'Dominican Republic'},
+  {keys:['french guiana'], lat:3.8574, lon:-53.3223, label:'French Guiana'},
+  {keys:['grenada'], lat:12.1129, lon:-61.6794, label:'Grenada'},
+  {keys:['guadeloupe'], lat:16.2442, lon:-61.5438, label:'Guadeloupe'},
+  {keys:['guyana'], lat:4.6821, lon:-58.9135, label:'Guyana'},
+  {keys:['haiti'], lat:18.8835, lon:-72.8929, label:'Haiti'},
+  {keys:['honduras'], lat:14.7404, lon:-86.4925, label:'Honduras'},
+  {keys:['jamaica'], lat:18.1221, lon:-77.3036, label:'Jamaica'},
+  {keys:['martinique'], lat:14.6427, lon:-61.0143, label:'Martinique'},
+  {keys:['montserrat'], lat:16.7354, lon:-62.1869, label:'Montserrat'},
+  {keys:['nicaragua'], lat:12.8936, lon:-85.0161, label:'Nicaragua'},
+  {keys:['panama'], lat:8.4395, lon:-80.1443, label:'Panama'},
+  {keys:['puerto rico'], lat:18.2162, lon:-66.4943, label:'Puerto Rico'},
+  {keys:['saint kitts and nevis'], lat:17.3147, lon:-62.7456, label:'Saint Kitts and Nevis'},
+  {keys:['saint lucia'], lat:13.8957, lon:-60.9690, label:'Saint Lucia'},
+  {keys:['saint vincent and the grenadines'], lat:13.2548, lon:-61.1938, label:'Saint Vincent and the Grenadines'},
+  {keys:['suriname'], lat:4.0987, lon:-55.8555, label:'Suriname'},
+  {keys:['trinidad and tobago'], lat:10.4155, lon:-61.3724, label:'Trinidad and Tobago'},
+  {keys:['turks and caicos islands'], lat:21.7999, lon:-71.7406, label:'Turks and Caicos Islands'},
+  {keys:['us virgin islands'], lat:17.7380, lon:-64.7616, label:'US Virgin Islands'},
+  {keys:['venezuela'], lat:7.1483, lon:-66.3649, label:'Venezuela'},
+  {keys:['burkina faso'], lat:12.1087, lon:-1.6933, label:'Burkina Faso'},
+  {keys:['cabo verde'], lat:15.0764, lon:-23.6340, label:'Cabo Verde'},
+  {keys:['cote divoire'], lat:7.5368, lon:-5.5717, label:"Cote d'Ivoire"},
+  {keys:['gambia'], lat:13.4286, lon:-15.3834, label:'Gambia'},
+  {keys:['ghana'], lat:7.9453, lon:-1.2192, label:'Ghana'},
+  {keys:['gibraltar'], lat:36.1402, lon:-5.3455, label:'Gibraltar'},
+  {keys:['guinea'], lat:10.2560, lon:-10.9869, label:'Guinea'},
+  {keys:['guineabissau'], lat:11.9801, lon:-14.9802, label:'Guinea-Bissau'},
+  {keys:['liberia'], lat:6.5201, lon:-9.2590, label:'Liberia'},
+  {keys:['mali'], lat:17.1681, lon:-4.3464, label:'Mali'},
+  {keys:['mauritania'], lat:20.4667, lon:-10.4951, label:'Mauritania'},
+  {keys:['morocco'], lat:28.6876, lon:-8.8172, label:'Morocco'},
+  {keys:['portugal'], lat:39.6753, lon:-7.9337, label:'Portugal'},
+  {keys:['senegal'], lat:14.2289, lon:-14.6109, label:'Senegal'},
+  {keys:['sierra leone'], lat:8.5613, lon:-11.7866, label:'Sierra Leone'},
+  {keys:['greenland'], lat:74.1685, lon:-42.0757, label:'Greenland'},
+  {keys:['ireland'], lat:53.3049, lon:-8.2411, label:'Ireland'},
+  {keys:['united kingdom'], lat:53.9784, lon:-2.8529, label:'United Kingdom'},
+  {keys:['iceland'], lat:65.1236, lon:-19.0568, label:'Iceland'},
+  {keys:['new zealand'], lat:-43.8277, lon:170.6904, label:'New Zealand'},
+  {keys:['angola'], lat:-12.1674, lon:17.6518, label:'Angola'},
+  {keys:['botswana'], lat:-22.2366, lon:23.8578, label:'Botswana'},
+  {keys:['burundi'], lat:-3.2613, lon:29.8852, label:'Burundi'},
+  {keys:['comoros'], lat:-11.6589, lon:43.3483, label:'Comoros'},
+  {keys:['congo'], lat:-0.7294, lon:14.8797, label:'Congo'},
+  {keys:['congo drc'], lat:-3.3386, lon:23.4198, label:'Congo DRC'},
+  {keys:['gabon'], lat:-0.6284, lon:11.8394, label:'Gabon'},
+  {keys:['kenya'], lat:0.6899, lon:37.9531, label:'Kenya'},
+  {keys:['lesotho'], lat:-29.6017, lon:28.2448, label:'Lesotho'},
+  {keys:['malawi'], lat:-13.1290, lon:34.2344, label:'Malawi'},
+  {keys:['mozambique'], lat:-17.5252, lon:35.2086, label:'Mozambique'},
+  {keys:['namibia'], lat:-21.9086, lon:18.1645, label:'Namibia'},
+  {keys:['rwanda'], lat:-2.0147, lon:29.9194, label:'Rwanda'},
+  {keys:['sao tome and principe'], lat:0.2274, lon:6.6062, label:'Sao Tome and Principe'},
+  {keys:['south africa'], lat:-28.5536, lon:24.7525, label:'South Africa'},
+  {keys:['eswatini'], lat:-26.5625, lon:31.5107, label:'Eswatini'},
+  {keys:['tanzania'], lat:-6.3558, lon:34.8183, label:'Tanzania'},
+  {keys:['zambia'], lat:-13.1628, lon:27.7552, label:'Zambia'},
+  {keys:['zimbabwe'], lat:-18.9270, lon:29.7178, label:'Zimbabwe'},
+  {keys:['madagascar'], lat:-19.0416, lon:46.6849, label:'Madagascar'},
+  {keys:['mauritius'], lat:-20.2814, lon:57.5642, label:'Mauritius'},
+  {keys:['seychelles'], lat:-4.6600, lon:55.4725, label:'Seychelles'},
+  {keys:['algeria'], lat:28.3510, lon:2.6558, label:'Algeria'},
+  {keys:['benin'], lat:9.5030, lon:2.3057, label:'Benin'},
+  {keys:['cameroon'], lat:6.2942, lon:12.9485, label:'Cameroon'},
+  {keys:['central african republic'], lat:6.3314, lon:20.5207, label:'Central African Republic'},
+  {keys:['chad'], lat:15.2835, lon:18.4271, label:'Chad'},
+  {keys:['equatorial guinea'], lat:1.5955, lon:10.4255, label:'Equatorial Guinea'},
+  {keys:['libya'], lat:27.2029, lon:17.9113, label:'Libya'},
+  {keys:['malta'], lat:35.8905, lon:14.4419, label:'Malta'},
+  {keys:['niger'], lat:17.0811, lon:8.8686, label:'Niger'},
+  {keys:['nigeria'], lat:9.6103, lon:8.1477, label:'Nigeria'},
+  {keys:['togo'], lat:8.6607, lon:0.8991, label:'Togo'},
+  {keys:['tunisia'], lat:34.0864, lon:9.6559, label:'Tunisia'},
+  {keys:['cyprus'], lat:35.1170, lon:33.3753, label:'Cyprus'},
+  {keys:['djibouti'], lat:11.7502, lon:42.6135, label:'Djibouti'},
+  {keys:['egypt'], lat:26.6052, lon:30.2401, label:'Egypt'},
+  {keys:['eritrea'], lat:15.0055, lon:39.2672, label:'Eritrea'},
+  {keys:['ethiopia'], lat:8.7294, lon:39.9149, label:'Ethiopia'},
+  {keys:['greece'], lat:39.4201, lon:23.1104, label:'Greece'},
+  {keys:['iraq'], lat:33.1051, lon:43.8325, label:'Iraq'},
+  {keys:['israel'], lat:31.5135, lon:35.0279, label:'Israel'},
+  {keys:['jordan'], lat:31.3871, lon:36.9573, label:'Jordan'},
+  {keys:['lebanon'], lat:33.9116, lon:35.8965, label:'Lebanon'},
+  {keys:['south sudan'], lat:7.6578, lon:30.3852, label:'South Sudan'},
+  {keys:['sudan'], lat:15.6706, lon:29.9515, label:'Sudan'},
+  {keys:['syria'], lat:35.0975, lon:38.5117, label:'Syria'},
+  {keys:['turkey'], lat:38.9321, lon:35.5689, label:'Turkey'},
+  {keys:['uganda'], lat:1.2822, lon:32.3437, label:'Uganda'},
+  {keys:['united states'], lat:38.8208, lon:-96.3316, label:'United States'},
+  {keys:['france'], lat:46.6424, lon:2.1940, label:'France'},
+  {keys:['switzerland'], lat:46.7368, lon:8.2869, label:'Switzerland'},
+  {keys:['belgium'], lat:50.6182, lon:4.6750, label:'Belgium'},
+  {keys:['germany'], lat:51.0830, lon:10.4262, label:'Germany'},
+  {keys:['luxembourg'], lat:49.7752, lon:6.1032, label:'Luxembourg'},
+  {keys:['netherlands'], lat:52.1341, lon:5.5541, label:'Netherlands'},
+  {keys:['albania'], lat:41.1417, lon:20.0611, label:'Albania'},
+  {keys:['austria'], lat:47.6319, lon:13.7978, label:'Austria'},
+  {keys:['bosnia and herzegovina'], lat:44.1442, lon:17.8347, label:'Bosnia and Herzegovina'},
+  {keys:['croatia'], lat:44.9119, lon:16.6258, label:'Croatia'},
+  {keys:['czech republic'], lat:49.7492, lon:15.3833, label:'Czech Republic'},
+  {keys:['denmark'], lat:56.0012, lon:9.3787, label:'Denmark'},
+  {keys:['hungary'], lat:47.2253, lon:19.3962, label:'Hungary'},
+  {keys:['italy'], lat:42.9820, lon:12.7637, label:'Italy'},
+  {keys:['montenegro'], lat:42.7369, lon:19.2951, label:'Montenegro'},
+  {keys:['poland'], lat:52.0685, lon:19.4357, label:'Poland'},
+  {keys:['serbia'], lat:44.0268, lon:20.8568, label:'Serbia'},
+  {keys:['slovakia'], lat:48.6981, lon:19.5810, label:'Slovakia'},
+  {keys:['slovenia'], lat:46.1376, lon:14.8906, label:'Slovenia'},
+  {keys:['north macedonia'], lat:41.5940, lon:21.7100, label:'North Macedonia'},
+  {keys:['norway'], lat:64.9778, lon:16.6703, label:'Norway'},
+  {keys:['sweden'], lat:62.7342, lon:17.0624, label:'Sweden'},
+  {keys:['belarus'], lat:53.4679, lon:27.9643, label:'Belarus'},
+  {keys:['bulgaria'], lat:42.8204, lon:25.2517, label:'Bulgaria'},
+  {keys:['estonia'], lat:58.6481, lon:25.9169, label:'Estonia'},
+  {keys:['finland'], lat:65.0158, lon:25.6574, label:'Finland'},
+  {keys:['georgia'], lat:42.1799, lon:43.3789, label:'Georgia'},
+  {keys:['latvia'], lat:56.8139, lon:24.6937, label:'Latvia'},
+  {keys:['lithuania'], lat:55.2944, lon:23.9460, label:'Lithuania'},
+  {keys:['moldova'], lat:47.0726, lon:28.3911, label:'Moldova'},
+  {keys:['romania'], lat:45.8245, lon:25.0942, label:'Romania'},
+  {keys:['ukraine'], lat:48.6575, lon:31.2738, label:'Ukraine'},
+  {keys:['afghanistan'], lat:34.1340, lon:66.5922, label:'Afghanistan'},
+  {keys:['bahrain'], lat:26.0480, lon:50.5407, label:'Bahrain'},
+  {keys:['india'], lat:23.5863, lon:81.1730, label:'India'},
+  {keys:['iran'], lat:32.9060, lon:54.2371, label:'Iran'},
+  {keys:['kuwait'], lat:29.2814, lon:47.5631, label:'Kuwait'},
+  {keys:['maldives'], lat:-0.6066, lon:73.1008, label:'Maldives'},
+  {keys:['nepal'], lat:28.3009, lon:84.1339, label:'Nepal'},
+  {keys:['oman'], lat:20.7243, lon:55.8411, label:'Oman'},
+  {keys:['pakistan'], lat:30.1162, lon:69.0884, label:'Pakistan'},
+  {keys:['qatar'], lat:25.3185, lon:51.1979, label:'Qatar'},
+  {keys:['saudi arabia'], lat:24.1360, lon:44.6010, label:'Saudi Arabia'},
+  {keys:['somalia'], lat:6.5245, lon:45.4004, label:'Somalia'},
+  {keys:['sri lanka'], lat:7.6966, lon:80.6693, label:'Sri Lanka'},
+  {keys:['tajikistan'], lat:38.5693, lon:70.9422, label:'Tajikistan'},
+  {keys:['turkmenistan'], lat:39.0607, lon:58.4577, label:'Turkmenistan'},
+  {keys:['united arab emirates'], lat:24.1825, lon:54.2792, label:'United Arab Emirates'},
+  {keys:['yemen'], lat:16.0014, lon:47.4682, label:'Yemen'},
+  {keys:['armenia'], lat:40.1784, lon:45.0549, label:'Armenia'},
+  {keys:['azerbaijan'], lat:40.3921, lon:48.6346, label:'Azerbaijan'},
+  {keys:['kazakhstan'], lat:47.6415, lon:66.3759, label:'Kazakhstan'},
+  {keys:['kyrgyzstan'], lat:41.3570, lon:74.1753, label:'Kyrgyzstan'},
+  {keys:['uzbekistan'], lat:41.4879, lon:63.8548, label:'Uzbekistan'},
+  {keys:['indonesia'], lat:0.1559, lon:113.9654, label:'Indonesia'},
+  {keys:['timorleste'], lat:-8.8099, lon:125.9502, label:'Timor-Leste'},
+  {keys:['australia'], lat:-25.6973, lon:134.0228, label:'Australia'},
+  {keys:['papua new guinea'], lat:-7.1569, lon:144.8349, label:'Papua New Guinea'},
+  {keys:['solomon islands'], lat:-9.6131, lon:160.1648, label:'Solomon Islands'},
+  {keys:['vanuatu'], lat:-15.1891, lon:166.8491, label:'Vanuatu'},
+  {keys:['cambodia'], lat:12.6992, lon:105.0397, label:'Cambodia'},
+  {keys:['laos'], lat:18.1173, lon:103.7638, label:'Laos'},
+  {keys:['malaysia'], lat:3.6717, lon:114.6333, label:'Malaysia'},
+  {keys:['myanmar'], lat:19.9012, lon:97.0889, label:'Myanmar'},
+  {keys:['singapore'], lat:1.3528, lon:103.8103, label:'Singapore'},
+  {keys:['thailand'], lat:13.6622, lon:101.0868, label:'Thailand'},
+  {keys:['vietnam','viet nam'], lat:16.5173, lon:105.9134, label:'Vietnam'},
+  {keys:['bangladesh'], lat:23.6737, lon:90.4321, label:'Bangladesh'},
+  {keys:['bhutan'], lat:27.4216, lon:90.4672, label:'Bhutan'},
+  {keys:['china'], lat:38.0733, lon:104.6911, label:'China'},
+  {keys:['brunei'], lat:4.5432, lon:114.6431, label:'Brunei'},
+  {keys:['philippines'], lat:15.5865, lon:121.8221, label:'Philippines'},
+  {keys:['south korea'], lat:36.4024, lon:127.7622, label:'South Korea'},
+  {keys:['mongolia'], lat:47.0864, lon:103.3987, label:'Mongolia'},
+  {keys:['north korea'], lat:40.1920, lon:127.3380, label:'North Korea'},
+  {keys:['japan'], lat:36.7674, lon:137.4693, label:'Japan'},
+  {keys:['russia'], lat:59.0394, lon:98.6705, label:'Russia'},
+  {keys:['spain'], lat:40.3650, lon:-3.6516, label:'Spain'},
+];
+
+const WORLD_PORTS = [
+  {name:'Cang Hai Phong, Viet Nam', lat:20.8449, lon:106.6881, type:'sea', country:'Vietnam'},
+  {name:'Cang Cat Lai, TP.HCM, Viet Nam', lat:10.7626, lon:106.7710, type:'sea', country:'Vietnam'},
+  {name:'Cang Cai Mep, Ba Ria - Vung Tau, Viet Nam', lat:10.5417, lon:107.0333, type:'sea', country:'Vietnam'},
+  {name:'San bay Noi Bai, Ha Noi, Viet Nam', lat:21.2212, lon:105.8072, type:'air', country:'Vietnam'},
+  {name:'San bay Tan Son Nhat, TP.HCM, Viet Nam', lat:10.8188, lon:106.6520, type:'air', country:'Vietnam'},
+  {name:'San bay Da Nang, Viet Nam', lat:16.0439, lon:108.1994, type:'air', country:'Vietnam'},
+  {name:'San bay Van Don, Quang Ninh, Viet Nam', lat:21.1187, lon:107.4150, type:'air', country:'Vietnam'},
+  {name:'San bay Cam Ranh, Khanh Hoa, Viet Nam', lat:11.9982, lon:109.2192, type:'air', country:'Vietnam'},
+  {name:'Cang Phnom Penh, Cambodia', lat:11.5466, lon:104.9313, type:'sea', country:'Cambodia'},
+  {name:'Cang Sihanoukville, Cambodia', lat:10.6104, lon:103.5300, type:'sea', country:'Cambodia'},
+  {name:'San bay Phnom Penh, Cambodia', lat:11.5466, lon:104.8441, type:'air', country:'Cambodia'},
+  {name:'San bay Siem Reap Angkor, Cambodia', lat:13.3671, lon:103.8123, type:'air', country:'Cambodia'},
+  {name:'Cang Vientiane (song), Laos', lat:17.9757, lon:102.6331, type:'sea', country:'Laos'},
+  {name:'San bay Vientiane Wattay, Laos', lat:17.9883, lon:102.5633, type:'air', country:'Laos'},
+  {name:'Cang Laem Chabang, Thailand', lat:13.0827, lon:100.8830, type:'sea', country:'Thailand'},
+  {name:'San bay Bangkok Suvarnabhumi, Thailand', lat:13.6900, lon:100.7501, type:'air', country:'Thailand'},
+  {name:'San bay Bangkok Don Mueang, Thailand', lat:13.9126, lon:100.6068, type:'air', country:'Thailand'},
+  {name:'Cang Singapore, Singapore', lat:1.2650, lon:103.8200, type:'sea', country:'Singapore'},
+  {name:'San bay Changi, Singapore', lat:1.3644, lon:103.9915, type:'air', country:'Singapore'},
+  {name:'Cang Port Klang, Malaysia', lat:3.0044, lon:101.3931, type:'sea', country:'Malaysia'},
+  {name:'Cang Tanjung Pelepas, Malaysia', lat:1.3624, lon:103.5507, type:'sea', country:'Malaysia'},
+  {name:'San bay Kuala Lumpur, Malaysia', lat:2.7456, lon:101.7099, type:'air', country:'Malaysia'},
+  {name:'Cang Tanjung Priok, Jakarta, Indonesia', lat:-6.1045, lon:106.8654, type:'sea', country:'Indonesia'},
+  {name:'Cang Tanjung Perak, Surabaya, Indonesia', lat:-7.2001, lon:112.7340, type:'sea', country:'Indonesia'},
+  {name:'San bay Jakarta Soekarno-Hatta, Indonesia', lat:-6.1256, lon:106.6559, type:'air', country:'Indonesia'},
+  {name:'Cang Manila, Philippines', lat:14.5995, lon:120.9842, type:'sea', country:'Philippines'},
+  {name:'San bay Manila Ninoy Aquino, Philippines', lat:14.5086, lon:121.0198, type:'air', country:'Philippines'},
+  {name:'Cang Yangon, Myanmar', lat:16.7833, lon:96.1667, type:'sea', country:'Myanmar'},
+  {name:'San bay Yangon, Myanmar', lat:16.9073, lon:96.1332, type:'air', country:'Myanmar'},
+  {name:'Cang Hong Kong', lat:22.2830, lon:114.1590, type:'sea', country:'Hong Kong'},
+  {name:'San bay Hong Kong', lat:22.3080, lon:113.9185, type:'air', country:'Hong Kong'},
+  {name:'Cang Kaohsiung, Dai Loan', lat:22.6163, lon:120.2870, type:'sea', country:'Taiwan'},
+  {name:'Cang Keelung, Dai Loan', lat:25.1333, lon:121.7333, type:'sea', country:'Taiwan'},
+  {name:'San bay Dai Loan (Taipei)', lat:25.0797, lon:121.2342, type:'air', country:'Taiwan'},
+  {name:'Cang Thuong Hai, Trung Quoc', lat:31.3400, lon:121.5000, type:'sea', country:'China'},
+  {name:'Cang Ninh Ba - Chau Son, Trung Quoc', lat:29.8683, lon:121.5440, type:'sea', country:'China'},
+  {name:'Cang Duong Son (Yantian), Trung Quoc', lat:22.5760, lon:114.2670, type:'sea', country:'China'},
+  {name:'Cang Quang Chau, Trung Quoc', lat:23.1000, lon:113.4600, type:'sea', country:'China'},
+  {name:'Cang Thanh Dao, Trung Quoc', lat:36.0670, lon:120.3830, type:'sea', country:'China'},
+  {name:'Cang Thien Tan, Trung Quoc', lat:38.9800, lon:117.7300, type:'sea', country:'China'},
+  {name:'Cang Ha Mon (Xiamen), Trung Quoc', lat:24.4667, lon:118.0667, type:'sea', country:'China'},
+  {name:'Cang Dai Lien, Trung Quoc', lat:38.9260, lon:121.6150, type:'sea', country:'China'},
+  {name:'San bay Bac Kinh Thu Do, Trung Quoc', lat:40.0799, lon:116.6031, type:'air', country:'China'},
+  {name:'San bay Thuong Hai Phu Dong, Trung Quoc', lat:31.1443, lon:121.8083, type:'air', country:'China'},
+  {name:'San bay Quang Chau Bach Van, Trung Quoc', lat:23.3924, lon:113.2988, type:'air', country:'China'},
+  {name:'San bay Tham Quyen, Trung Quoc', lat:22.6393, lon:113.8107, type:'air', country:'China'},
+  {name:'Cang Busan, Han Quoc', lat:35.1028, lon:129.0403, type:'sea', country:'South Korea'},
+  {name:'San bay Incheon, Han Quoc', lat:37.4602, lon:126.4407, type:'air', country:'South Korea'},
+  {name:'Cang Tokyo, Nhat Ban', lat:35.6300, lon:139.7700, type:'sea', country:'Japan'},
+  {name:'Cang Yokohama, Nhat Ban', lat:35.4500, lon:139.6500, type:'sea', country:'Japan'},
+  {name:'Cang Kobe, Nhat Ban', lat:34.6833, lon:135.1833, type:'sea', country:'Japan'},
+  {name:'Cang Nagoya, Nhat Ban', lat:35.0833, lon:136.8833, type:'sea', country:'Japan'},
+  {name:'San bay Narita, Nhat Ban', lat:35.7647, lon:140.3864, type:'air', country:'Japan'},
+  {name:'San bay Haneda, Nhat Ban', lat:35.5494, lon:139.7798, type:'air', country:'Japan'},
+  {name:'San bay Kansai, Nhat Ban', lat:34.4347, lon:135.2441, type:'air', country:'Japan'},
+  {name:'Cang Colombo, Sri Lanka', lat:6.9483, lon:79.8438, type:'sea', country:'Sri Lanka'},
+  {name:'San bay Colombo Bandaranaike, Sri Lanka', lat:7.1808, lon:79.8841, type:'air', country:'Sri Lanka'},
+  {name:'Cang Chittagong, Bangladesh', lat:22.3300, lon:91.8000, type:'sea', country:'Bangladesh'},
+  {name:'San bay Dhaka, Bangladesh', lat:23.8433, lon:90.3978, type:'air', country:'Bangladesh'},
+  {name:'Cang Mumbai JNPT, An Do', lat:18.9490, lon:72.9525, type:'sea', country:'India'},
+  {name:'Cang Chennai, An Do', lat:13.1000, lon:80.3000, type:'sea', country:'India'},
+  {name:'Cang Kolkata, An Do', lat:22.5500, lon:88.3000, type:'sea', country:'India'},
+  {name:'Cang Cochin, An Do', lat:9.9667, lon:76.2667, type:'sea', country:'India'},
+  {name:'San bay Mumbai, An Do', lat:19.0887, lon:72.8679, type:'air', country:'India'},
+  {name:'San bay Delhi, An Do', lat:28.5562, lon:77.1000, type:'air', country:'India'},
+  {name:'San bay Chennai, An Do', lat:12.9941, lon:80.1709, type:'air', country:'India'},
+  {name:'Cang Karachi, Pakistan', lat:24.8500, lon:66.9800, type:'sea', country:'Pakistan'},
+  {name:'San bay Karachi, Pakistan', lat:24.9065, lon:67.1608, type:'air', country:'Pakistan'},
+  {name:'San bay Kathmandu, Nepal', lat:27.6966, lon:85.3591, type:'air', country:'Nepal'},
+  {name:'San bay Male, Maldives', lat:4.1918, lon:73.5290, type:'air', country:'Maldives'},
+  {name:'Cang Jebel Ali, Dubai, UAE', lat:25.0100, lon:55.0600, type:'sea', country:'United Arab Emirates'},
+  {name:'Cang Khalifa, Abu Dhabi, UAE', lat:24.7500, lon:54.6500, type:'sea', country:'United Arab Emirates'},
+  {name:'San bay Dubai, UAE', lat:25.2532, lon:55.3657, type:'air', country:'United Arab Emirates'},
+  {name:'San bay Abu Dhabi, UAE', lat:24.4330, lon:54.6511, type:'air', country:'United Arab Emirates'},
+  {name:'Cang Jeddah Islamic, Saudi Arabia', lat:21.4667, lon:39.1667, type:'sea', country:'Saudi Arabia'},
+  {name:'Cang Dammam, Saudi Arabia', lat:26.4333, lon:50.1000, type:'sea', country:'Saudi Arabia'},
+  {name:'San bay Riyadh, Saudi Arabia', lat:24.9576, lon:46.6988, type:'air', country:'Saudi Arabia'},
+  {name:'San bay Jeddah, Saudi Arabia', lat:21.6796, lon:39.1565, type:'air', country:'Saudi Arabia'},
+  {name:'Cang Kuwait, Kuwait', lat:29.3667, lon:48.1500, type:'sea', country:'Kuwait'},
+  {name:'San bay Kuwait, Kuwait', lat:29.2266, lon:47.9689, type:'air', country:'Kuwait'},
+  {name:'Cang Bandar Abbas, Iran', lat:27.1833, lon:56.2667, type:'sea', country:'Iran'},
+  {name:'San bay Teheran Imam Khomeini, Iran', lat:35.4161, lon:51.1522, type:'air', country:'Iran'},
+  {name:'Cang Salalah, Oman', lat:17.0167, lon:54.1000, type:'sea', country:'Oman'},
+  {name:'San bay Muscat, Oman', lat:23.5933, lon:58.2844, type:'air', country:'Oman'},
+  {name:'Cang Haifa, Israel', lat:32.8167, lon:34.9833, type:'sea', country:'Israel'},
+  {name:'San bay Tel Aviv Ben Gurion, Israel', lat:32.0055, lon:34.8854, type:'air', country:'Israel'},
+  {name:'San bay Doha Hamad, Qatar', lat:25.2609, lon:51.6138, type:'air', country:'Qatar'},
+  {name:'San bay Manama, Bahrain', lat:26.2708, lon:50.6336, type:'air', country:'Bahrain'},
+  {name:'San bay Amman Queen Alia, Jordan', lat:31.7226, lon:35.9932, type:'air', country:'Jordan'},
+  {name:'San bay Beirut, Lebanon', lat:33.8209, lon:35.4884, type:'air', country:'Lebanon'},
+  {name:'San bay Baghdad, Iraq', lat:33.2625, lon:44.2346, type:'air', country:'Iraq'},
+  {name:'San bay Istanbul, Tho Nhi Ky', lat:41.2753, lon:28.7519, type:'air', country:'Turkey'},
+  {name:'Cang Rotterdam, Ha Lan', lat:51.9550, lon:4.1400, type:'sea', country:'Netherlands'},
+  {name:'Cang Antwerp, Bi', lat:51.2400, lon:4.4000, type:'sea', country:'Belgium'},
+  {name:'Cang Hamburg, Duc', lat:53.5450, lon:9.9700, type:'sea', country:'Germany'},
+  {name:'Cang Bremerhaven, Duc', lat:53.5400, lon:8.5800, type:'sea', country:'Germany'},
+  {name:'Cang Le Havre, Phap', lat:49.4900, lon:0.1000, type:'sea', country:'France'},
+  {name:'Cang Marseille, Phap', lat:43.3500, lon:5.3667, type:'sea', country:'France'},
+  {name:'Cang Valencia, Tay Ban Nha', lat:39.4400, lon:-0.3167, type:'sea', country:'Spain'},
+  {name:'Cang Algeciras, Tay Ban Nha', lat:36.1408, lon:-5.4562, type:'sea', country:'Spain'},
+  {name:'Cang Barcelona, Tay Ban Nha', lat:41.3500, lon:2.1667, type:'sea', country:'Spain'},
+  {name:'Cang Genoa, Y', lat:44.4000, lon:8.9333, type:'sea', country:'Italy'},
+  {name:'Cang Gioia Tauro, Y', lat:38.4333, lon:15.8833, type:'sea', country:'Italy'},
+  {name:'Cang Piraeus, Hy Lap', lat:37.9400, lon:23.6350, type:'sea', country:'Greece'},
+  {name:'Cang Felixstowe, Anh', lat:51.9600, lon:1.3500, type:'sea', country:'United Kingdom'},
+  {name:'Cang Southampton, Anh', lat:50.8931, lon:-1.3925, type:'sea', country:'United Kingdom'},
+  {name:'Cang London Gateway, Anh', lat:51.5000, lon:0.4700, type:'sea', country:'United Kingdom'},
+  {name:'Cang Gdansk, Ba Lan', lat:54.3500, lon:18.6667, type:'sea', country:'Poland'},
+  {name:'Cang St Petersburg, Nga', lat:59.9300, lon:30.3000, type:'sea', country:'Russia'},
+  {name:'San bay London Heathrow, Anh', lat:51.4700, lon:-0.4543, type:'air', country:'United Kingdom'},
+  {name:'San bay Paris CDG, Phap', lat:49.0097, lon:2.5479, type:'air', country:'France'},
+  {name:'San bay Amsterdam Schiphol, Ha Lan', lat:52.3105, lon:4.7683, type:'air', country:'Netherlands'},
+  {name:'San bay Frankfurt, Duc', lat:50.0379, lon:8.5622, type:'air', country:'Germany'},
+  {name:'San bay Leipzig/Halle (hang hoa), Duc', lat:51.4239, lon:12.2364, type:'air', country:'Germany'},
+  {name:'San bay Madrid Barajas, Tay Ban Nha', lat:40.4983, lon:-3.5676, type:'air', country:'Spain'},
+  {name:'San bay Rome Fiumicino, Y', lat:41.8003, lon:12.2389, type:'air', country:'Italy'},
+  {name:'San bay Milan Malpensa, Y', lat:45.6306, lon:8.7281, type:'air', country:'Italy'},
+  {name:'San bay Zurich, Thuy Si', lat:47.4647, lon:8.5492, type:'air', country:'Switzerland'},
+  {name:'San bay Brussels, Bi', lat:50.9014, lon:4.4844, type:'air', country:'Belgium'},
+  {name:'San bay Liege (hang hoa), Bi', lat:50.6374, lon:5.4432, type:'air', country:'Belgium'},
+  {name:'San bay Luxembourg (hang hoa)', lat:49.6233, lon:6.2044, type:'air', country:'Luxembourg'},
+  {name:'San bay Vienna, Ao', lat:48.1103, lon:16.5697, type:'air', country:'Austria'},
+  {name:'San bay Copenhagen, Dan Mach', lat:55.6180, lon:12.6560, type:'air', country:'Denmark'},
+  {name:'San bay Stockholm Arlanda, Thuy Dien', lat:59.6519, lon:17.9186, type:'air', country:'Sweden'},
+  {name:'San bay Oslo, Na Uy', lat:60.1939, lon:11.1004, type:'air', country:'Norway'},
+  {name:'San bay Helsinki, Phan Lan', lat:60.3172, lon:24.9633, type:'air', country:'Finland'},
+  {name:'San bay Moscow Sheremetyevo, Nga', lat:55.9726, lon:37.4146, type:'air', country:'Russia'},
+  {name:'San bay Warsaw Chopin, Ba Lan', lat:52.1657, lon:20.9671, type:'air', country:'Poland'},
+  {name:'San bay Prague, Sec', lat:50.1008, lon:14.2600, type:'air', country:'Czech Republic'},
+  {name:'San bay Lisbon, Bo Dao Nha', lat:38.7813, lon:-9.1359, type:'air', country:'Portugal'},
+  {name:'San bay Athens, Hy Lap', lat:37.9364, lon:23.9445, type:'air', country:'Greece'},
+  {name:'San bay Dublin, Ai Len', lat:53.4213, lon:-6.2701, type:'air', country:'Ireland'},
+  {name:'Cang Durban, Nam Phi', lat:-29.8667, lon:31.0333, type:'sea', country:'South Africa'},
+  {name:'Cang Cape Town, Nam Phi', lat:-33.9083, lon:18.4333, type:'sea', country:'South Africa'},
+  {name:'San bay Johannesburg OR Tambo, Nam Phi', lat:-26.1392, lon:28.2460, type:'air', country:'South Africa'},
+  {name:'Cang Port Said, Ai Cap', lat:31.2653, lon:32.3019, type:'sea', country:'Egypt'},
+  {name:'Cang Alexandria, Ai Cap', lat:31.2000, lon:29.9167, type:'sea', country:'Egypt'},
+  {name:'San bay Cairo, Ai Cap', lat:30.1219, lon:31.4056, type:'air', country:'Egypt'},
+  {name:'Cang Mombasa, Kenya', lat:-4.0500, lon:39.6667, type:'sea', country:'Kenya'},
+  {name:'San bay Nairobi Jomo Kenyatta, Kenya', lat:-1.3192, lon:36.9278, type:'air', country:'Kenya'},
+  {name:'Cang Dar es Salaam, Tanzania', lat:-6.8167, lon:39.2833, type:'sea', country:'Tanzania'},
+  {name:'Cang Lagos Apapa, Nigeria', lat:6.4500, lon:3.3833, type:'sea', country:'Nigeria'},
+  {name:'San bay Lagos Murtala Muhammed, Nigeria', lat:6.5774, lon:3.3212, type:'air', country:'Nigeria'},
+  {name:'Cang Tema, Ghana', lat:5.6333, lon:-0.0167, type:'sea', country:'Ghana'},
+  {name:'San bay Accra Kotoka, Ghana', lat:5.6052, lon:-0.1668, type:'air', country:'Ghana'},
+  {name:'Cang Abidjan, Cote d\'Ivoire', lat:5.2500, lon:-4.0167, type:'sea', country:'Cote d\'Ivoire'},
+  {name:'San bay Abidjan, Cote d\'Ivoire', lat:5.2614, lon:-3.9263, type:'air', country:'Cote d\'Ivoire'},
+  {name:'Cang Casablanca, Ma-rop', lat:33.6083, lon:-7.6167, type:'sea', country:'Morocco'},
+  {name:'Cang Tangier Med, Ma-rop', lat:35.8833, lon:-5.5000, type:'sea', country:'Morocco'},
+  {name:'San bay Casablanca, Ma-rop', lat:33.3675, lon:-7.5900, type:'air', country:'Morocco'},
+  {name:'Cang Djibouti', lat:11.6000, lon:43.1500, type:'sea', country:'Djibouti'},
+  {name:'San bay Addis Ababa Bole, Ethiopia', lat:8.9779, lon:38.7993, type:'air', country:'Ethiopia'},
+  {name:'San bay Kigali, Rwanda', lat:-1.9686, lon:30.1395, type:'air', country:'Rwanda'},
+  {name:'San bay Kampala Entebbe, Uganda', lat:0.0424, lon:32.4436, type:'air', country:'Uganda'},
+  {name:'San bay Lusaka, Zambia', lat:-15.3308, lon:28.4526, type:'air', country:'Zambia'},
+  {name:'San bay Harare, Zimbabwe', lat:-17.9318, lon:31.0928, type:'air', country:'Zimbabwe'},
+  {name:'San bay Antananarivo Ivato, Madagascar', lat:-18.7969, lon:47.4788, type:'air', country:'Madagascar'},
+  {name:'San bay Port Louis, Mauritius', lat:-20.4302, lon:57.6836, type:'air', country:'Mauritius'},
+  {name:'San bay Kinshasa N\'djili, DRC', lat:-4.3858, lon:15.4446, type:'air', country:'Congo DRC'},
+  {name:'San bay Luanda, Angola', lat:-8.8584, lon:13.2312, type:'air', country:'Angola'},
+  {name:'San bay Dakar Blaise Diagne, Senegal', lat:14.6700, lon:-17.0733, type:'air', country:'Senegal'},
+  {name:'San bay Khartoum, Sudan', lat:15.5895, lon:32.5532, type:'air', country:'Sudan'},
+  {name:'San bay Algiers, Algeria', lat:36.6910, lon:3.2154, type:'air', country:'Algeria'},
+  {name:'San bay Tunis Carthage, Tunisia', lat:36.8510, lon:10.2272, type:'air', country:'Tunisia'},
+  {name:'Cang Los Angeles/Long Beach, Hoa Ky', lat:33.7550, lon:-118.2160, type:'sea', country:'United States'},
+  {name:'Cang Oakland, Hoa Ky', lat:37.7955, lon:-122.2778, type:'sea', country:'United States'},
+  {name:'Cang Seattle/Tacoma, Hoa Ky', lat:47.5800, lon:-122.3900, type:'sea', country:'United States'},
+  {name:'Cang New York/New Jersey, Hoa Ky', lat:40.6700, lon:-74.0800, type:'sea', country:'United States'},
+  {name:'Cang Savannah, Hoa Ky', lat:32.0800, lon:-81.0900, type:'sea', country:'United States'},
+  {name:'Cang Houston, Hoa Ky', lat:29.7300, lon:-95.2600, type:'sea', country:'United States'},
+  {name:'Cang Miami, Hoa Ky', lat:25.7700, lon:-80.1700, type:'sea', country:'United States'},
+  {name:'San bay New York JFK, Hoa Ky', lat:40.6413, lon:-73.7781, type:'air', country:'United States'},
+  {name:'San bay Los Angeles, Hoa Ky', lat:33.9416, lon:-118.4085, type:'air', country:'United States'},
+  {name:'San bay Chicago O\'Hare, Hoa Ky', lat:41.9742, lon:-87.9073, type:'air', country:'United States'},
+  {name:'San bay Miami, Hoa Ky', lat:25.7959, lon:-80.2870, type:'air', country:'United States'},
+  {name:'San bay Memphis (hang hoa FedEx), Hoa Ky', lat:35.0424, lon:-89.9767, type:'air', country:'United States'},
+  {name:'San bay Louisville (hang hoa UPS), Hoa Ky', lat:38.1744, lon:-85.7360, type:'air', country:'United States'},
+  {name:'San bay Anchorage (hang hoa), Hoa Ky', lat:61.1743, lon:-149.9982, type:'air', country:'United States'},
+  {name:'San bay Atlanta, Hoa Ky', lat:33.6407, lon:-84.4277, type:'air', country:'United States'},
+  {name:'San bay Dallas Fort Worth, Hoa Ky', lat:32.8998, lon:-97.0403, type:'air', country:'United States'},
+  {name:'San bay San Francisco, Hoa Ky', lat:37.6213, lon:-122.3790, type:'air', country:'United States'},
+  {name:'Cang Vancouver, Canada', lat:49.2900, lon:-123.1200, type:'sea', country:'Canada'},
+  {name:'Cang Montreal, Canada', lat:45.5500, lon:-73.5500, type:'sea', country:'Canada'},
+  {name:'San bay Toronto Pearson, Canada', lat:43.6772, lon:-79.6306, type:'air', country:'Canada'},
+  {name:'San bay Vancouver, Canada', lat:49.1939, lon:-123.1844, type:'air', country:'Canada'},
+  {name:'San bay Mexico City, Mexico', lat:19.4363, lon:-99.0721, type:'air', country:'Mexico'},
+  {name:'Cang Veracruz, Mexico', lat:19.2000, lon:-96.1333, type:'sea', country:'Mexico'},
+  {name:'Cang Manzanillo, Mexico', lat:19.0500, lon:-104.3167, type:'sea', country:'Mexico'},
+  {name:'Cang Santos, Brazil', lat:-23.9600, lon:-46.3300, type:'sea', country:'Brazil'},
+  {name:'Cang Rio de Janeiro, Brazil', lat:-22.8900, lon:-43.1800, type:'sea', country:'Brazil'},
+  {name:'San bay Sao Paulo Guarulhos, Brazil', lat:-23.4356, lon:-46.4731, type:'air', country:'Brazil'},
+  {name:'San bay Rio de Janeiro Galeao, Brazil', lat:-22.8090, lon:-43.2506, type:'air', country:'Brazil'},
+  {name:'Cang Buenos Aires, Argentina', lat:-34.6000, lon:-58.3667, type:'sea', country:'Argentina'},
+  {name:'San bay Buenos Aires Ezeiza, Argentina', lat:-34.8222, lon:-58.5358, type:'air', country:'Argentina'},
+  {name:'Cang Valparaiso, Chile', lat:-33.0400, lon:-71.6300, type:'sea', country:'Chile'},
+  {name:'Cang San Antonio, Chile', lat:-33.5928, lon:-71.6128, type:'sea', country:'Chile'},
+  {name:'San bay Santiago, Chile', lat:-33.3930, lon:-70.7858, type:'air', country:'Chile'},
+  {name:'Cang Callao, Peru', lat:-12.0500, lon:-77.1500, type:'sea', country:'Peru'},
+  {name:'San bay Lima, Peru', lat:-12.0219, lon:-77.1143, type:'air', country:'Peru'},
+  {name:'Cang Cartagena, Colombia', lat:10.4000, lon:-75.5167, type:'sea', country:'Colombia'},
+  {name:'San bay Bogota, Colombia', lat:4.7016, lon:-74.1469, type:'air', country:'Colombia'},
+  {name:'San bay Quito, Ecuador', lat:-0.1292, lon:-78.3575, type:'air', country:'Ecuador'},
+  {name:'San bay Caracas, Venezuela', lat:10.6013, lon:-66.9911, type:'air', country:'Venezuela'},
+  {name:'Cang Balboa, Panama', lat:8.9500, lon:-79.5667, type:'sea', country:'Panama'},
+  {name:'Cang Colon, Panama', lat:9.3600, lon:-79.9000, type:'sea', country:'Panama'},
+  {name:'San bay Panama City Tocumen, Panama', lat:9.0714, lon:-79.3835, type:'air', country:'Panama'},
+  {name:'San bay Guatemala City, Guatemala', lat:14.5833, lon:-90.5275, type:'air', country:'Guatemala'},
+  {name:'San bay San Jose Costa Rica', lat:9.9939, lon:-84.2088, type:'air', country:'Costa Rica'},
+  {name:'San bay San Salvador, El Salvador', lat:13.4409, lon:-89.0557, type:'air', country:'El Salvador'},
+  {name:'San bay Managua, Nicaragua', lat:12.1415, lon:-86.1682, type:'air', country:'Nicaragua'},
+  {name:'San bay Tegucigalpa, Honduras', lat:14.0608, lon:-87.2172, type:'air', country:'Honduras'},
+  {name:'San bay Havana, Cuba', lat:22.9892, lon:-82.4091, type:'air', country:'Cuba'},
+  {name:'San bay Santo Domingo, Dominican Republic', lat:18.4297, lon:-69.6689, type:'air', country:'Dominican Republic'},
+  {name:'San bay Kingston, Jamaica', lat:17.9357, lon:-76.7875, type:'air', country:'Jamaica'},
+  {name:'San bay Port-au-Prince, Haiti', lat:18.5800, lon:-72.2925, type:'air', country:'Haiti'},
+  {name:'San bay Asuncion, Paraguay', lat:-25.2400, lon:-57.5199, type:'air', country:'Paraguay'},
+  {name:'San bay Montevideo, Uruguay', lat:-34.8384, lon:-56.0308, type:'air', country:'Uruguay'},
+  {name:'San bay La Paz, Bolivia', lat:-16.5133, lon:-68.1925, type:'air', country:'Bolivia'},
+  {name:'Cang Sydney, Uc', lat:-33.8600, lon:151.2000, type:'sea', country:'Australia'},
+  {name:'Cang Melbourne, Uc', lat:-37.8300, lon:144.9300, type:'sea', country:'Australia'},
+  {name:'Cang Brisbane, Uc', lat:-27.4000, lon:153.1667, type:'sea', country:'Australia'},
+  {name:'Cang Fremantle/Perth, Uc', lat:-32.0500, lon:115.7500, type:'sea', country:'Australia'},
+  {name:'San bay Sydney, Uc', lat:-33.9399, lon:151.1753, type:'air', country:'Australia'},
+  {name:'San bay Melbourne, Uc', lat:-37.6690, lon:144.8410, type:'air', country:'Australia'},
+  {name:'San bay Brisbane, Uc', lat:-27.3842, lon:153.1175, type:'air', country:'Australia'},
+  {name:'San bay Perth, Uc', lat:-31.9403, lon:115.9668, type:'air', country:'Australia'},
+  {name:'Cang Auckland, New Zealand', lat:-36.8400, lon:174.7700, type:'sea', country:'New Zealand'},
+  {name:'San bay Auckland, New Zealand', lat:-37.0082, lon:174.7850, type:'air', country:'New Zealand'},
+  {name:'San bay Almaty, Kazakhstan', lat:43.3521, lon:77.0405, type:'air', country:'Kazakhstan'},
+  {name:'San bay Tashkent, Uzbekistan', lat:41.2579, lon:69.2811, type:'air', country:'Uzbekistan'},
+  {name:'San bay Bishkek, Kyrgyzstan', lat:43.0613, lon:74.4776, type:'air', country:'Kyrgyzstan'},
+  {name:'San bay Dushanbe, Tajikistan', lat:38.5433, lon:68.8250, type:'air', country:'Tajikistan'},
+  {name:'San bay Ashgabat, Turkmenistan', lat:37.9868, lon:58.3610, type:'air', country:'Turkmenistan'},
+  {name:'San bay Baku, Azerbaijan', lat:40.4675, lon:50.0467, type:'air', country:'Azerbaijan'},
+  {name:'San bay Yerevan, Armenia', lat:40.1473, lon:44.3959, type:'air', country:'Armenia'},
+  {name:'San bay Tbilisi, Georgia', lat:41.6693, lon:44.9547, type:'air', country:'Georgia'},
+  {name:'San bay Ulaanbaatar, Mongolia', lat:47.6438, lon:106.8161, type:'air', country:'Mongolia'},
+];
+
+function lookupKnownPort(name){
+  const n = ' ' + norm(name).replace(/[''`]/g,'').replace(/[,.]/g,' ').replace(/\s+/g,' ').trim() + ' ';
+  let best = null;
+  for(const p of KNOWN_PORTS){
+    for(const k of p.keys){
+      if(n.includes(' '+k+' ') || n.trim()===k){
+        if(!best || k.length > best._k.length){ best = {lat:p.lat, lon:p.lon, label:p.label, _k:k}; }
+      }
+    }
+  }
+  return best ? {lat:best.lat, lon:best.lon, label:best.label} : null;
+}
+
+async function geocodeRaw(name){
+  const url = 'https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(name.trim()) + '&count=1&format=json';
+  const res = await fetch(url);
+  const data = await res.json();
+  if(data && data.results && data.results.length){
+    const r = data.results[0];
+    return { lat:r.latitude, lon:r.longitude, label:[r.name,r.admin1,r.country].filter(Boolean).join(', ') };
+  }
+  return null;
+}
+async function geocode(name){
+  if(!name || !name.trim()) return null;
+  const known = lookupKnownPort(name);
+  if(known) return known;
+
+  const cacheKey = 'geocode:' + norm(name);
+  const cached = await safeGet(cacheKey, false);
+  if(cached){ try{ return JSON.parse(cached); }catch(e){} }
+
+  try{
+    // Open-Meteo requires the part after a comma (country/admin) to match EXACTLY.
+    // "Hải Phòng, Việt Nam" fails because "Việt Nam" isn't the indexed English form,
+    // even though "Hải Phòng" alone matches fine (name matching is diacritic-insensitive).
+    let out = await geocodeRaw(name);
+    if(!out && name.includes(',')){
+      const firstPart = name.split(',')[0].trim();
+      if(firstPart) out = await geocodeRaw(firstPart);
+    }
+    if(!out){
+      const stripped = norm(name).split(',')[0].trim();
+      if(stripped && stripped !== norm(name)) out = await geocodeRaw(stripped);
+    }
+    if(out) await safeSet(cacheKey, JSON.stringify(out), false);
+    return out;
+  }catch(e){ console.error('geocode failed', e); return null; }
+}
+
+function pickYearForMonth(month){
+  const now = new Date();
+  const curM = now.getMonth()+1, curY = now.getFullYear();
+  return (month < curM) ? curY : curY - 1;
+}
+
+async function fetchWithTimeout(url, ms){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), ms);
+  try{
+    const res = await fetch(url, {signal: controller.signal});
+    return res;
+  }finally{ clearTimeout(timer); }
+}
+
+async function fetchMonthClimate(lat, lon, year, month){
+  const cacheKey = `climate:${lat.toFixed(2)}:${lon.toFixed(2)}:${year}:${month}`;
+  const cached = await safeGet(cacheKey, false);
+  if(cached){ try{ return JSON.parse(cached); }catch(e){} }
+  const mm = String(month).padStart(2,'0');
+  const lastDay = new Date(year, month, 0).getDate();
+  const start = `${year}-${mm}-01`, end = `${year}-${mm}-${String(lastDay).padStart(2,'0')}`;
+  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${start}&end_date=${end}&daily=temperature_2m_max,temperature_2m_min,temperature_2m_mean&timezone=auto`;
+
+  // Open-Meteo's historical archive occasionally times out transiently — retry a
+  // couple of times with a short backoff before giving up, instead of failing on
+  // the first hiccup.
+  const ATTEMPTS = 3;
+  for(let attempt=1; attempt<=ATTEMPTS; attempt++){
+    try{
+      const res = await fetchWithTimeout(url, 12000);
+      const data = await res.json();
+      if(!data || !data.daily) throw new Error('no daily data in response');
+      const tmax = data.daily.temperature_2m_max || [];
+      const tmin = data.daily.temperature_2m_min || [];
+      const tmean = data.daily.temperature_2m_mean || [];
+      const out = {
+        year, month, days: tmax.length,
+        dates: data.daily.time || [],
+        tmax, tmin, tmean,
+        avgMax: tmax.reduce((a,b)=>a+b,0)/tmax.length,
+        avgMin: tmin.reduce((a,b)=>a+b,0)/tmin.length,
+        avgMean: tmean.reduce((a,b)=>a+b,0)/tmean.length,
+        hiMax: Math.max(...tmax),
+        loMin: Math.min(...tmin),
+        over30: tmax.filter(t=>t>30).length,
+        over35: tmax.filter(t=>t>35).length,
+        over40: tmax.filter(t=>t>40).length,
+      };
+      await safeSet(cacheKey, JSON.stringify(out), false);
+      return out;
+    }catch(e){
+      console.error(`climate fetch failed (attempt ${attempt}/${ATTEMPTS})`, e);
+      if(attempt < ATTEMPTS) await new Promise(r=>setTimeout(r, 800*attempt));
+      else { climateFetchHadNetworkError = true; return null; }
+    }
+  }
+}
+let climateFetchHadNetworkError = false;
+
+/* ---------------- PDF parsing ---------------- */
+async function parsePdf(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  let fullText = '';
+  for(let p=1; p<=pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    fullText += content.items.map(it=>it.str).join(' ') + '\n';
+  }
+
+  // The "Alarm Statistics" section lists histogram bucket-edge timestamps immediately
+  // followed by bucket-edge temperatures (e.g. "...20:11:33 -1.0 C 1.6 C 4.2 C...").
+  // This can look exactly like a real "date time value" reading and pollute the parse.
+  // The real logged readings only start at the repeating "Date Time ... °C" table header
+  // on the following pages, so we cut everything before that away first.
+  const tableHeaderIdx = fullText.indexOf('Date Time');
+  const dataText = tableHeaderIdx >= 0 ? fullText.slice(tableHeaderIdx) : fullText;
+
+  // Authoritative logging window, read directly from the "Logging Summary" block
+  // ("Start Time: dd/mm/yyyy hh:mm:ss ... Stop Time: dd/mm/yyyy hh:mm:ss"). Any parsed
+  // reading outside this window (e.g. stray histogram bucket-edge timestamps elsewhere
+  // in the document) is discarded below, regardless of where in the text it was found.
+  let officialStart = null, officialStop = null;
+  const winMatch = fullText.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}:\d{2})\s*(?:\([^)]*\))?\s+(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}:\d{2})/);
+  if(winMatch){
+    const s = parseDMY(winMatch[1]), e = parseDMY(winMatch[2]);
+    if(s && e && e.getTime() > s.getTime()){ officialStart = s.getTime(); officialStop = e.getTime(); }
+  }
+
+  // 1) extract all timestamp+value pairs anywhere in the (trimmed) text, sort & dedupe by time
+  const re = /(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2}:\d{2})\s+(-?\d{1,3}\.\d)\b/g;
+  const found = new Map();
+  let m;
+  while((m = re.exec(dataText)) !== null){
+    const dateStr = m[1], timeStr = m[2], val = parseFloat(m[3]);
+    if(val < -60 || val > 90) continue; // sanity bounds
+    const dt = parseDMY(dateStr + ' ' + timeStr);
+    if(!dt) continue;
+    const key = dt.getTime();
+    if(!found.has(key)) found.set(key, val);
+  }
+  let points = Array.from(found.entries()).map(([t,c])=>({t, c})).sort((a,b)=>a.t-b.t);
+
+  if(officialStart !== null && officialStop !== null){
+    points = points.filter(p => p.t >= officialStart && p.t <= officialStop);
+  }
+
+  // sanity: if too few points parsed, bail with error
+  if(points.length < 5){
+    throw new Error('Không đọc được dữ liệu nhiệt độ dạng bảng trong file này. Hãy kiểm tra lại file PDF (cần đúng định dạng data logger dạng Date/Time/°C).');
+  }
+
+  // 2) device id best-effort
+  let deviceId = 'N/A';
+  const devMatch = fullText.match(/\b([A-Z]{1,3}\d{5,8})\b/);
+  if(devMatch) deviceId = devMatch[1];
+
+  const values = points.map(p=>p.c);
+  const min = Math.min(...values), max = Math.max(...values);
+  const avg = values.reduce((a,b)=>a+b,0)/values.length;
+  const start = officialStart !== null ? officialStart : points[0].t;
+  const stop = officialStop !== null ? officialStop : points[points.length-1].t;
+
+  // months spanned (calendar month numbers present in trip, 1-12, deduped)
+  const monthsSet = new Set();
+  points.forEach(p => monthsSet.add(new Date(p.t).getMonth()+1));
+
+  return {
+    fileName: file.name,
+    deviceId,
+    points, // [{t: epoch ms, c: number}]
+    min, max, avg,
+    start, stop,
+    months: Array.from(monthsSet).sort((a,b)=>a-b),
+    pointCount: points.length,
+  };
+}
+
+/* ---------------- thermal ribbon canvas ---------------- */
+function drawLoggerLineChart(canvas, points){
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || 600, h = canvas.clientHeight || 220;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+  if(!points.length) return;
+
+  const vals = points.map(p=>p.c);
+  let vmin = Math.min(...vals), vmax = Math.max(...vals);
+  const pad = (vmax-vmin)*0.15 || 2;
+  vmin -= pad; vmax += pad;
+
+  const n = points.length;
+  const leftPad=38, rightPad=8, topPad=12, botPad=26;
+  const plotW = w-leftPad-rightPad, plotH = h-topPad-botPad;
+  const xAt = i => leftPad + (n<=1?0:(i/(n-1))*plotW);
+  const yAt = v => topPad + plotH - ((v-vmin)/(vmax-vmin))*plotH;
+
+  const step = niceStep(vmax-vmin, 4);
+  const gridStart = Math.ceil(vmin/step)*step;
+  ctx.font = '10px "IBM Plex Mono", monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for(let g=gridStart; g<=vmax; g+=step){
+    const py = yAt(g);
+    ctx.strokeStyle = 'rgba(231,236,243,.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(leftPad, py); ctx.lineTo(leftPad+plotW, py); ctx.stroke();
+    ctx.fillStyle = 'rgba(140,160,188,.8)';
+    ctx.fillText(Math.round(g)+'°', leftPad-6, py);
+  }
+  ctx.textBaseline = 'alphabetic';
+
+  ctx.beginPath();
+  points.forEach((p,i)=>{
+    const px=xAt(i), py=yAt(p.c);
+    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  });
+  ctx.strokeStyle = '#5BD9E8';
+  ctx.lineWidth = 1.6;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  ctx.font = '10px Inter, sans-serif';
+  ctx.fillStyle = 'rgba(231,236,243,.6)';
+  ctx.textAlign = 'left';
+  ctx.fillText(new Date(points[0].t).toLocaleDateString('vi-VN'), leftPad, topPad+plotH+16);
+  ctx.textAlign = 'right';
+  ctx.fillText(new Date(points[n-1].t).toLocaleDateString('vi-VN'), leftPad+plotW, topPad+plotH+16);
+}
+
+function drawRibbon(canvas, points, globalMin=null, globalMax=null){
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || 600, h = canvas.clientHeight || 46;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  const values = points.map(p=>p.c);
+  const min = globalMin!==null ? globalMin : Math.min(...values);
+  const max = globalMax!==null ? globalMax : Math.max(...values);
+  const range = Math.max(1, max-min);
+
+  function colorFor(t){
+    // 0 -> blue (cold), .35 -> cyan, .65 -> amber, 1 -> red (hot)
+    const stops = [
+      [0.00, [46,111,224]],
+      [0.30, [91,217,232]],
+      [0.60, [242,166,90]],
+      [1.00, [255,110,110]],
+    ];
+    for(let i=0;i<stops.length-1;i++){
+      const [t0,c0]=stops[i], [t1,c1]=stops[i+1];
+      if(t>=t0 && t<=t1){
+        const f=(t-t0)/(t1-t0);
+        return `rgb(${Math.round(lerp(c0[0],c1[0],f))},${Math.round(lerp(c0[1],c1[1],f))},${Math.round(lerp(c0[2],c1[2],f))})`;
+      }
+    }
+    return 'rgb(255,110,110)';
+  }
+
+  const n = points.length;
+  for(let i=0;i<n-1;i++){
+    const x0 = (i/(n-1))*w, x1 = ((i+1)/(n-1))*w;
+    const tval = (points[i].c - min)/range;
+    ctx.fillStyle = colorFor(Math.max(0,Math.min(1,tval)));
+    ctx.fillRect(x0, 0, (x1-x0)+1, h);
+  }
+}
+
+/* ---------------- recommendation logic ---------------- */
+function computeDayStats(points){
+  // group hourly readings into per-calendar-day max, then count days over each
+  // threshold plus the longest run of CONSECUTIVE calendar days over that threshold.
+  const dayMax = new Map();
+  points.forEach(p=>{
+    const d = new Date(p.t);
+    const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const cur = dayMax.get(key);
+    if(cur===undefined || p.c>cur) dayMax.set(key, p.c);
+  });
+  const days = Array.from(dayMax.entries()).sort((a,b)=> a[0]<b[0] ? -1 : (a[0]>b[0]?1:0));
+  function countAndStreak(threshold){
+    let count=0, streak=0, maxStreak=0;
+    days.forEach(([,v])=>{
+      if(v>threshold){ count++; streak++; if(streak>maxStreak) maxStreak=streak; }
+      else streak=0;
+    });
+    return {count, maxStreak};
+  }
+  const c30=countAndStreak(30), c35=countAndStreak(35), c40=countAndStreak(40);
+  return {
+    totalDays: days.length,
+    over30: c30.count, streak30: c30.maxStreak,
+    over35: c35.count, streak35: c35.maxStreak,
+    over40: c40.count, streak40: c40.maxStreak,
+  };
+}
+
+function recommend(reqMin, reqMax, obsMin, obsMax){
+  const margin = 1.0;
+  const hasReq = (reqMin!==null && !isNaN(reqMin)) || (reqMax!==null && !isNaN(reqMax));
+  if(!hasReq) return {level:'unknown'};
+  let breachHigh = (reqMax!==null && !isNaN(reqMax)) ? obsMax > reqMax : false;
+  let breachLow  = (reqMin!==null && !isNaN(reqMin)) ? obsMin < reqMin : false;
+  let nearHigh = (reqMax!==null && !isNaN(reqMax)) ? (obsMax > reqMax - margin && !breachHigh) : false;
+  let nearLow  = (reqMin!==null && !isNaN(reqMin)) ? (obsMin < reqMin + margin && !breachLow) : false;
+
+  if(breachHigh || breachLow){
+    return {level:'reefer', breachHigh, breachLow};
+  }
+  if(nearHigh || nearLow){
+    return {level:'borderline', nearHigh, nearLow};
+  }
+  return {level:'standard'};
+}
+
+function verdictBlock(rec, obsMin, obsMax, reqMin, reqMax, sourceLabel){
+  const reqTxt = `${reqMin!==null&&!isNaN(reqMin)?reqMin+'°C':'—'} ~ ${reqMax!==null&&!isNaN(reqMax)?reqMax+'°C':'—'}`;
+  if(rec.level==='unknown'){
+    return `<div class="verdict borderline">
+      <div class="verdict-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></div>
+      <div><h2>Chưa nhập ngưỡng bảo quản</h2><p>Nhập nhiệt độ bảo quản yêu cầu để nhận khuyến nghị container. Dưới đây vẫn là dữ liệu nhiệt độ thực tế trên tuyến (${sourceLabel}): thấp nhất ${fmt1(obsMin)}°C — cao nhất ${fmt1(obsMax)}°C.</p></div>
+    </div>`;
+  }
+  if(rec.level==='reefer'){
+    const parts=[];
+    if(rec.breachHigh) parts.push(`nhiệt độ cao nhất ghi nhận ${fmt1(obsMax)}°C vượt ngưỡng tối đa cho phép`);
+    if(rec.breachLow) parts.push(`nhiệt độ thấp nhất ${fmt1(obsMin)}°C thấp hơn ngưỡng tối thiểu cho phép`);
+    return `<div class="verdict reefer">
+      <div class="verdict-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9L4.9 19.1"/></svg></div>
+      <div><h2>Nên dùng container LẠNH</h2><p>Theo ${sourceLabel}, ${parts.join(' và ')} (ngưỡng yêu cầu ${reqTxt}). Vận chuyển thường có nguy cơ vi phạm điều kiện bảo quản.</p></div>
+    </div>`;
+  }
+  if(rec.level==='borderline'){
+    return `<div class="verdict borderline">
+      <div class="verdict-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></div>
+      <div><h2>Cận ngưỡng — cân nhắc container lạnh</h2><p>Theo ${sourceLabel}, nhiệt độ tuyến (${fmt1(obsMin)}°C – ${fmt1(obsMax)}°C) nằm sát ngưỡng yêu cầu (${reqTxt}), biên an toàn dưới 1°C. Nên ưu tiên container lạnh hoặc giám sát chặt bằng data logger.</p></div>
+    </div>`;
+  }
+  return `<div class="verdict standard">
+      <div class="verdict-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <div><h2>Container THƯỜNG là đủ</h2><p>Theo ${sourceLabel}, nhiệt độ tuyến dự kiến (${fmt1(obsMin)}°C – ${fmt1(obsMax)}°C) nằm trong ngưỡng yêu cầu (${reqTxt}), có biên an toàn ≥1°C.</p></div>
+    </div>`;
+}
+
+/* ================= TAB SWITCHING ================= */
+document.getElementById('tabs').addEventListener('click', e=>{
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+  if(btn.dataset.tab==='library') renderLibrary();
+});
+
+/* transport mode preset (AIR/SEA) */
+let lkTransportMode = 'SEA';
+document.getElementById('lk-mode-presets').addEventListener('click', e=>{
+  const btn = e.target.closest('.preset-btn');
+  if(!btn) return;
+  document.querySelectorAll('#lk-mode-presets .preset-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  lkTransportMode = btn.dataset.mode;
+});
+
+/* populate shared country datalist + lookup map (destination-only, so Vietnam is
+   excluded from suggestions here too — export cargo never ships back to Vietnam). */
+const COUNTRY_BY_NAME = {};
+(function(){
+  const dl = document.getElementById('country-datalist');
+  WORLD_COUNTRIES.forEach(c=>{
+    COUNTRY_BY_NAME[c.name] = c; // keep resolvable even though hidden from suggestions
+    if(c.name === 'Vietnam') return;
+    const opt = document.createElement('option');
+    opt.value = c.name;
+    dl.appendChild(opt);
+  });
+})();
+function resolveCountryInput(inputEl){
+  const val = inputEl.value.trim();
+  const hit = COUNTRY_BY_NAME[val];
+  return hit ? { name: val, lat: hit.lat, lon: hit.lon } : null;
+}
+
+/* populate port/airport datalist (specific seaports & airports worldwide) + country list,
+   so the Upload tab can pick an exact port — grouping in Kho dữ liệu still uses the port's
+   parent country (see resolvePortInput) so cards don't fragment per-port.
+   Vietnam itself is excluded from the visible suggestions here since this list is only
+   ever used to pick the DESTINATION — always export cargo, never back to Vietnam. */
+const PORT_BY_NAME = {};
+(function(){
+  const dl = document.getElementById('port-datalist');
+  WORLD_PORTS.forEach(p=>{
+    PORT_BY_NAME[p.name] = p; // keep resolvable even though hidden from suggestions
+    if(p.country === 'Vietnam') return;
+    const opt = document.createElement('option');
+    opt.value = p.name;
+    opt.label = p.type==='air' ? '✈' : '🚢';
+    dl.appendChild(opt);
+  });
+  WORLD_COUNTRIES.forEach(c=>{
+    if(c.name === 'Vietnam') return;
+    const opt = document.createElement('option');
+    opt.value = c.name;
+    dl.appendChild(opt);
+  });
+})();
+function resolvePortInput(inputEl){
+  const val = inputEl.value.trim();
+  const port = PORT_BY_NAME[val];
+  if(port) return { label: port.name, lat: port.lat, lon: port.lon, country: port.country, type: port.type };
+  const country = COUNTRY_BY_NAME[val];
+  if(country) return { label: country.name, lat: country.lat, lon: country.lon, country: country.name, type: null };
+  return null;
+}
+
+/* ================= TRANSIT STOPS ================= */
+let transitSeq = 0;
+function addTransitRow(){
+  const id = 'transit-' + (transitSeq++);
+  const wrap = document.createElement('div');
+  wrap.className = 'transit-row';
+  wrap.id = id;
+  wrap.innerHTML = `
+    <div style="flex:2;">
+      <label class="mini">Tên cảng trung chuyển</label>
+      <input type="text" class="transit-name" placeholder="VD: Cái Mép, Việt Nam">
+    </div>
+    <div style="flex:1;">
+      <label class="mini">Ngày thứ mấy (tuỳ chọn)</label>
+      <input type="number" class="transit-offset" placeholder="Tự ước tính" min="0">
+      <div class="hint transit-offset-hint" style="margin-top:4px;"></div>
+    </div>
+    <div style="flex:1;">
+      <label class="mini">Số ngày lưu bãi</label>
+      <input type="number" class="transit-dwell" value="2" min="0">
+    </div>
+    <div>
+      <label class="mini">&nbsp;</label>
+      <button type="button" class="remove-transit" title="Xoá">✕</button>
+    </div>
+  `;
+  document.getElementById('transit-list').appendChild(wrap);
+  wrap.querySelector('.remove-transit').addEventListener('click', ()=>wrap.remove());
+}
+document.getElementById('btn-add-transit').addEventListener('click', addTransitRow);
+
+function getTransitStops(){
+  return Array.from(document.querySelectorAll('.transit-row')).map(row=>{
+    const name = row.querySelector('.transit-name').value.trim();
+    const offsetRaw = row.querySelector('.transit-offset').value;
+    const dwellRaw = row.querySelector('.transit-dwell').value;
+    return {
+      name,
+      offset: offsetRaw==='' ? null : parseFloat(offsetRaw),
+      dwell: dwellRaw==='' ? 0 : Math.max(0, parseFloat(dwellRaw)),
+    };
+  }).filter(t=>t.name);
+}
+
+/* ================= UPLOAD FLOW ================= */
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+dropzone.addEventListener('click', ()=>fileInput.click());
+['dragover'].forEach(ev=>dropzone.addEventListener(ev, e=>{e.preventDefault(); dropzone.classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>dropzone.addEventListener(ev, e=>{e.preventDefault(); dropzone.classList.remove('drag');}));
+dropzone.addEventListener('drop', e=>{
+  const files = Array.from(e.dataTransfer.files).filter(f=>f.type==='application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+  handleFiles(files);
+});
+fileInput.addEventListener('change', e=>{
+  handleFiles(Array.from(e.target.files));
+  fileInput.value = '';
+});
+
+function handleFiles(files){
+  files.forEach(processFile);
+}
+
+async function fileToBase64(file){
+  const buf = await file.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for(let i=0; i<bytes.length; i+=chunkSize){
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunkSize));
+  }
+  return btoa(binary);
+}
+function openPdfFromBase64(base64, fileName){
+  try{
+    const byteChars = atob(base64);
+    const byteNumbers = new Array(byteChars.length);
+    for(let i=0; i<byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], {type:'application/pdf'});
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  }catch(e){
+    console.error('open pdf failed', e);
+    toast('Không mở được file PDF gốc (có thể chưa được lưu khi tải lên).');
+  }
+}
+window.openPdfById = async function(id){
+  const full = await getShipment(id);
+  if(!full || !full.pdfBase64){ toast('Lô này chưa có file PDF gốc được lưu.'); return; }
+  openPdfFromBase64(full.pdfBase64, full.fileName);
+};
+
+async function processFile(file){
+  const cardId = uid();
+  const list = document.getElementById('pending-list');
+  const card = document.createElement('div');
+  card.className = 'pending-card';
+  card.innerHTML = `
+    <div class="pending-head">
+      <span class="fname">${escapeHtml(file.name)}</span>
+      <span class="status-chip status-parsing" id="chip-${cardId}"><span class="spinner"></span> Đang đọc PDF…</span>
+    </div>
+    <div class="pending-body" id="body-${cardId}"></div>
+  `;
+  list.prepend(card);
+
+  try{
+    const parsed = await parsePdf(file);
+    document.getElementById('chip-'+cardId).outerHTML = `<span class="status-chip status-ok" id="chip-${cardId}">✓ Đã đọc ${parsed.pointCount} điểm dữ liệu</span>`;
+    renderPendingBody(cardId, file, parsed);
+  }catch(err){
+    document.getElementById('chip-'+cardId).outerHTML = `<span class="status-chip status-error">✕ Lỗi</span>`;
+    document.getElementById('body-'+cardId).innerHTML = `<p style="color:var(--danger);font-size:13.5px;">${escapeHtml(err.message || String(err))}</p>`;
+  }
+}
+
+function renderPendingBody(cardId, file, parsed){
+  const body = document.getElementById('body-'+cardId);
+  const startD = new Date(parsed.start), stopD = new Date(parsed.stop);
+  const tripDays = ((parsed.stop - parsed.start)/86400000).toFixed(1);
+  body.innerHTML = `
+    <div class="stat-strip">
+      <div class="stat-item"><b>${fmt1(parsed.max)}°C</b><span>Cao nhất</span></div>
+      <div class="stat-item"><b>${fmt1(parsed.min)}°C</b><span>Thấp nhất</span></div>
+      <div class="stat-item"><b>${fmt1(parsed.avg)}°C</b><span>Trung bình</span></div>
+      <div class="stat-item"><b>${tripDays}</b><span>Ngày hành trình</span></div>
+    </div>
+    <div class="ribbon-wrap"><canvas class="ribbon" id="ribbon-${cardId}"></canvas></div>
+    <div class="hint" style="margin-bottom:16px;">Từ ${startD.toLocaleString('vi-VN')} đến ${stopD.toLocaleString('vi-VN')} · Các tháng trong hành trình: ${parsed.months.map(m=>MONTH_NAMES[m]).join(', ')}</div>
+
+    <div class="grid-2">
+      <div class="field">
+        <label class="field-label">Cảng / nước đến</label>
+        <input type="text" id="meta-dest-${cardId}" list="port-datalist" placeholder="Gõ tên cảng, sân bay hoặc quốc gia...">
+      </div>
+      <div class="field">
+        <label class="field-label">Loại hình vận chuyển</label>
+        <select id="meta-mode-${cardId}">
+          <option value="">— Chọn loại hình —</option>
+          <option value="AIR">AIR</option>
+          <option value="LCL">LCL</option>
+          <option value="FCL_COLD">FCL Lạnh</option>
+          <option value="FCL_STD">FCL Thường</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="save-${cardId}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+      Lưu vào kho dữ liệu
+    </button>
+  `;
+  requestAnimationFrame(()=>drawRibbon(document.getElementById('ribbon-'+cardId), parsed.points));
+
+  document.getElementById('save-'+cardId).addEventListener('click', async ()=>{
+    const btn = document.getElementById('save-'+cardId);
+    const destInput = document.getElementById('meta-dest-'+cardId);
+    const destResolved = resolvePortInput(destInput);
+    const modeSelect = document.getElementById('meta-mode-'+cardId);
+    const transportMode = modeSelect.value;
+    if(!destResolved){ toast('Gõ tên cảng/sân bay/quốc gia rồi chọn đúng tên trong danh sách gợi ý nhé.'); return; }
+    const dest = destResolved.country;
+    const destPort = destResolved.type ? destResolved.label : null;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Đang lưu…';
+
+    const destLat = destResolved.lat, destLon = destResolved.lon;
+    const origin = 'Việt Nam';
+    const og = await geocode(origin);
+
+    let pdfBase64 = null;
+    try{ pdfBase64 = await fileToBase64(file); }
+    catch(e){ console.error('pdf to base64 failed', e); }
+
+    const record = {
+      id: uid(),
+      fileName: file.name,
+      deviceId: parsed.deviceId,
+      origin, dest, destPort,
+      originLat: og?og.lat:null, originLon: og?og.lon:null,
+      destLat, destLon,
+      transportMode,
+      drug: '', reqMin: null, reqMax: null,
+      points: parsed.points,
+      min: parsed.min, max: parsed.max, avg: parsed.avg,
+      start: parsed.start, stop: parsed.stop,
+      months: parsed.months,
+      uploadedAt: Date.now(),
+      pdfBase64,
+    };
+    await saveShipment(record);
+    toast('Đã lưu "'+file.name+'" vào kho dữ liệu.');
+    btn.outerHTML = '<span class="status-chip status-saved">✓ Đã lưu vào kho dữ liệu</span>';
+  });
+}
+
+/* ================= LOOKUP FLOW ================= */
+document.getElementById('btn-run-lookup').addEventListener('click', runLookup);
+
+function niceStep(range, targetCount){
+  const rough = range/targetCount;
+  const mag = Math.pow(10, Math.floor(Math.log10(rough || 1)));
+  const norm = rough/mag;
+  let step;
+  if(norm < 1.5) step = 1;
+  else if(norm < 3) step = 2;
+  else if(norm < 7) step = 5;
+  else step = 10;
+  return step*mag;
+}
+
+function drawJourneyChart(canvas, journey, reqMin, reqMax){
+  const { ambientMax, containerMax, waypoints, totalDays } = journey;
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || 600, h = canvas.clientHeight || 220;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+
+  const validVals = [...ambientMax, ...containerMax].filter(v=>v!=null);
+  if(!validVals.length) return;
+  const allVals = [...validVals];
+  if(reqMin!==null && !isNaN(reqMin)) allVals.push(reqMin);
+  if(reqMax!==null && !isNaN(reqMax)) allVals.push(reqMax);
+  let vmin = Math.min(...allVals), vmax = Math.max(...allVals);
+  const pad = (vmax-vmin)*0.22 || 2;
+  vmin -= pad; vmax += pad;
+
+  const n = ambientMax.length;
+  const leftPad=38, rightPad=8, topPad=14, botPad=28;
+  const plotW = w-leftPad-rightPad, plotH = h-topPad-botPad;
+  const xAt = i => leftPad + (n<=1?0:(i/(n-1))*plotW);
+  const yAt = v => topPad + plotH - ((v-vmin)/(vmax-vmin))*plotH;
+
+  // Y-axis gridlines with numeric labels
+  const step = niceStep(vmax-vmin, 4);
+  const gridStart = Math.ceil(vmin/step)*step;
+  ctx.font = '10px "IBM Plex Mono", monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for(let g=gridStart; g<=vmax; g+=step){
+    const py = yAt(g);
+    ctx.strokeStyle = 'rgba(231,236,243,.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(leftPad, py); ctx.lineTo(leftPad+plotW, py); ctx.stroke();
+    ctx.fillStyle = 'rgba(140,160,188,.8)';
+    ctx.fillText(Math.round(g)+'°', leftPad-6, py);
+  }
+  ctx.textBaseline = 'alphabetic';
+
+  if(reqMin!==null && !isNaN(reqMin) && reqMax!==null && !isNaN(reqMax)){
+    const yTop=yAt(reqMax), yBot=yAt(reqMin);
+    ctx.fillStyle='rgba(103,217,154,0.10)';
+    ctx.fillRect(leftPad, yTop, plotW, yBot-yTop);
+    ctx.strokeStyle='rgba(103,217,154,.3)'; ctx.setLineDash([3,3]); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(leftPad,yTop); ctx.lineTo(leftPad+plotW,yTop); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(leftPad,yBot); ctx.lineTo(leftPad+plotW,yBot); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  waypoints.forEach(wp=>{
+    const px = xAt(wp.offset);
+    ctx.strokeStyle = wp.type==='transit' ? 'rgba(242,166,90,.55)' : 'rgba(231,236,243,.2)';
+    if(wp.type==='transit') ctx.setLineDash([3,3]);
+    ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(px, topPad); ctx.lineTo(px, topPad+plotH); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = wp.type==='transit' ? '#F2A65A' : 'rgba(231,236,243,.75)';
+    ctx.font = '10px Inter, sans-serif';
+    ctx.textAlign = wp.offset < totalDays*0.12 ? 'left' : (wp.offset > totalDays*0.88 ? 'right' : 'center');
+    ctx.fillText((wp.name||'').split(',')[0].slice(0,16), px, topPad+plotH+15);
+  });
+
+  function line(vals, color, width){
+    ctx.beginPath();
+    let started=false;
+    vals.forEach((v,i)=>{
+      if(v==null) return;
+      const px=xAt(i), py=yAt(v);
+      if(!started){ ctx.moveTo(px,py); started=true; } else ctx.lineTo(px,py);
+    });
+    ctx.strokeStyle=color; ctx.lineWidth=width; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.stroke();
+  }
+  line(ambientMax, '#F2A65A', 2);
+  line(containerMax, '#FF6E6E', 2.3);
+
+  // numeric value labels at each waypoint, for both lines
+  ctx.font = '600 10px "IBM Plex Mono", monospace';
+  waypoints.forEach(wp=>{
+    const idx = Math.max(0, Math.min(n-1, wp.offset));
+    const px = xAt(idx);
+    const align = wp.offset < totalDays*0.08 ? 'left' : (wp.offset > totalDays*0.92 ? 'right' : 'center');
+    ctx.textAlign = align;
+    const cVal = containerMax[idx], aVal = ambientMax[idx];
+    if(cVal!=null){
+      ctx.fillStyle = '#FF6E6E';
+      ctx.fillText(cVal.toFixed(1)+'°', px, yAt(cVal)-8);
+    }
+    if(aVal!=null){
+      ctx.fillStyle = '#F2A65A';
+      ctx.fillText(aVal.toFixed(1)+'°', px, yAt(aVal)+16);
+    }
+  });
+}
+
+function drawClimateChart(canvas, tmax, tmin, tmean, reqMin, reqMax){
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || 280, h = canvas.clientHeight || 100;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+
+  const allVals = [...tmax, ...tmin];
+  if(reqMin!==null && !isNaN(reqMin)) allVals.push(reqMin);
+  if(reqMax!==null && !isNaN(reqMax)) allVals.push(reqMax);
+  let vmin = Math.min(...allVals), vmax = Math.max(...allVals);
+  const pad = (vmax-vmin)*0.15 || 2;
+  vmin -= pad; vmax += pad;
+  const n = tmax.length;
+  const xAt = i => n<=1 ? 0 : (i/(n-1))*w;
+  const yAt = v => h - ((v-vmin)/(vmax-vmin))*h;
+
+  // requirement band (safe zone)
+  if(reqMin!==null && !isNaN(reqMin) && reqMax!==null && !isNaN(reqMax)){
+    const yTop = yAt(reqMax), yBot = yAt(reqMin);
+    ctx.fillStyle = 'rgba(103,217,154,0.10)';
+    ctx.fillRect(0, yTop, w, yBot-yTop);
+    ctx.strokeStyle = 'rgba(103,217,154,0.35)';
+    ctx.setLineDash([3,3]);
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0,yTop); ctx.lineTo(w,yTop); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,yBot); ctx.lineTo(w,yBot); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function line(vals, color, width){
+    ctx.beginPath();
+    vals.forEach((v,i)=>{ const px=xAt(i), py=yAt(v); if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); });
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin='round'; ctx.stroke();
+  }
+  line(tmean, 'rgba(231,236,243,.4)', 1);
+  line(tmin, '#5BD9E8', 1.6);
+  line(tmax, '#FF8A65', 1.6);
+}
+
+async function runLookup(){
+  climateFetchHadNetworkError = false;
+  const destInput = document.getElementById('lk-dest');
+  const destCountry = resolveCountryInput(destInput);
+  const etdRaw = document.getElementById('lk-etd').value;
+  const etaRaw = document.getElementById('lk-eta').value;
+  const origin = 'Việt Nam';
+  const drug = '', reqMin = null, reqMax = null;
+
+  const resultsEl = document.getElementById('lookup-results');
+  if(!destCountry){
+    toast('Gõ tên quốc gia rồi chọn đúng tên trong danh sách gợi ý nhé.');
+    return;
+  }
+  const dest = destCountry.name;
+  if(!etdRaw){
+    toast('Chọn ngày đi (ETD) trước đã.');
+    return;
+  }
+  const etd = new Date(etdRaw + 'T00:00:00');
+  const eta = etaRaw ? new Date(etaRaw + 'T00:00:00') : null;
+  const month = etd.getMonth()+1;
+  const days = eta ? Math.max(0, Math.round((eta-etd)/86400000)) : 14;
+
+  const btn = document.getElementById('btn-run-lookup');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Đang tra cứu…';
+
+  resultsEl.innerHTML = `<div class="empty"><span class="spinner" style="width:20px;height:20px;"></span><div style="margin-top:10px;">Đang tìm dữ liệu logger và khí hậu lịch sử…</div></div>`;
+
+  try{
+    // ---- 1. resolve endpoints: origin is always Vietnam; destination comes straight
+    //         from the resolved country lookup (no geocoding call needed, always exact) ----
+    const og = await geocode(origin);
+    const ds = { lat: destCountry.lat, lon: destCountry.lon, label: dest };
+
+    // ---- 2. match stored shipments: same destination COUNTRY only (regardless of the
+    //         SEA/AIR toggle — real logger data is useful reference either way).
+    //         Within that, split by month: exact calendar-month match (any year) shows
+    //         directly; anything else is sorted by closeness-in-month but kept collapsed
+    //         until the user asks to see it. ----
+    const idx = await loadIndex();
+    const nDest = norm(dest);
+    const sameCountry = idx.filter(rec=>{
+      const rDest = norm(rec.dest||'');
+      return rDest && (rDest.includes(nDest) || nDest.includes(rDest));
+    });
+    function monthCircularDist(m1, m2){ const d = Math.abs(m1-m2); return Math.min(d, 12-d); }
+    const exact = [], closest = [];
+    sameCountry.forEach(rec=>{
+      const months = rec.months || [];
+      const minDist = months.length ? Math.min(...months.map(m=>monthCircularDist(month,m))) : 99;
+      if(minDist === 0) exact.push({...rec});
+      else closest.push({...rec, monthDist: minDist});
+    });
+    closest.sort((a,b)=>a.monthDist-b.monthDist);
+    const reference = closest; // kept name for the render/PDF-hydration code below
+
+    await Promise.all([...exact, ...reference].map(async r=>{
+      const full = await getShipment(r.id);
+      if(full && full.points) r.dayStats = computeDayStats(full.points);
+      r.hasPdf = !!(full && full.pdfBase64);
+    }));
+
+    // ---- 3. build day-by-day journey: origin -> transit stops -> destination ----
+    let journey = null, climateError = null;
+    const transitStops = getTransitStops();
+    // container-vs-ambient deltas: differ a lot between SEA (long exposure to tropical
+    // sun/heat, especially while dwelling in a yard) and AIR (short overall transit;
+    // in-flight cargo holds are usually cool/managed, but ground/tarmac dwell before
+    // and after the flight can still get hot in direct sun).
+    const OFFSET_PRESETS = {
+      SEA:  {transit: 3,  dwell: 8,  min: 1},
+      AIR:  {transit: 1,  dwell: 6,  min: -3},
+    };
+    const preset = OFFSET_PRESETS[lkTransportMode] || OFFSET_PRESETS.SEA;
+    const offsetTransit = preset.transit, offsetDwell = preset.dwell, offsetMinC = preset.min;
+    const totalDays = days > 0 ? days : 14;
+
+    if(og && ds){
+      const transitGeo = await Promise.all(transitStops.map(t=>geocode(t.name)));
+      const rawWaypoints = [
+        {type:'origin', name: origin, lat:og.lat, lon:og.lon, offset:0, dwell:0},
+        ...transitStops.map((t,i)=>({
+          type:'transit', name: t.name,
+          lat: transitGeo[i]?transitGeo[i].lat:null, lon: transitGeo[i]?transitGeo[i].lon:null,
+          offset: t.offset, dwell: t.dwell,
+        })).filter(w=>w.lat!=null),
+        {type:'dest', name: dest, lat:ds.lat, lon:ds.lon, offset: totalDays, dwell:0},
+      ];
+      // For any transit stop without an explicit day number, estimate its day
+      // proportionally to real sailing/flying distance (origin -> stops in the order
+      // added -> destination), rather than just spacing them evenly by count. This is
+      // still a rough estimate (no real vessel/flight schedule data), but tracks reality
+      // much better — e.g. a transit port very close to the origin lands early in the
+      // timeline instead of being pushed to the middle.
+      const legDists = [];
+      for(let i=0; i<rawWaypoints.length-1; i++){
+        legDists.push(haversine(rawWaypoints[i].lat, rawWaypoints[i].lon, rawWaypoints[i+1].lat, rawWaypoints[i+1].lon));
+      }
+      const totalDist = legDists.reduce((a,b)=>a+b,0) || 1;
+      let cumDist = 0;
+      for(let i=1; i<rawWaypoints.length; i++){
+        cumDist += legDists[i-1];
+        const w = rawWaypoints[i];
+        if(w.type==='transit' && w.offset===null){
+          w.offset = Math.round(totalDays * (cumDist/totalDist));
+        }
+      }
+      rawWaypoints.forEach(w=>{ w.offset = Math.max(0, Math.min(totalDays, w.offset)); });
+      const waypoints = rawWaypoints.sort((a,b)=>a.offset-b.offset);
+
+      // Show the computed estimate back in each transit row (informational only —
+      // does not overwrite the input's actual value, so it stays "auto" next search
+      // unless the user explicitly types a day number themselves).
+      document.querySelectorAll('.transit-row').forEach(row=>{
+        const nameVal = row.querySelector('.transit-name').value.trim();
+        const hintEl = row.querySelector('.transit-offset-hint');
+        const offsetInput = row.querySelector('.transit-offset');
+        if(!hintEl) return;
+        const match = waypoints.find(w=>w.type==='transit' && w.name===nameVal);
+        if(match){
+          hintEl.textContent = offsetInput.value.trim()===''
+            ? `≈ ngày thứ ${match.offset} (tự ước tính theo khoảng cách)`
+            : `Dùng đúng ngày ${match.offset} bạn nhập`;
+        }else{
+          hintEl.textContent = '';
+        }
+      });
+
+      const depDate = etd;
+
+      await Promise.all(waypoints.map(async w=>{
+        const wDate = new Date(depDate.getTime() + w.offset*86400000);
+        const m = wDate.getMonth()+1;
+        const y = pickYearForMonth(m);
+        w.clim = await fetchMonthClimate(w.lat, w.lon, y, m);
+        w.month = m; w.yearUsed = y;
+      }));
+
+      const dayDates=[], ambientMax=[], ambientMin=[], containerMax=[], containerMin=[];
+      for(let d=0; d<=totalDays; d++){
+        let L = waypoints[0], R = waypoints[waypoints.length-1];
+        for(let i=0;i<waypoints.length-1;i++){
+          if(d >= waypoints[i].offset && d <= waypoints[i+1].offset){ L = waypoints[i]; R = waypoints[i+1]; break; }
+        }
+        const span = (R.offset - L.offset) || 1;
+        const wR = (R===L) ? 0 : (d - L.offset)/span;
+        const wL = 1 - wR;
+
+        const sample = (w, arr) => (!w || !w.clim || !arr || !arr.length) ? null : arr[((d % arr.length)+arr.length)%arr.length];
+        const lMax = sample(L, L.clim&&L.clim.tmax), rMax = sample(R, R.clim&&R.clim.tmax);
+        const lMin = sample(L, L.clim&&L.clim.tmin), rMin = sample(R, R.clim&&R.clim.tmin);
+        const amMax = (lMax!=null && rMax!=null) ? (wL*lMax+wR*rMax) : (lMax!=null?lMax:rMax);
+        const amMin = (lMin!=null && rMin!=null) ? (wL*lMin+wR*rMin) : (lMin!=null?lMin:rMin);
+
+        let inDwell = false;
+        waypoints.forEach(w=>{ if(w.dwell>0 && d>=w.offset && d<w.offset+w.dwell) inDwell=true; });
+        const bonus = inDwell ? offsetDwell : offsetTransit;
+
+        ambientMax.push(amMax); ambientMin.push(amMin);
+        containerMax.push(amMax!=null ? amMax+bonus : null);
+        containerMin.push(amMin!=null ? amMin+offsetMinC : null);
+        dayDates.push(new Date(depDate.getTime() + d*86400000));
+      }
+
+      journey = { waypoints, dayDates, ambientMax, ambientMin, containerMax, containerMin, totalDays };
+    }else if(!og || !ds){
+      climateError = 'Không định vị được toạ độ cho tuyến này. Hãy chọn lại quốc gia đến.';
+    }
+
+    renderLookupResults({origin, dest, month, days, drug, reqMin, reqMax, exact, reference, journey, climateError, og, ds});
+  }catch(e){
+    console.error(e);
+    resultsEl.innerHTML = `<div class="empty">Có lỗi khi tra cứu: ${escapeHtml(e.message||String(e))}</div>`;
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg> Tìm khuyến nghị';
+  }
+}
+
+function renderLookupResults(ctx){
+  const { origin, dest, month, days, drug, reqMin, reqMax, exact, reference, journey, climateError } = ctx;
+  const resultsEl = document.getElementById('lookup-results');
+  let html = '';
+
+  // ---- compute journey-based stats (container estimate drives the recommendation) ----
+  let jStats = null;
+  if(journey){
+    const cMax = journey.containerMax.filter(v=>v!=null);
+    const cMin = journey.containerMin.filter(v=>v!=null);
+    const aMax = journey.ambientMax.filter(v=>v!=null);
+    const aMin = journey.ambientMin.filter(v=>v!=null);
+    if(cMax.length && cMin.length){
+      jStats = {
+        contMax: Math.max(...cMax), contMin: Math.min(...cMin),
+        ambMax: Math.max(...aMax), ambMin: Math.min(...aMin),
+        over30: journey.containerMax.filter(v=>v!=null&&v>30).length,
+        over35: journey.containerMax.filter(v=>v!=null&&v>35).length,
+        over40: journey.containerMax.filter(v=>v!=null&&v>40).length,
+        totalDays: journey.totalDays,
+      };
+    }
+  }
+
+  // ---- overall banner: prefer exact real-data match, else journey/container estimate ----
+  let bannerHtml = '';
+  if(exact.length){
+    const worstMin = Math.min(...exact.map(r=>r.min));
+    const worstMax = Math.max(...exact.map(r=>r.max));
+    const rec = recommend(reqMin, reqMax, worstMin, worstMax);
+    bannerHtml = verdictBlock(rec, worstMin, worstMax, reqMin, reqMax, `${exact.length} lô data logger thực tế đã lưu cho tuyến này`);
+  }else if(jStats){
+    const rec = recommend(reqMin, reqMax, jStats.contMin, jStats.contMax);
+    bannerHtml = verdictBlock(rec, jStats.contMin, jStats.contMax, reqMin, reqMax, 'dự đoán nhiệt độ trong container theo hành trình (chưa có data logger thực tế trùng khớp)');
+  }
+  if(!bannerHtml){
+    bannerHtml = `<div class="verdict borderline"><div class="verdict-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></div><div><h2>Chưa đủ dữ liệu để khuyến nghị</h2><p>${climateError || 'Chưa có data logger phù hợp và chưa xác định được toạ độ khí hậu. Hãy kiểm tra lại tên cảng hoặc chọn tháng khởi hành.'}</p></div></div>`;
+  }
+  html += bannerHtml;
+
+  // ---- section: real data logger matches ----
+  html += `<div class="section-label"><span class="dot"></span><h3>Dữ liệu logger thực tế</h3><small>${exact.length} khớp đúng tháng · ${reference.length} tháng khác</small></div>`;
+  if(!exact.length && !reference.length){
+    html += `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg><div>Chưa có data logger nào cho quốc gia ${escapeHtml(dest)}. Hãy dựa vào dự đoán khí hậu bên dưới, hoặc tải thêm data logger cho tuyến này.</div></div>`;
+  }else{
+    function cardHtml(r, ex){
+      const tripDays = ((r.stop-r.start)/86400000).toFixed(0);
+      const monthNote = !ex ? `<div class="hint" style="margin-top:6px;">Dữ liệu thuộc ${(r.months||[]).map(m=>MONTH_NAMES[m]).join(', ')} — khác tháng bạn đang tra (${MONTH_NAMES[month]}), dùng để tham khảo.</div>` : '';
+      return `<div class="match-card">
+        <div class="match-head">
+          <div>
+            <div class="match-route">${escapeHtml(r.origin||'?')}<span class="arrow">→</span>${escapeHtml(r.destPort||r.dest||'?')}</div>
+            <div class="match-meta">${new Date(r.start).toLocaleDateString('vi-VN')} – ${new Date(r.stop).toLocaleDateString('vi-VN')} · ${tripDays} ngày ${r.transportMode?(' · '+transportModeLabel(r.transportMode)):''} · ${escapeHtml(r.fileName)}</div>
+          </div>
+          <span class="tag ${ex?'tag-exact':'tag-ref'}">${ex?'Khớp tháng':'Tháng khác'}</span>
+        </div>
+        <div class="stat-strip" style="margin-top:14px;margin-bottom:6px;">
+          <div class="stat-item"><b>${fmt1(r.max)}°C</b><span>Cao nhất</span></div>
+          <div class="stat-item"><b>${fmt1(r.min)}°C</b><span>Thấp nhất</span></div>
+          <div class="stat-item"><b>${fmt1(r.avg)}°C</b><span>Trung bình</span></div>
+        </div>
+        ${r.dayStats ? `<div class="leg-grid" style="grid-template-columns:repeat(3,1fr);margin:10px 0 4px;">
+          <div class="leg-card" style="padding:11px 13px;">
+            <div class="leg-row" style="border-top:none;"><span>Ngày &gt;30°C</span><b>${r.dayStats.over30}/${r.dayStats.totalDays}</b></div>
+            <div class="leg-row"><span>Liên tục dài nhất</span><b>${r.dayStats.streak30} ngày</b></div>
+          </div>
+          <div class="leg-card" style="padding:11px 13px;">
+            <div class="leg-row" style="border-top:none;"><span>Ngày &gt;35°C</span><b>${r.dayStats.over35}/${r.dayStats.totalDays}</b></div>
+            <div class="leg-row"><span>Liên tục dài nhất</span><b>${r.dayStats.streak35} ngày</b></div>
+          </div>
+          <div class="leg-card" style="padding:11px 13px;">
+            <div class="leg-row" style="border-top:none;"><span>Ngày &gt;40°C</span><b>${r.dayStats.over40}/${r.dayStats.totalDays}</b></div>
+            <div class="leg-row"><span>Liên tục dài nhất</span><b>${r.dayStats.streak40} ngày</b></div>
+          </div>
+        </div>` : ''}
+        ${monthNote}
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button class="btn btn-ghost btn-sm" onclick="openDetail('${r.id}')">Xem chi tiết &amp; biểu đồ</button>
+          ${r.hasPdf ? `<button class="btn btn-ghost btn-sm" onclick="openPdfById('${r.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg> Xem file PDF</button>` : ''}
+        </div>
+      </div>`;
+    }
+    exact.forEach(r=>{ html += cardHtml(r, true); });
+    if(!exact.length && reference.length){
+      html += `<div class="empty">Không có data logger nào đúng tháng ${MONTH_NAMES[month]} cho ${escapeHtml(dest)}.</div>`;
+    }
+    if(reference.length){
+      html += `<button type="button" class="btn btn-ghost btn-sm" id="btn-toggle-closest" style="margin:6px 0 4px;">Xem ${reference.length} lô gần thời gian này (khác tháng) ▾</button>
+      <div id="closest-loggers" style="display:none;margin-top:10px;">${reference.map(r=>cardHtml(r,false)).join('')}</div>`;
+    }
+  }
+
+  // ---- section: journey climate + container estimate chart ----
+  html += `<div class="section-label"><span class="dot" style="background:var(--amber);box-shadow:0 0 8px var(--amber);"></span><h3>Dự đoán nhiệt độ theo hành trình</h3><small>Nguồn: khí hậu lịch sử Open-Meteo + ước tính chênh lệch container</small></div>`;
+  if(climateError){
+    html += `<div class="empty">${escapeHtml(climateError)}</div>`;
+  }else if(!month){
+    html += `<div class="empty">Chọn tháng khởi hành để xem dự đoán theo hành trình.</div>`;
+  }else if(journey && jStats){
+    html += `<div class="journey-chart-card">
+      <canvas id="journey-chart" style="width:100%;height:220px;display:block;"></canvas>
+      <div class="journey-legend">
+        <span><i style="background:#F2A65A"></i> Nhiệt độ ngoài trời (đỉnh/ngày)</span>
+        <span><i style="background:#FF6E6E"></i> Nhiệt độ trong container (ước tính)</span>
+        <span><i style="background:var(--safe);opacity:.5;"></i> Vùng ngưỡng bảo quản yêu cầu</span>
+        <span style="color:var(--amber)">┊ vạch cam = cảng trung chuyển</span>
+      </div>
+    </div>
+    <div class="journey-stats">
+      <div class="journey-stat ${jStats.contMax > (reqMax??999) ? 'warn':''}"><b>${fmt1(jStats.contMax)}°C</b><span>Cao nhất trong cont</span></div>
+      <div class="journey-stat"><b>${fmt1(jStats.contMin)}°C</b><span>Thấp nhất trong cont</span></div>
+      <div class="journey-stat"><b>${fmt1(jStats.ambMax)}°C</b><span>Cao nhất ngoài trời</span></div>
+      <div class="journey-stat"><b>${fmt1(jStats.ambMin)}°C</b><span>Thấp nhất ngoài trời</span></div>
+      <div class="journey-stat ${jStats.over30>0?'warn':''}"><b>${jStats.over30}/${jStats.totalDays+1}</b><span>Ngày cont &gt;30°C</span></div>
+      <div class="journey-stat ${jStats.over35>0?'warn':''}"><b>${jStats.over35}/${jStats.totalDays+1}</b><span>Ngày cont &gt;35°C</span></div>
+      <div class="journey-stat ${jStats.over40>0?'warn':''}"><b>${jStats.over40}/${jStats.totalDays+1}</b><span>Ngày cont &gt;40°C</span></div>
+    </div>
+    <div class="footnote">* Đường "ngoài trời" lấy nhiệt độ đỉnh trong ngày theo dữ liệu khí hậu lịch sử (nội suy dọc theo các điểm: cảng đi → cảng trung chuyển → cảng đến, năm gần nhất có đủ dữ liệu). Đường "trong container" = ngoài trời + độ chênh m khai báo ở trên (chênh nhiều hơn trong những ngày lưu bãi tại cảng trung chuyển). Đây là ước tính kỹ thuật, không phải số đo thật — ưu tiên dùng data logger thực tế khi có, và nên hiệu chỉnh lại độ chênh dựa trên kinh nghiệm/dữ liệu logger thật của m theo thời gian.</div>`;
+  }else{
+    html += climateFetchHadNetworkError
+      ? `<div class="empty">Không kết nối được tới dịch vụ dữ liệu khí hậu (Open-Meteo) sau ${3} lần thử — có thể do dịch vụ đang gián đoạn tạm thời hoặc mạng chập chờn.<br><button type="button" class="btn btn-primary btn-sm" style="margin-top:10px;" id="btn-retry-climate">↻ Thử lại</button></div>`
+      : `<div class="empty">Không đủ dữ liệu khí hậu cho hành trình này.</div>`;
+  }
+
+  resultsEl.innerHTML = html;
+  const retryBtn = document.getElementById('btn-retry-climate');
+  if(retryBtn) retryBtn.addEventListener('click', runLookup);
+  const toggleBtn = document.getElementById('btn-toggle-closest');
+  if(toggleBtn){
+    toggleBtn.addEventListener('click', ()=>{
+      const box = document.getElementById('closest-loggers');
+      const showing = box.style.display !== 'none';
+      box.style.display = showing ? 'none' : 'block';
+      toggleBtn.innerHTML = toggleBtn.innerHTML.replace(showing?'▴':'▾', showing?'▾':'▴');
+    });
+  }
+  if(journey && jStats){
+    requestAnimationFrame(()=>{
+      const canvas = document.getElementById('journey-chart');
+      if(canvas) drawJourneyChart(canvas, journey, reqMin, reqMax);
+    });
+  }
+}
+
+/* ================= LIBRARY ================= */
+function transportModeLabel(m){
+  return {AIR:'✈ AIR', LCL:'📦 LCL', FCL_COLD:'❄ FCL Lạnh', FCL_STD:'🚛 FCL Thường'}[m] || '';
+}
+function transportModeShort(m){
+  return {AIR:'AIR', LCL:'LCL', FCL_COLD:'FCL Lạnh', FCL_STD:'FCL Thường'}[m] || '';
+}
+
+document.getElementById('btn-backup').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btn-backup');
+  const idx = await loadIndex();
+  if(!idx.length){ toast('Chưa có dữ liệu nào để backup.'); return; }
+  btn.disabled = true;
+  const originalHtml = btn.innerHTML;
+  try{
+    const records = [];
+    for(let i=0; i<idx.length; i++){
+      btn.innerHTML = `<span class="spinner"></span> Đang tải ${i+1}/${idx.length}…`;
+      const full = await getShipment(idx[i].id);
+      if(full) records.push(full);
+    }
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      appVersion: 'tuyen-lanh-v1',
+      count: records.length,
+      shipments: records,
+    };
+    const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dateStr = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `tuyen-lanh-backup-${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast(`Đã tải backup ${records.length} lô dữ liệu về máy.`);
+  }catch(e){
+    console.error('backup failed', e);
+    toast('Có lỗi khi tạo file backup.');
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
+});
+
+async function renderLibrary(){
+  const el = document.getElementById('library-list');
+  const idx = await loadIndex();
+  if(!idx.length){
+    el.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg><div>Chưa có dữ liệu nào. Sang tab "Tải lên dữ liệu" để bắt đầu.</div></div>`;
+    return;
+  }
+
+  // group by destination country (normalized), keep the most recent raw label for display
+  const groups = new Map();
+  idx.forEach(r=>{
+    const key = norm(r.dest || 'khac');
+    if(!groups.has(key)) groups.set(key, {label: r.dest || 'Khác', items: []});
+    groups.get(key).items.push(r);
+  });
+  const groupList = Array.from(groups.values());
+  const now = Date.now();
+  const closest = r => Math.abs(now - r.stop);
+  groupList.forEach(g=>g.items.sort((a,b)=> closest(a)-closest(b)));
+  groupList.sort((a,b)=> Math.min(...a.items.map(closest)) - Math.min(...b.items.map(closest)));
+
+  el.innerHTML = `<div class="lib-grid">` + groupList.map(g=>{
+    const allMax = g.items.map(r=>r.max), allMin = g.items.map(r=>r.min);
+    const modeCounts = {};
+    g.items.forEach(r=>{ const m=r.transportMode||'—'; modeCounts[m]=(modeCounts[m]||0)+1; });
+    const modeSummary = Object.entries(modeCounts).map(([m,c])=>`${m==='—'?'Chưa gắn loại':transportModeLabel(m)} ×${c}`).join(' · ');
+    return `<div class="lib-card" style="cursor:pointer;" onclick="openCountryGroup('${escapeHtml(norm(g.label)).replace(/'/g,"\\'")}')">
+      <div class="route">${escapeHtml(g.label)}</div>
+      <div class="period">${g.items.length} lô data logger · ${modeSummary}</div>
+      <div class="stat-strip" style="gap:16px;">
+        <div class="stat-item"><b>${fmt1(Math.max(...allMax))}°</b><span>Max toàn bộ</span></div>
+        <div class="stat-item"><b>${fmt1(Math.min(...allMin))}°</b><span>Min toàn bộ</span></div>
+      </div>
+      <div class="lib-foot">
+        <button class="btn btn-ghost btn-sm">Xem tất cả lô →</button>
+      </div>
+    </div>`;
+  }).join('') + `</div>`;
+}
+
+window.openCountryGroup = async function(groupKey){
+  const idx = await loadIndex();
+  const now = Date.now();
+  const allItems = idx.filter(r=>norm(r.dest||'khac')===groupKey);
+  if(!allItems.length) return;
+  const label = allItems[0].dest || 'Khác';
+
+  function rowHtml(r){
+    const tripDays = ((r.stop-r.start)/86400000).toFixed(0);
+    const modeSuffix = r.transportMode ? ` (${transportModeShort(r.transportMode)})` : '';
+    const destLabel = r.destPort || r.dest || '?';
+    return `<div class="match-card" style="margin-bottom:10px;">
+      <div class="match-head">
+        <div>
+          <div class="match-route">${escapeHtml(r.origin||'Việt Nam')}<span class="arrow">→</span>${escapeHtml(destLabel)}${escapeHtml(modeSuffix)}</div>
+          <div class="match-meta">${new Date(r.start).toLocaleDateString('vi-VN')} – ${new Date(r.stop).toLocaleDateString('vi-VN')} · ${tripDays} ngày · ${escapeHtml(r.fileName)}</div>
+        </div>
+      </div>
+      <div class="stat-strip" style="margin-top:12px;margin-bottom:4px;">
+        <div class="stat-item"><b>${fmt1(r.max)}°C</b><span>Cao nhất</span></div>
+        <div class="stat-item"><b>${fmt1(r.min)}°C</b><span>Thấp nhất</span></div>
+        <div class="stat-item"><b>${fmt1(r.avg)}°C</b><span>Trung bình</span></div>
+      </div>
+      <div class="lib-foot" style="margin-top:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="openDetail('${r.id}')">Xem chi tiết &amp; biểu đồ</button>
+        ${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="removeShipmentFromGroup('${r.id}','${groupKey.replace(/'/g,"\\'")}')">Xoá</button>` : ''}
+      </div>
+    </div>`;
+  }
+
+  function sectionHtml(titleHtml, dotColor, list){
+    if(!list.length) return '';
+    return `<div class="section-label" style="margin-top:22px;">
+      <span class="dot" style="background:${dotColor}"></span>
+      <h3>${titleHtml}</h3>
+      <small>${list.length} lô</small>
+    </div>
+    ${list.map(rowHtml).join('')}`;
+  }
+
+  function render(){
+    const fromRaw = document.getElementById('lib-filter-from').value;
+    const toRaw = document.getElementById('lib-filter-to').value;
+    let items = allItems;
+    if(fromRaw){
+      const fromT = new Date(fromRaw+'T00:00:00').getTime();
+      items = items.filter(r=>r.stop >= fromT);
+    }
+    if(toRaw){
+      const toT = new Date(toRaw+'T23:59:59').getTime();
+      items = items.filter(r=>r.start <= toT);
+    }
+    items = items.slice().sort((a,b)=> Math.abs(now-a.stop) - Math.abs(now-b.stop));
+
+    const seaItems = items.filter(r=>r.transportMode!=='AIR');
+    const airItems = items.filter(r=>r.transportMode==='AIR');
+
+    let html = sectionHtml('🚢 Đường biển (SEA)', 'var(--ice)', seaItems)
+             + sectionHtml('✈ Đường hàng không (AIR)', 'var(--amber)', airItems);
+    if(!items.length){
+      html = `<div class="empty" style="margin-top:18px;">Không có lô nào trong khoảng thời gian đã chọn.</div>`;
+    }
+    document.getElementById('lib-modal-body').innerHTML = html;
+  }
+
+  const modal = document.getElementById('modal-content');
+  modal.innerHTML = `
+    <button class="modal-close" onclick="document.getElementById('modal-bg').classList.remove('active')">✕</button>
+    <h2 style="font-family:var(--font-display);margin:0 0 4px;">${escapeHtml(label)}</h2>
+    <div class="hint" style="margin-bottom:14px;">${allItems.length} lô data logger đã lưu cho quốc gia này</div>
+    <div class="grid-2">
+      <div class="field"><label class="field-label">Từ ngày</label><input type="date" id="lib-filter-from"></div>
+      <div class="field"><label class="field-label">Đến ngày</label><input type="date" id="lib-filter-to"></div>
+    </div>
+    <div id="lib-modal-body"></div>
+  `;
+  document.getElementById('modal-bg').classList.add('active');
+  document.getElementById('lib-filter-from').addEventListener('change', render);
+  document.getElementById('lib-filter-to').addEventListener('change', render);
+  render();
+};
+window.removeShipmentFromGroup = async function(id, groupKey){
+  if(!isAdmin){ toast('Chỉ tài khoản admin mới xoá được. Bấm "Đăng nhập admin" ở góc trên trước.'); return; }
+  if(!confirm('Xoá lô dữ liệu này khỏi kho? Không thể hoàn tác.')) return;
+  await deleteShipment(id);
+  toast('Đã xoá.');
+  renderLibrary();
+  const idx = await loadIndex();
+  const remaining = idx.some(r=>norm(r.dest||'khac')===groupKey);
+  if(remaining) openCountryGroup(groupKey);
+  else document.getElementById('modal-bg').classList.remove('active');
+};
+
+function updateAdminUI(){
+  const btn = document.getElementById('admin-login-btn');
+  if(!btn) return;
+  if(isLoggedIn){
+    btn.textContent = (isAdmin ? '🔓 Admin' : '👤 ') + ' (' + (fsAuth.currentUser ? fsAuth.currentUser.email : '') + ') · Đăng xuất';
+    btn.onclick = async ()=>{ await fsAuth.signOut(); toast('Đã đăng xuất.'); };
+  }else{
+    btn.textContent = '🔒 Chưa đăng nhập';
+    btn.onclick = null;
+  }
+}
+
+function updateGate(){
+  const gate = document.getElementById('login-gate');
+  const topbar = document.getElementById('app-topbar');
+  const wrap = document.getElementById('app-wrap');
+  if(!HAS_FIREBASE || isLoggedIn){
+    gate.classList.remove('active');
+    topbar.style.display = '';
+    wrap.style.display = '';
+  }else{
+    gate.classList.add('active');
+    topbar.style.display = 'none';
+    wrap.style.display = 'none';
+  }
+}
+
+document.getElementById('gate-submit').addEventListener('click', async ()=>{
+  const email = document.getElementById('gate-email').value.trim();
+  const pass = document.getElementById('gate-pass').value;
+  const errEl = document.getElementById('gate-error');
+  errEl.style.display = 'none';
+  try{
+    await fsAuth.signInWithEmailAndPassword(email, pass);
+  }catch(e){
+    console.error('login error', e.code, e.message);
+    const FRIENDLY = {
+      'auth/wrong-password': 'Sai mật khẩu.',
+      'auth/invalid-credential': 'Sai email hoặc mật khẩu.',
+      'auth/user-not-found': 'Không tìm thấy tài khoản với email này. Kiểm tra lại đúng chữ (không dấu cách thừa).',
+      'auth/invalid-email': 'Email không đúng định dạng.',
+      'auth/user-disabled': 'Tài khoản này đã bị vô hiệu hoá (Disable) trong Firebase.',
+      'auth/too-many-requests': 'Đăng nhập sai quá nhiều lần, Firebase tạm khoá thử lại sau vài phút.',
+      'auth/network-request-failed': 'Lỗi mạng, kiểm tra lại kết nối internet.',
+    };
+    errEl.textContent = (FRIENDLY[e.code] || (e.code + ': ' + e.message)) + ' [' + (e.code||'no-code') + ']';
+    errEl.style.display = 'block';
+  }
+});
+document.getElementById('gate-pass').addEventListener('keydown', e=>{
+  if(e.key==='Enter') document.getElementById('gate-submit').click();
+});
+
+window.removeShipment = async function(id){
+  if(!confirm('Xoá lô dữ liệu này khỏi kho? Không thể hoàn tác.')) return;
+  await deleteShipment(id);
+  toast('Đã xoá.');
+  renderLibrary();
+};
+
+window.openDetail = async function(id){
+  const r = await getShipment(id);
+  if(!r){ toast('Không tìm thấy dữ liệu.'); return; }
+  const modalBg = document.getElementById('modal-bg');
+  const modal = document.getElementById('modal-content');
+  const tripDays = ((r.stop-r.start)/86400000).toFixed(1);
+  modal.innerHTML = `
+    <button class="modal-close" onclick="document.getElementById('modal-bg').classList.remove('active')">✕</button>
+    <h2 style="font-family:var(--font-display);margin:0 0 4px;">${escapeHtml(r.origin||'?')} → ${escapeHtml(r.dest||'?')}</h2>
+    <div class="hint" style="margin-bottom:16px;">${escapeHtml(r.fileName)} · Device ${escapeHtml(r.deviceId||'N/A')} · ${tripDays} ngày</div>
+    <div class="ribbon-wrap"><canvas id="modal-linechart" style="width:100%;height:220px;display:block;"></canvas></div>
+    <div class="stat-strip">
+      <div class="stat-item"><b>${fmt1(r.max)}°C</b><span>Cao nhất</span></div>
+      <div class="stat-item"><b>${fmt1(r.min)}°C</b><span>Thấp nhất</span></div>
+      <div class="stat-item"><b>${fmt1(r.avg)}°C</b><span>Trung bình</span></div>
+    </div>
+    ${r.drug?`<div class="hint">Thuốc / lô hàng: ${escapeHtml(r.drug)}</div>`:''}
+    ${(r.reqMin!=null||r.reqMax!=null)?`<div class="hint">Ngưỡng yêu cầu: ${r.reqMin!=null?r.reqMin+'°C':'—'} ~ ${r.reqMax!=null?r.reqMax+'°C':'—'}</div>`:''}
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      ${r.pdfBase64
+        ? `<button class="btn btn-primary btn-sm" id="btn-open-pdf"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg> Mở file PDF gốc</button>`
+        : `<span class="hint">(File PDF gốc chưa được lưu — lô này tải lên trước khi có tính năng này)</span>`}
+    </div>
+  `;
+  modalBg.classList.add('active');
+  requestAnimationFrame(()=>drawLoggerLineChart(document.getElementById('modal-linechart'), r.points));
+  if(r.pdfBase64){
+    const btnPdf = document.getElementById('btn-open-pdf');
+    if(btnPdf) btnPdf.addEventListener('click', ()=>openPdfFromBase64(r.pdfBase64, r.fileName));
+  }
+};
+document.getElementById('modal-bg').addEventListener('click', e=>{
+  if(e.target.id==='modal-bg') e.currentTarget.classList.remove('active');
+});
+
+/* init */
+(function(){
+  const el = document.getElementById('sync-status');
+  if(HAS_FIREBASE){
+    el.textContent = '🔗 ĐỒNG BỘ CHUNG (FIREBASE)';
+    el.style.color = 'var(--safe)';
+    updateGate();
+  }else{
+    el.textContent = '💾 LƯU CỤC BỘ (CHƯA DÙNG CHUNG)';
+    el.style.color = 'var(--amber)';
+    document.getElementById('admin-login-btn').style.display = 'none';
+  }
+  updateAdminUI();
+})();
+if(!HAS_FIREBASE) renderLibrary();
+</script>
+</body>
+</html>
