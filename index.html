@@ -326,7 +326,7 @@
     <div class="card">
       <div class="field">
         <label class="field-label">Cảng / nước đến</label>
-        <input type="text" id="lk-dest" list="country-datalist" placeholder="Gõ tên quốc gia để tìm...">
+        <input type="text" id="lk-dest" list="port-datalist" placeholder="Gõ tên cảng, sân bay hoặc quốc gia...">
       </div>
 
       <div class="field">
@@ -2144,18 +2144,19 @@ function drawClimateChart(canvas, tmax, tmin, tmean, reqMin, reqMax){
 async function runLookup(){
   climateFetchHadNetworkError = false;
   const destInput = document.getElementById('lk-dest');
-  const destCountry = resolveCountryInput(destInput);
+  const destResolved = resolvePortInput(destInput);
   const etdRaw = document.getElementById('lk-etd').value;
   const etaRaw = document.getElementById('lk-eta').value;
   const origin = 'Việt Nam';
   const drug = '', reqMin = null, reqMax = null;
 
   const resultsEl = document.getElementById('lookup-results');
-  if(!destCountry){
-    toast('Gõ tên quốc gia rồi chọn đúng tên trong danh sách gợi ý nhé.');
+  if(!destResolved){
+    toast('Gõ tên cảng/sân bay/quốc gia rồi chọn đúng tên trong danh sách gợi ý nhé.');
     return;
   }
-  const dest = destCountry.name;
+  const dest = destResolved.country; // used for matching stored loggers (which store country)
+  const destLabel = destResolved.label; // specific port/country name, shown to the user
   if(!etdRaw){
     toast('Chọn ngày đi (ETD) trước đã.');
     return;
@@ -2173,9 +2174,9 @@ async function runLookup(){
 
   try{
     // ---- 1. resolve endpoints: origin is always Vietnam; destination comes straight
-    //         from the resolved country lookup (no geocoding call needed, always exact) ----
+    //         from the resolved port/country lookup (no geocoding call needed, always exact) ----
     const og = await geocode(origin);
-    const ds = { lat: destCountry.lat, lon: destCountry.lon, label: dest };
+    const ds = { lat: destResolved.lat, lon: destResolved.lon, label: destLabel };
 
     // ---- 2. match stored shipments: same destination COUNTRY only (regardless of the
     //         SEA/AIR toggle — real logger data is useful reference either way).
@@ -2215,13 +2216,27 @@ async function runLookup(){
     // in between is assumed climate-controlled, but still loosely tracks the local
     // outdoor climate along the route (a flight over/through a hot region should read
     // hotter than one over a mild region) rather than a single fixed number everywhere.
+    // Dwell offsets are intentionally large: a sealed container/pallet sitting still in
+    // direct sun ("greenhouse effect") commonly runs 10–15°C above outdoor ambient —
+    // moving cargo gets some cooling from airflow/wind, so that offset stays much smaller.
     const OFFSET_PRESETS = {
-      SEA:  {transit: 3,  dwell: 4,  min: 1},
-      AIR:  {transit: 1,  dwell: 6,  min: -1},
+      SEA:  {transit: 5,  dwell: 12, min: 1},
+      AIR:  {transit: 1,  dwell: 10, min: -1},
     };
     const preset = OFFSET_PRESETS[lkTransportMode] || OFFSET_PRESETS.SEA;
-    const offsetTransit = preset.transit, offsetDwell = preset.dwell, offsetMinC = preset.min;
+    const offsetTransit = preset.transit, offsetMinC = preset.min;
     const isAir = lkTransportMode === 'AIR';
+    // The greenhouse-effect heat gain of a sealed, sun-exposed container/pallet isn't
+    // a fixed number — it scales with how intense the sun/heat actually is that day.
+    // Mild/cool weather (winter-like) barely builds up extra heat; a harsh, blazing-hot
+    // summer day builds up a lot more. Scale the dwell offset off the real ambient peak
+    // temperature for that specific day/location rather than one constant all year.
+    function dwellOffsetForWeather(ambientMaxC){
+      if(ambientMaxC == null) return preset.dwell;
+      if(ambientMaxC < 20) return 5;   // mát/mùa đông
+      if(ambientMaxC < 33) return 10;  // hè bình thường / thu
+      return 15;                       // hè nắng gắt
+    }
     const totalDays = days > 0 ? days : 14;
 
     if(og && ds){
@@ -2238,7 +2253,7 @@ async function runLookup(){
           lat: transitGeo[i]?transitGeo[i].lat:null, lon: transitGeo[i]?transitGeo[i].lon:null,
           offset: t.offset, dwell: t.dwell,
         })).filter(w=>w.lat!=null),
-        {type:'dest', name: dest, lat:ds.lat, lon:ds.lon, offset: totalDays, dwell:groundDwell},
+        {type:'dest', name: destLabel, lat:ds.lat, lon:ds.lon, offset: totalDays, dwell:groundDwell},
       ];
       // For any transit stop without an explicit day number, estimate its day
       // proportionally to real sailing/flying distance (origin -> stops in the order
@@ -2311,6 +2326,18 @@ async function runLookup(){
         let inDwell = false;
         waypoints.forEach(w=>{ if(w.dwell>0 && d>=w.offset && d<w.offset+w.dwell) inDwell=true; });
 
+        // During a real ground-dwell window (container/pallet sitting exposed to sun at
+        // a port yard or airport tarmac), use the TRUE statistical peak (hiMax) of that
+        // location's fetched month instead of an arbitrarily cycled day — this is
+        // specifically the highest-risk moment, so it should reflect the worst realistic
+        // day that location sees that month, not a random sample that might land on a
+        // mild day and understate the risk.
+        if(inDwell){
+          const lHi = L.clim && L.clim.hiMax, rHi = R.clim && R.clim.hiMax;
+          const hiInterp = (lHi!=null && rHi!=null) ? (wL*lHi+wR*rHi) : (lHi!=null?lHi:rHi);
+          if(hiInterp!=null) amMax = hiInterp;
+        }
+
         // For AIR, ground-dwell days (tarmac at origin/transit/destination) use the real
         // daily PEAK outdoor temperature (direct sun on the ramp). Days in between (in
         // flight or in a climate-controlled cargo terminal) use the real daily AVERAGE
@@ -2322,7 +2349,7 @@ async function runLookup(){
           amMin = amMean;
         }
 
-        const bonus = inDwell ? offsetDwell : offsetTransit;
+        const bonus = inDwell ? dwellOffsetForWeather(amMax) : offsetTransit;
 
         ambientMax.push(amMax); ambientMin.push(amMin);
         containerMax.push(amMax!=null ? amMax+bonus : null);
@@ -2467,7 +2494,7 @@ function renderLookupResults(ctx){
     </div>
     ${journey.isAir
       ? `<div class="footnote">* Với AIR: những ngày lô hàng thực sự nằm ở mặt đất (chờ ở sân bay đi/đến, hoặc trung chuyển) dùng nhiệt độ **đỉnh trong ngày** ngoài trời thật (phơi nắng trực tiếp trên bãi). Những ngày còn lại (đang bay, hoặc nằm kho/thủ tục hải quan) dùng nhiệt độ **trung bình trong ngày** ngoài trời thật tại đúng vị trí trên hành trình (không phải số cố định — bay qua vùng nóng vẫn ra nhiệt độ cao hơn bay qua vùng ôn đới). Đây vẫn là ước tính kỹ thuật, không phải số đo thật — ưu tiên dùng data logger thực tế khi có.</div>`
-      : `<div class="footnote">* Đường "ngoài trời" lấy nhiệt độ đỉnh trong ngày theo dữ liệu khí hậu lịch sử (nội suy dọc theo các điểm: cảng đi → cảng trung chuyển → cảng đến, năm gần nhất có đủ dữ liệu). Đường "trong container" = ngoài trời + độ chênh m khai báo ở trên (chênh nhiều hơn trong những ngày lưu bãi tại cảng trung chuyển). Đây là ước tính kỹ thuật, không phải số đo thật — ưu tiên dùng data logger thực tế khi có, và nên hiệu chỉnh lại độ chênh dựa trên kinh nghiệm/dữ liệu logger thật của m theo thời gian.</div>`}`;
+      : `<div class="footnote">* Đường "ngoài trời" lấy nhiệt độ đỉnh trong ngày theo dữ liệu khí hậu lịch sử (nội suy dọc theo các điểm: cảng đi → cảng trung chuyển → cảng đến, năm gần nhất có đủ dữ liệu). Đường "trong container" = ngoài trời + độ chênh do hiệu ứng nhà kính khi container kín phơi nắng — độ chênh này **tự tăng theo cường độ nắng thật của từng ngày lưu bãi** (dưới 20°C ngoài trời: +5°C; 20-33°C: +10°C; trên 33°C nắng gắt: +15°C), lúc đang di chuyển có gió lùa thì chênh ít hơn (+5°C). Đây là ước tính kỹ thuật dựa theo hiệu ứng vật lý thường gặp, không phải số đo thật — ưu tiên dùng data logger thực tế khi có.</div>`}`;
   }else{
     html += climateFetchHadNetworkError
       ? `<div class="empty">Không kết nối được tới dịch vụ dữ liệu khí hậu (Open-Meteo) sau ${3} lần thử — có thể do dịch vụ đang gián đoạn tạm thời hoặc mạng chập chờn.<br><button type="button" class="btn btn-primary btn-sm" style="margin-top:10px;" id="btn-retry-climate">↻ Thử lại</button></div>`
