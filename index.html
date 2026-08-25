@@ -2226,23 +2226,21 @@ async function runLookup(){
     const preset = OFFSET_PRESETS[lkTransportMode] || OFFSET_PRESETS.SEA;
     const offsetTransit = preset.transit, offsetMinC = preset.min;
     const isAir = lkTransportMode === 'AIR';
-    // The greenhouse-effect heat gain of a sun-exposed shipment isn't a fixed number —
-    // it scales with how intense the sun/heat actually is that day, AND with how the
-    // cargo is actually packaged/handled. A SEA container is a fully sealed steel box
-    // that can sit in a yard for days — the full greenhouse effect applies. AIR cargo
-    // (pallets/ULDs, often just netted, not fully sealed) typically only dwells on the
-    // tarmac for hours, and time-sensitive pharma freight is often prioritized/covered —
-    // so the same blazing-hot day builds up noticeably less excess heat for AIR than SEA.
+    // The greenhouse-effect heat gain of a sun-exposed shipment scales with how intense
+    // the sun/heat actually is that day for BOTH SEA and AIR — but the ceiling is lower
+    // for AIR: cargo only dwells on the tarmac for a few hours (not days) and is often
+    // netted rather than fully sealed, so even in harsh summer sun it builds up
+    // noticeably less excess heat than a sealed steel sea container would.
     function dwellOffsetForWeather(ambientMaxC){
       if(ambientMaxC == null) return preset.dwell;
       if(isAir){
-        if(ambientMaxC < 20) return 3;   // mát/mùa đông
-        if(ambientMaxC < 33) return 6;   // hè bình thường / thu
-        return 10;                       // hè nắng gắt
+        if(ambientMaxC < 20) return 2;   // mát/mùa đông
+        if(ambientMaxC < 33) return 3;   // hè bình thường / thu
+        return 5;                        // hè nắng gắt
       }
-      if(ambientMaxC < 20) return 5;   // mát/mùa đông
-      if(ambientMaxC < 33) return 10;  // hè bình thường / thu
-      return 15;                       // hè nắng gắt
+      if(ambientMaxC < 20) return 3;   // mát/mùa đông
+      if(ambientMaxC < 33) return 7;   // hè bình thường / thu
+      return 11;                       // hè nắng gắt
     }
     const totalDays = days > 0 ? days : 14;
 
@@ -2500,8 +2498,8 @@ function renderLookupResults(ctx){
       <div class="journey-stat ${jStats.over40>0?'warn':''}"><b>${jStats.over40}/${jStats.totalDays+1}</b><span>Ngày &gt;40°C</span></div>
     </div>
     ${journey.isAir
-      ? `<div class="footnote">* Với AIR: những ngày lô hàng thực sự nằm ở mặt đất (chờ ở sân bay đi/đến, hoặc trung chuyển) dùng nhiệt độ **đỉnh trong ngày** ngoài trời thật (phơi nắng trực tiếp trên bãi), cộng thêm độ chênh nhà kính **tự tăng theo mức nắng** (dưới 20°C: +3°C; 20-33°C: +6°C; trên 33°C nắng gắt: +10°C) — mức chênh này thấp hơn hàng đi biển vì kiện hàng air thường không kín tuyệt đối và thời gian nằm bãi ngắn hơn nhiều so với container tàu biển. Những ngày còn lại (đang bay, hoặc nằm kho/thủ tục hải quan) dùng nhiệt độ **trung bình trong ngày** ngoài trời thật tại đúng vị trí trên hành trình (không phải số cố định — bay qua vùng nóng vẫn ra nhiệt độ cao hơn bay qua vùng ôn đới). Đây vẫn là ước tính kỹ thuật, không phải số đo thật — ưu tiên dùng data logger thực tế khi có.</div>`
-      : `<div class="footnote">* Đường "ngoài trời" lấy nhiệt độ đỉnh trong ngày theo dữ liệu khí hậu lịch sử (nội suy dọc theo các điểm: cảng đi → cảng trung chuyển → cảng đến, năm gần nhất có đủ dữ liệu). Đường "trong container" = ngoài trời + độ chênh do hiệu ứng nhà kính khi container kín phơi nắng — độ chênh này **tự tăng theo cường độ nắng thật của từng ngày lưu bãi** (dưới 20°C ngoài trời: +5°C; 20-33°C: +10°C; trên 33°C nắng gắt: +15°C), lúc đang di chuyển có gió lùa thì chênh ít hơn (+5°C). Đây là ước tính kỹ thuật dựa theo hiệu ứng vật lý thường gặp, không phải số đo thật — ưu tiên dùng data logger thực tế khi có.</div>`}`;
+      ? `<div class="footnote">* Với AIR: những ngày lô hàng thực sự nằm ở mặt đất (chờ ở sân bay đi/đến, hoặc trung chuyển) dùng nhiệt độ **đỉnh trong ngày** ngoài trời thật (phơi nắng trực tiếp trên bãi), cộng thêm độ chênh nhà kính **tự tăng theo mức nắng** (dưới 20°C: +2°C; 20-33°C: +3°C; trên 33°C nắng gắt: +5°C) — mức trần thấp hơn hàng biển vì hàng air chỉ nằm bãi vài giờ, không kín tuyệt đối như container. Những ngày còn lại (đang bay, hoặc nằm kho/thủ tục hải quan) dùng nhiệt độ **trung bình trong ngày** ngoài trời thật tại đúng vị trí trên hành trình (không phải số cố định — bay qua vùng nóng vẫn ra nhiệt độ cao hơn bay qua vùng ôn đới). Đây vẫn là ước tính kỹ thuật, không phải số đo thật — ưu tiên dùng data logger thực tế khi có.</div>`
+      : `<div class="footnote">* Đường "ngoài trời" lấy nhiệt độ đỉnh trong ngày theo dữ liệu khí hậu lịch sử (nội suy dọc theo các điểm: cảng đi → cảng trung chuyển → cảng đến, năm gần nhất có đủ dữ liệu). Đường "trong container" = ngoài trời + độ chênh do hiệu ứng nhà kính khi container kín phơi nắng — độ chênh này **tự tăng theo cường độ nắng thật của từng ngày lưu bãi** (dưới 20°C ngoài trời: +3°C; 20-33°C: +7°C; trên 33°C nắng gắt: +11°C), lúc đang di chuyển có gió lùa thì chênh ít hơn (+5°C). Đây là ước tính kỹ thuật dựa theo hiệu ứng vật lý thường gặp, không phải số đo thật — ưu tiên dùng data logger thực tế khi có.</div>`}`;
   }else{
     html += climateFetchHadNetworkError
       ? `<div class="empty">Không kết nối được tới dịch vụ dữ liệu khí hậu (Open-Meteo) sau ${3} lần thử — có thể do dịch vụ đang gián đoạn tạm thời hoặc mạng chập chờn.<br><button type="button" class="btn btn-primary btn-sm" style="margin-top:10px;" id="btn-retry-climate">↻ Thử lại</button></div>`
