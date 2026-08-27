@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script>
 <style>
   :root{
     --bg:#0A1420;
@@ -464,6 +465,14 @@ const FIREBASE_CONFIG = {
    Phải khớp đúng với email đặt trong Firestore Rules. */
 const ADMIN_EMAIL = "expdocs2.cpc1hn@gmail.com";
 
+/* App Check — chặn bot/script tự động dội request vào Firebase (đăng nhập, Firestore),
+   khác với đăng nhập (xác minh NGƯỜI), App Check xác minh yêu cầu đến từ đúng trang web
+   này (không phải script bên ngoài). Dán site key reCAPTCHA v3 vào đây, xem hướng dẫn
+   lấy key tại: https://console.firebase.google.com > App Check > apps > Web > reCAPTCHA v3.
+   Nếu để nguyên placeholder, App Check tự động không bật (không lỗi gì, chỉ là chưa có
+   lớp chặn bot này). */
+const RECAPTCHA_SITE_KEY = "6LcaYZstAAAAAPK0QSZ12xvRlqOBWP9lM7s4bh1p";
+
 const HAS_FIREBASE = (typeof firebase !== 'undefined') && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
 let fsDb = null;
 let fsAuth = null;
@@ -472,6 +481,11 @@ let isAdmin = false;
 if(HAS_FIREBASE){
   try{
     firebase.initializeApp(FIREBASE_CONFIG);
+    if(RECAPTCHA_SITE_KEY && RECAPTCHA_SITE_KEY !== 'YOUR_RECAPTCHA_V3_SITE_KEY'){
+      try{
+        firebase.appCheck().activate(RECAPTCHA_SITE_KEY, true);
+      }catch(e){ console.error('App Check init failed', e); }
+    }
     fsDb = firebase.firestore();
     fsAuth = firebase.auth();
     fsAuth.onAuthStateChanged(user=>{
