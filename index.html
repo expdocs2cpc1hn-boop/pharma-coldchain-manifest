@@ -628,34 +628,78 @@ function _withTimeout(p, ms, label){
     new Promise((_,rej)=>setTimeout(()=>rej(new Error('Hết giờ chờ: '+label)), ms))
   ]);
 }
-/* Thử lấy 1 token bằng kiểu Enterprise. Ném lỗi nếu key không phải loại này
-   hoặc tên miền chưa được cho phép. */
-async function _probeEnterprise(key){
-  await _loadScriptOnce('https://www.google.com/recaptcha/enterprise.js?render='+encodeURIComponent(key));
-  if(typeof grecaptcha === 'undefined' || !grecaptcha.enterprise) throw new Error('enterprise.js không tạo grecaptcha.enterprise');
-  await _withTimeout(new Promise(res=>grecaptcha.enterprise.ready(res)), 10000, 'enterprise.ready');
-  const t = await _withTimeout(grecaptcha.enterprise.execute(key, {action:'appcheck_probe'}), 10000, 'enterprise.execute');
-  if(!t) throw new Error('enterprise.execute trả về token rỗng');
-  return true;
+/* ⚠️ enterprise.js và api.js KHÔNG sống chung được trong cùng một window: script nào
+   nạp trước sẽ đặt window.___grecaptcha_cfg, script sau thấy có rồi nên bỏ qua phần
+   khởi tạo ⇒ grecaptcha.execute không bao giờ xuất hiện và phép thử thứ hai luôn báo
+   sai. Vì vậy mỗi phép thử được chạy trong MỘT IFRAME RIÊNG (window sạch, nhưng vẫn
+   kế thừa nguyên origin của trang nên reCAPTCHA thấy đúng tên miền), và window chính
+   được giữ sạch hoàn toàn để Firebase tự nạp script của nó sau đó. */
+function _makeProbeFrame(){
+  const ifr = document.createElement('iframe');
+  ifr.setAttribute('aria-hidden', 'true');
+  ifr.setAttribute('tabindex', '-1');
+  ifr.style.cssText = 'position:absolute;left:-9999px;top:0;width:1px;height:1px;border:0;visibility:hidden;';
+  document.body.appendChild(ifr);
+  return ifr;
 }
-/* Thử lấy 1 token bằng kiểu v3 cổ điển. */
-async function _probeV3(key){
-  await _loadScriptOnce('https://www.google.com/recaptcha/api.js?render='+encodeURIComponent(key));
-  if(typeof grecaptcha === 'undefined' || typeof grecaptcha.execute !== 'function') throw new Error('api.js không tạo grecaptcha.execute');
-  await _withTimeout(new Promise(res=>grecaptcha.ready(res)), 10000, 'v3.ready');
-  const t = await _withTimeout(grecaptcha.execute(key, {action:'appcheck_probe'}), 10000, 'v3.execute');
-  if(!t) throw new Error('v3.execute trả về token rỗng');
-  return true;
+function _loadScriptIn(win, src){
+  return new Promise((resolve, reject)=>{
+    const d = win.document;
+    const s = d.createElement('script');
+    s.src = src; s.async = true;
+    s.onload  = ()=>resolve();
+    s.onerror = ()=>reject(new Error('không tải được script (mạng chặn hoặc adblock?)'));
+    (d.head || d.documentElement).appendChild(s);
+  });
+}
+/* kind: 'enterprise' | 'v3'. Ném lỗi nếu key không thuộc loại đó, hoặc tên miền
+   hiện tại chưa nằm trong danh sách Domains của key. */
+async function _probeKind(kind, key){
+  const ifr = _makeProbeFrame();
+  try{
+    const win = ifr.contentWindow;
+    if(kind === 'enterprise'){
+      await _withTimeout(_loadScriptIn(win, 'https://www.google.com/recaptcha/enterprise.js?render='+encodeURIComponent(key)), 12000, 'tải enterprise.js');
+      const g = win.grecaptcha;
+      if(!g || !g.enterprise) throw new Error('enterprise.js không tạo grecaptcha.enterprise');
+      await _withTimeout(new Promise(res=>g.enterprise.ready(res)), 10000, 'enterprise.ready');
+      const t = await _withTimeout(g.enterprise.execute(key, {action:'appcheck_probe'}), 10000, 'enterprise.execute');
+      if(!t) throw new Error('trả về token rỗng');
+    }else{
+      await _withTimeout(_loadScriptIn(win, 'https://www.google.com/recaptcha/api.js?render='+encodeURIComponent(key)), 12000, 'tải api.js');
+      const g = win.grecaptcha;
+      if(!g || typeof g.execute !== 'function') throw new Error('api.js không tạo grecaptcha.execute');
+      await _withTimeout(new Promise(res=>g.ready(res)), 10000, 'v3.ready');
+      const t = await _withTimeout(g.execute(key, {action:'appcheck_probe'}), 10000, 'v3.execute');
+      if(!t) throw new Error('trả về token rỗng');
+    }
+    return true;
+  }finally{
+    setTimeout(()=>{ try{ ifr.remove(); }catch(e){} }, 0);
+  }
 }
 async function _detectRecaptchaKind(key){
   if(APPCHECK_MODE === 'enterprise' || APPCHECK_MODE === 'v3') return APPCHECK_MODE;
-  const errs = [];
-  try{ await _probeEnterprise(key); return 'enterprise'; }
-  catch(e){ errs.push('Enterprise: '+e.message); }
-  try{ await _probeV3(key); return 'v3'; }
-  catch(e){ errs.push('v3: '+e.message); }
-  const err = new Error(errs.join(' | '));
-  err.probeErrors = errs;
+  const errs = {};
+  try{ await _probeKind('v3', key); return 'v3'; }
+  catch(e){ errs.v3 = e.message; }
+  try{ await _probeKind('enterprise', key); return 'enterprise'; }
+  catch(e){ errs.enterprise = e.message; }
+
+  /* Diễn giải lỗi thành việc cần làm, thay vì ném nguyên văn tiếng Anh của Google. */
+  const all = ((errs.v3||'') + ' ' + (errs.enterprise||'')).toLowerCase();
+  let why;
+  if(all.indexOf('invalid domain') >= 0){
+    why = 'Google báo SAI TÊN MIỀN. Mở trang quản lý site key, thêm "' + location.hostname + '" vào danh sách Domains.';
+  }else if(all.indexOf('invalid site key') >= 0 || all.indexOf('invalid key') >= 0){
+    why = 'Google báo KHÔNG TÌM THẤY key này. Hoặc key đã bị xoá, hoặc site key trong code không khớp với key thật, hoặc tên miền "' + location.hostname + '" chưa có trong danh sách Domains của key.';
+  }else if(all.indexOf('không tải được') >= 0){
+    why = 'Không tải nổi script reCAPTCHA — mạng công ty chặn google.com, hoặc trình duyệt đang bật chặn quảng cáo.';
+  }else{
+    why = 'Không lấy được token reCAPTCHA. Kiểm tra key còn tồn tại và tên miền "' + location.hostname + '" đã có trong danh sách Domains.';
+  }
+  const err = new Error(why);
+  err.detail = 'v3: ' + (errs.v3 || 'ok') + ' | Enterprise: ' + (errs.enterprise || 'ok');
   throw err;
 }
 async function setupAppCheck(){
@@ -678,9 +722,9 @@ async function setupAppCheck(){
   try{
     kind = await _detectRecaptchaKind(RECAPTCHA_SITE_KEY);
   }catch(e){
-    appCheckState = { ok:false, provider:null,
-      message:'Site key không dùng được trên tên miền "'+host+'". Kiểm tra: (1) key còn tồn tại, (2) tên miền này đã có trong danh sách Domains của key. Chi tiết: '+e.message };
-    console.error('[App Check] ' + appCheckState.message);
+    appCheckState = { ok:false, provider:null, message:e.message, detail:e.detail || '' };
+    console.error('[App Check] ' + e.message);
+    if(e.detail) console.error('[App Check] chi tiết kỹ thuật — ' + e.detail);
     console.error('[App Check] ⚠️ ĐỪNG bật Enforce trong Firebase console khi còn dòng lỗi này, nếu bật app sẽ ngừng đăng nhập/lưu được.');
     return;
   }
@@ -22714,7 +22758,9 @@ function _secRow(dot, title, body){
 function securityPanelHtml(){
   const ac = appCheckState;
   const acDot  = ac.ok ? 'sec-ok' : (APPCHECK_MODE === 'off' ? 'sec-warn' : 'sec-bad');
-  const acHtml = _secRow(acDot, 'App Check (chặn bot dội request)', escapeHtml(ac.message));
+  const acHtml = _secRow(acDot, 'App Check (chặn bot dội request)',
+    escapeHtml(ac.message) +
+    (ac.detail ? '<div style="opacity:.55;font-size:11px;margin-top:5px;">' + escapeHtml(ac.detail) + '</div>' : ''));
 
   let mfaDot = 'sec-warn', mfaMsg = 'Chưa đăng nhập bằng tài khoản admin.';
   if(isLoggedIn && fsAuth && fsAuth.currentUser){
