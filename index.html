@@ -367,6 +367,7 @@
         <input type="checkbox" id="mfa-recovery-ack" style="margin-top:3px;">
         <span>Tôi đã lưu mã dự phòng này ở nơi an toàn.</span>
       </label>
+      <div id="mfa-recovery-error" class="hint" style="color:var(--danger);display:none;margin-bottom:10px;"></div>
       <button class="btn btn-primary btn-block" id="mfa-recovery-done" disabled>Xong</button>
     </div>
 
@@ -597,6 +598,11 @@ const RECAPTCHA_SITE_KEY = "6LcaYZstAAAAAPK0QSZ12xvRlqOBWP9lM7s4bh1p";
 /* 'auto' = tự dò (khuyến nghị) · 'enterprise' · 'v3' · 'off' = tắt hẳn App Check */
 const APPCHECK_MODE = 'auto';
 
+/* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
+   đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
+const APP_VERSION = 'v9 · 2026-09-03 · step-up 2FA + vá 8 lỗi';
+console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
+
 const HAS_FIREBASE = (typeof firebase !== 'undefined') && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
 let fsDb = null;
 let fsAuth = null;
@@ -610,15 +616,20 @@ function _loadScriptOnce(src){
     const existing = document.querySelector('script[data-appcheck-src="'+src+'"]');
     if(existing){
       if(existing.dataset.loaded === '1') return resolve();
-      existing.addEventListener('load', ()=>resolve());
-      existing.addEventListener('error', ()=>reject(new Error('Không tải được '+src)));
-      return;
+      /* Script đã hỏng lần trước: gỡ khỏi DOM rồi nạp lại. Bản cũ chỉ gắn thêm
+         listener vào thẻ đã chết ⇒ listener không bao giờ chạy, lời hứa treo mãi. */
+      if(existing.dataset.failed === '1'){ existing.remove(); }
+      else{
+        existing.addEventListener('load', ()=>resolve());
+        existing.addEventListener('error', ()=>reject(new Error('Không tải được '+src)));
+        return;
+      }
     }
     const s = document.createElement('script');
     s.src = src; s.async = true; s.defer = true;
     s.dataset.appcheckSrc = src;
     s.onload = ()=>{ s.dataset.loaded = '1'; resolve(); };
-    s.onerror = ()=>reject(new Error('Không tải được '+src+' (mạng chặn hoặc adblock?)'));
+    s.onerror = ()=>{ s.dataset.failed = '1'; reject(new Error('Không tải được '+src+' (mạng chặn hoặc adblock?)')); };
     document.head.appendChild(s);
   });
 }
@@ -652,6 +663,22 @@ function _loadScriptIn(win, src){
     (d.head || d.documentElement).appendChild(s);
   });
 }
+/* api.js / enterprise.js chỉ là script mồi: nạp xong nó mới đi tải tiếp gói
+   recaptcha__<lang>.js, và grecaptcha.execute chỉ xuất hiện SAU khi gói đó chạy.
+   Kiểm tra ngay tại onload là quá sớm ⇒ luôn báo "không tạo grecaptcha.execute"
+   kể cả khi key hoàn toàn hợp lệ. Vì vậy phải chờ có thật rồi mới kết luận. */
+function _waitFor(fn, ms, label){
+  const deadline = Date.now() + ms;
+  return new Promise((resolve, reject)=>{
+    (function tick(){
+      let v = null;
+      try{ v = fn(); }catch(e){}
+      if(v) return resolve(v);
+      if(Date.now() > deadline) return reject(new Error('chờ mãi không thấy ' + label));
+      setTimeout(tick, 120);
+    })();
+  });
+}
 /* kind: 'enterprise' | 'v3'. Ném lỗi nếu key không thuộc loại đó, hoặc tên miền
    hiện tại chưa nằm trong danh sách Domains của key. */
 async function _probeKind(kind, key){
@@ -659,18 +686,18 @@ async function _probeKind(kind, key){
   try{
     const win = ifr.contentWindow;
     if(kind === 'enterprise'){
-      await _withTimeout(_loadScriptIn(win, 'https://www.google.com/recaptcha/enterprise.js?render='+encodeURIComponent(key)), 12000, 'tải enterprise.js');
-      const g = win.grecaptcha;
-      if(!g || !g.enterprise) throw new Error('enterprise.js không tạo grecaptcha.enterprise');
-      await _withTimeout(new Promise(res=>g.enterprise.ready(res)), 10000, 'enterprise.ready');
-      const t = await _withTimeout(g.enterprise.execute(key, {action:'appcheck_probe'}), 10000, 'enterprise.execute');
+      await _withTimeout(_loadScriptIn(win, 'https://www.google.com/recaptcha/enterprise.js?render='+encodeURIComponent(key)), 8000, 'tải enterprise.js');
+      const ent = await _waitFor(()=> (win.grecaptcha && win.grecaptcha.enterprise && typeof win.grecaptcha.enterprise.execute === 'function') ? win.grecaptcha.enterprise : null,
+                                 7000, 'grecaptcha.enterprise');
+      await _withTimeout(new Promise(res=>ent.ready(res)), 6000, 'enterprise.ready');
+      const t = await _withTimeout(ent.execute(key, {action:'appcheck_probe'}), 8000, 'enterprise.execute');
       if(!t) throw new Error('trả về token rỗng');
     }else{
-      await _withTimeout(_loadScriptIn(win, 'https://www.google.com/recaptcha/api.js?render='+encodeURIComponent(key)), 12000, 'tải api.js');
-      const g = win.grecaptcha;
-      if(!g || typeof g.execute !== 'function') throw new Error('api.js không tạo grecaptcha.execute');
-      await _withTimeout(new Promise(res=>g.ready(res)), 10000, 'v3.ready');
-      const t = await _withTimeout(g.execute(key, {action:'appcheck_probe'}), 10000, 'v3.execute');
+      await _withTimeout(_loadScriptIn(win, 'https://www.google.com/recaptcha/api.js?render='+encodeURIComponent(key)), 8000, 'tải api.js');
+      const g = await _waitFor(()=> (win.grecaptcha && typeof win.grecaptcha.execute === 'function') ? win.grecaptcha : null,
+                               7000, 'grecaptcha.execute');
+      await _withTimeout(new Promise(res=>g.ready(res)), 6000, 'v3.ready');
+      const t = await _withTimeout(g.execute(key, {action:'appcheck_probe'}), 8000, 'v3.execute');
       if(!t) throw new Error('trả về token rỗng');
     }
     return true;
@@ -680,16 +707,25 @@ async function _probeKind(kind, key){
 }
 async function _detectRecaptchaKind(key){
   if(APPCHECK_MODE === 'enterprise' || APPCHECK_MODE === 'v3') return APPCHECK_MODE;
+  /* Hai phép thử nằm ở hai iframe tách biệt nên chạy SONG SONG được. Chạy nối
+     tiếp thì trường hợp key chết phải chờ hết hạn hai lần (~1 phút) mới cho đăng
+     nhập được — chạy song song thì chỉ mất thời gian của một phép thử. */
   const errs = {};
-  try{ await _probeKind('v3', key); return 'v3'; }
-  catch(e){ errs.v3 = e.message; }
-  try{ await _probeKind('enterprise', key); return 'enterprise'; }
-  catch(e){ errs.enterprise = e.message; }
+  const [rv3, rent] = await Promise.allSettled([
+    _probeKind('v3', key),
+    _probeKind('enterprise', key)
+  ]);
+  if(rv3.status === 'fulfilled') return 'v3';
+  if(rent.status === 'fulfilled') return 'enterprise';
+  errs.v3 = rv3.reason ? rv3.reason.message : 'lỗi không rõ';
+  errs.enterprise = rent.reason ? rent.reason.message : 'lỗi không rõ';
 
   /* Diễn giải lỗi thành việc cần làm, thay vì ném nguyên văn tiếng Anh của Google. */
   const all = ((errs.v3||'') + ' ' + (errs.enterprise||'')).toLowerCase();
   let why;
-  if(all.indexOf('invalid domain') >= 0){
+  if(all.indexOf('chờ mãi không thấy') >= 0 && all.indexOf('invalid') < 0){
+    why = 'Script reCAPTCHA nạp được nhưng không khởi tạo nổi với site key này — gần như chắc chắn key đã bị xoá hoặc không tồn tại. Tạo site key mới rồi thay vào code.';
+  }else if(all.indexOf('invalid domain') >= 0){
     why = 'Google báo SAI TÊN MIỀN. Mở trang quản lý site key, thêm "' + location.hostname + '" vào danh sách Domains.';
   }else if(all.indexOf('invalid site key') >= 0 || all.indexOf('invalid key') >= 0){
     why = 'Google báo KHÔNG TÌM THẤY key này. Hoặc key đã bị xoá, hoặc site key trong code không khớp với key thật, hoặc tên miền "' + location.hostname + '" chưa có trong danh sách Domains của key.';
@@ -754,12 +790,33 @@ if(HAS_FIREBASE){
        toàn bộ phần khởi tạo nằm trong hàm async này. Nếu App Check hỏng thì vẫn
        chạy tiếp (app không chết) — chỉ là chưa có lớp chặn bot. */
     (async ()=>{
-      try{ await setupAppCheck(); }
-      catch(e){ console.error('[App Check] lỗi không lường trước', e); }
+      const gateErr = document.getElementById('gate-error');
+      if(gateErr){
+        gateErr.textContent = 'Đang kiểm tra lớp bảo mật, chờ vài giây…';
+        gateErr.style.color = 'var(--text-dim)';
+        gateErr.style.display = 'block';
+      }
+      /* Chặn trên cứng: dù phép dò có kẹt thế nào cũng không được giữ màn hình
+         đăng nhập quá 25 giây. Hỏng thì bỏ App Check, app vẫn chạy. */
+      try{ await _withTimeout(setupAppCheck(), 25000, 'setupAppCheck'); }
+      catch(e){
+        console.error('[App Check] bỏ qua vì quá lâu hoặc lỗi:', e.message);
+        if(!appCheckState.message || appCheckState.message === 'Chưa khởi tạo'){
+          appCheckState = { ok:false, provider:null, message:'Kiểm tra quá lâu nên đã bỏ qua App Check. App vẫn chạy bình thường (đừng bật Enforce).', detail:e.message };
+        }
+      }
+      if(gateErr){
+        gateErr.style.display = 'none';
+        gateErr.style.color = 'var(--danger)';
+      }
       fsDb = firebase.firestore();
       fsAuth = firebase.auth();
       fsAuth.onAuthStateChanged(async user=>{
         isLoggedIn = !!user;
+        /* Phiên vừa đổi (đăng xuất, hết hạn, hoặc tab khác đăng nhập tài khoản khác):
+           đóng ngay màn hình 2FA đang mở và huỷ luồng của tài khoản cũ, nếu không
+           lời hứa của nó treo mãi và có thể cấp quyền nhầm cho phiên mới. */
+        if(typeof mfaAbortFlow === 'function') mfaAbortFlow();
         /* Đăng nhập đúng email admin là thấy được nút xoá ngay. Mã 6 số chỉ được
            hỏi đúng lúc bấm xoá (step-up), xem requireAdminStepUp() bên dưới. */
         isAdmin = !!user && user.email === ADMIN_EMAIL;
@@ -934,9 +991,13 @@ async function getShipment(id){
   const raw = await safeGet('shipment:'+id, false);
   return raw ? JSON.parse(raw) : null;
 }
+/* Trả về true nếu xoá THẬT SỰ thành công. Trước đây hàm này nuốt lỗi rồi vẫn để
+   giao diện báo "Đã xoá." — khi Firestore Rules hoặc App Check từ chối, người dùng
+   tưởng đã xoá xong trong khi dữ liệu còn nguyên. */
 async function deleteShipment(id){
-  await deleteIndexEntry(id);
-  await safeDelete('shipment:'+id, false);
+  const a = await deleteIndexEntry(id);
+  const b = await safeDelete('shipment:'+id, false);
+  return a !== null && b !== null;
 }
 
 /* ---------------- geocode + climate (Open-Meteo, free, CORS-enabled) ---------------- */
@@ -22472,7 +22533,11 @@ window.removeShipmentFromGroup = async function(id, groupKey){
   if(!isAdmin){ toast('Chỉ tài khoản admin mới xoá được. Bấm "Đăng nhập admin" ở góc trên trước.'); return; }
   if(!confirm('Xoá lô dữ liệu này khỏi kho? Không thể hoàn tác.')) return;
   if(!await requireAdminStepUp()) return;
-  await deleteShipment(id);
+  if(!await deleteShipment(id)){
+    toast('XOÁ KHÔNG THÀNH CÔNG — máy chủ từ chối. Dữ liệu vẫn còn. Mở F12 > Console xem lỗi.');
+    renderLibrary();
+    return;
+  }
   toast('Đã xoá.');
   renderLibrary();
   const idx = await loadIndex();
@@ -22569,7 +22634,33 @@ function mfaShow(step){
   });
 }
 function mfaHide(){ document.getElementById('mfa-gate').classList.remove('active'); }
+
+/* Mọi luồng 2FA đang mở đều đăng ký hàm huỷ ở đây, để khi người dùng đăng xuất
+   (hoặc phiên bị thu hồi ở tab khác) thì đóng luôn màn hình và trả về false,
+   thay vì để lời hứa treo vĩnh viễn và cấp quyền cho tài khoản đã đổi. */
+let mfaCancelCurrent = null;
+function mfaAbortFlow(){
+  const c = mfaCancelCurrent;
+  mfaCancelCurrent = null;
+  if(c) c();
+  mfaHide();
+}
+/* Chặn bấm hai lần: khoá nút trong lúc chờ mạng rồi mở lại. */
+async function _withButtonBusy(btn, label, fn){
+  const old = btn.textContent;
+  btn.disabled = true; btn.textContent = label;
+  try{ return await fn(); }
+  finally{ btn.disabled = false; btn.textContent = old; }
+}
 function mfaGrant(uid){
+  const u = fsAuth && fsAuth.currentUser;
+  /* Phiên có thể đã đổi trong lúc màn hình 2FA đang mở — không cấp quyền cho
+     tài khoản khác với tài khoản đã bắt đầu luồng này. */
+  if(!u || u.uid !== uid || u.email !== ADMIN_EMAIL){
+    mfaHide();
+    toast('Phiên đăng nhập đã thay đổi — hãy đăng nhập lại rồi thử lại.');
+    return false;
+  }
   isAdmin = true;
   mfaEnrolled = true;
   mfaUnlockUntil = Date.now() + MFA_UNLOCK_MS;
@@ -22577,6 +22668,7 @@ function mfaGrant(uid){
   updateAdminUI();
   if(typeof updateSecurityPanel === 'function') updateSecurityPanel();
   toast('Đã xác thực — mở khoá quyền xoá trong 5 phút.');
+  return true;
 }
 async function renderMfaQr(uri){
   const box = document.getElementById('mfa-qr');
@@ -22591,8 +22683,23 @@ async function renderMfaQr(uri){
   }
 }
 
+/* THỨ TỰ QUAN TRỌNG khi đăng ký:
+     1. kiểm mã 6 số đúng chưa
+     2. LƯU KHOÁ vào localStorage trước  ← nếu trình duyệt chặn thì dừng ngay,
+        chưa ghi gì lên Firestore, người dùng thử lại được bình thường
+     3. HIỆN mã dự phòng, bắt tích xác nhận đã chép
+     4. bấm "Xong" mới GHI enabled:true + recoveryHash lên Firestore
+   Bản trước ghi Firestore ở bước 2. Nếu localStorage bị chặn (ẩn danh, Safari,
+   trình duyệt chặn lưu trữ) thì Firestore đã ghi enabled:true trong khi mã dự
+   phòng chưa từng hiện ra ⇒ lần sau app đòi mã dự phòng mà người dùng không hề
+   có ⇒ MẤT QUYỀN XOÁ VĨNH VIỄN, chỉ cứu được bằng cách vào Firebase console xoá
+   tay doc admin_2fa. Đây là lỗi nặng nhất trong bản cũ. */
 function mfaRunEnroll(uid, email, ref){
   return new Promise(resolve=>{
+    let done = false;
+    const finish = v=>{ if(done) return; done = true; mfaCancelCurrent = null; resolve(v); };
+    mfaCancelCurrent = ()=>finish(false);
+
     const secret = newTotpSecret();
     const label  = 'TUYEN LANH:' + (email || ADMIN_EMAIL);
     const uri = 'otpauth://totp/' + encodeURIComponent(label) +
@@ -22602,96 +22709,133 @@ function mfaRunEnroll(uid, email, ref){
     renderMfaQr(uri);
     const codeEl = document.getElementById('mfa-setup-code');
     const errEl  = document.getElementById('mfa-setup-error');
+    const confirmBtn = document.getElementById('mfa-setup-confirm');
     codeEl.value = ''; errEl.style.display = 'none';
     mfaShow('setup');
     setTimeout(()=>codeEl.focus(), 80);
 
-    document.getElementById('mfa-setup-skip').onclick = ()=>{ mfaHide(); resolve(false); };
-    document.getElementById('mfa-setup-confirm').onclick = async ()=>{
+    document.getElementById('mfa-setup-skip').onclick = ()=>{ mfaHide(); finish(false); };
+    confirmBtn.onclick = ()=>_withButtonBusy(confirmBtn, 'Đang kiểm tra…', async ()=>{
       errEl.style.display = 'none';
       if(!await verifyTotp(secret, codeEl.value)){
         errEl.textContent = 'Mã không đúng. Kiểm tra đồng hồ điện thoại có đang để "tự động theo mạng" không, rồi thử lại.';
         errEl.style.display = 'block'; codeEl.select(); return;
       }
-      const rec = newRecoveryCode();
-      try{
-        await ref.set({
-          enabled: true,
-          recoveryHash: await sha256hex(normRecovery(rec)),
-          email: email || ADMIN_EMAIL,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      }catch(e){
-        errEl.textContent = 'Không lưu được lên Firestore: ' + (e.code || e.message) + '. Kiểm tra Firestore Rules cho collection admin_2fa.';
-        errEl.style.display = 'block'; return;
-      }
+      /* (2) lưu khoá lên máy TRƯỚC — chưa đụng gì tới Firestore */
       try{ localStorage.setItem(mfaSecretKey(uid), secret); }
       catch(e){
-        errEl.textContent = 'Trình duyệt chặn localStorage nên không lưu được khoá. Tắt chế độ ẩn danh rồi thử lại.';
+        errEl.textContent = 'Trình duyệt chặn localStorage nên không lưu được khoá. Tắt chế độ ẩn danh (hoặc bỏ chặn dữ liệu trang) rồi thử lại. Chưa có gì bị thay đổi.';
         errEl.style.display = 'block'; return;
       }
+      /* (3) hiện mã dự phòng, (4) ghi Firestore khi bấm Xong */
+      const rec   = newRecoveryCode();
       const recEl = document.getElementById('mfa-recovery-code');
       const ack   = document.getElementById('mfa-recovery-ack');
-      const done  = document.getElementById('mfa-recovery-done');
+      const doneBtn = document.getElementById('mfa-recovery-done');
+      const recErr  = document.getElementById('mfa-recovery-error');
       recEl.textContent = rec;
-      ack.checked = false; done.disabled = true;
-      ack.onchange = ()=>{ done.disabled = !ack.checked; };
-      done.onclick = ()=>{ mfaGrant(uid); resolve(true); };
+      ack.checked = false; doneBtn.disabled = true;
+      if(recErr) recErr.style.display = 'none';
+      ack.onchange = ()=>{ doneBtn.disabled = !ack.checked; };
+      doneBtn.onclick = ()=>_withButtonBusy(doneBtn, 'Đang lưu…', async ()=>{
+        try{
+          await ref.set({
+            enabled: true,
+            recoveryHash: await sha256hex(normRecovery(rec)),
+            email: email || ADMIN_EMAIL,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }catch(e){
+          if(recErr){
+            recErr.textContent = 'Không lưu được lên Firestore: ' + (e.code || e.message) + '. Kiểm tra Firestore Rules cho collection admin_2fa, rồi bấm Xong lại.';
+            recErr.style.display = 'block';
+          }else{
+            toast('Không lưu được lên Firestore: ' + (e.code || e.message));
+          }
+          return;   /* giữ nguyên màn hình, mã dự phòng vẫn còn trên màn */
+        }
+        if(mfaGrant(uid)) finish(true); else finish(false);
+      });
       mfaShow('recovery');
-    };
-    codeEl.onkeydown = e=>{ if(e.key === 'Enter') document.getElementById('mfa-setup-confirm').click(); };
+    });
+    codeEl.onkeydown = e=>{ if(e.key === 'Enter') confirmBtn.click(); };
   });
 }
 
 function mfaRunVerify(uid, ref){
   return new Promise(resolve=>{
-    const secret = localStorage.getItem(mfaSecretKey(uid));
+    let done = false;
+    const finish = v=>{ if(done) return; done = true; mfaCancelCurrent = null; resolve(v); };
+    mfaCancelCurrent = ()=>finish(false);
+
+    const secret = (()=>{ try{ return localStorage.getItem(mfaSecretKey(uid)); }catch(e){ return null; } })();
     const codeEl = document.getElementById('mfa-verify-code');
     const errEl  = document.getElementById('mfa-verify-error');
+    const confirmBtn = document.getElementById('mfa-verify-confirm');
+    const recoverBtn = document.getElementById('mfa-verify-recovery');
     codeEl.value = ''; errEl.style.display = 'none';
     mfaShow('verify');
     setTimeout(()=>codeEl.focus(), 80);
 
-    document.getElementById('mfa-verify-skip').onclick = ()=>{ mfaHide(); resolve(false); };
-    document.getElementById('mfa-verify-recovery').onclick = async ()=>{
+    document.getElementById('mfa-verify-skip').onclick = ()=>{ mfaHide(); finish(false); };
+    recoverBtn.onclick = ()=>_withButtonBusy(recoverBtn, 'Đang tải…', async ()=>{
       let hash = null;
       try{ const s = await ref.get(); hash = s.exists ? s.data().recoveryHash : null; }catch(e){}
-      if(!hash){ errEl.textContent = 'Không đọc được mã dự phòng từ máy chủ.'; errEl.style.display = 'block'; return; }
+      if(!hash){
+        errEl.textContent = 'Không đọc được mã dự phòng từ máy chủ. Kiểm tra kết nối mạng rồi thử lại.';
+        errEl.style.display = 'block'; return;
+      }
+      done = true;                       /* nhường quyền kết thúc cho luồng khôi phục */
+      mfaCancelCurrent = null;
       resolve(await mfaRunRestore(uid, hash, ref));
-    };
-    document.getElementById('mfa-verify-confirm').onclick = async ()=>{
+    });
+    confirmBtn.onclick = ()=>_withButtonBusy(confirmBtn, 'Đang kiểm tra…', async ()=>{
       errEl.style.display = 'none';
-      if(await verifyTotp(secret, codeEl.value)){ mfaGrant(uid); resolve(true); }
-      else{
+      if(!secret){
+        errEl.textContent = 'Máy này không có khoá 2FA (trình duyệt có thể đang chặn lưu trữ). Dùng nút "Mất điện thoại" bên dưới.';
+        errEl.style.display = 'block'; return;
+      }
+      if(await verifyTotp(secret, codeEl.value)){
+        if(mfaGrant(uid)) finish(true); else finish(false);
+      }else{
         errEl.textContent = 'Mã không đúng hoặc đã hết hạn (mã đổi mỗi 30 giây).';
         errEl.style.display = 'block'; codeEl.select();
       }
-    };
-    codeEl.onkeydown = e=>{ if(e.key === 'Enter') document.getElementById('mfa-verify-confirm').click(); };
+    });
+    codeEl.onkeydown = e=>{ if(e.key === 'Enter') confirmBtn.click(); };
   });
 }
 
 function mfaRunRestore(uid, recoveryHash, ref){
   return new Promise(resolve=>{
+    let done = false;
+    const finish = v=>{ if(done) return; done = true; mfaCancelCurrent = null; resolve(v); };
+    mfaCancelCurrent = ()=>finish(false);
+
     const codeEl = document.getElementById('mfa-restore-code');
     const errEl  = document.getElementById('mfa-restore-error');
+    const confirmBtn = document.getElementById('mfa-restore-confirm');
     codeEl.value = ''; errEl.style.display = 'none';
     mfaShow('restore');
     setTimeout(()=>codeEl.focus(), 80);
 
-    document.getElementById('mfa-restore-back').onclick = ()=>{ mfaHide(); resolve(false); };
-    document.getElementById('mfa-restore-confirm').onclick = async ()=>{
+    document.getElementById('mfa-restore-back').onclick = ()=>{ mfaHide(); finish(false); };
+    confirmBtn.onclick = ()=>_withButtonBusy(confirmBtn, 'Đang kiểm tra…', async ()=>{
       errEl.style.display = 'none';
       const h = await sha256hex(normRecovery(codeEl.value));
       if(h !== recoveryHash){
         errEl.textContent = 'Mã dự phòng không đúng.';
         errEl.style.display = 'block'; codeEl.select(); return;
       }
-      try{ localStorage.removeItem(mfaSecretKey(uid)); }catch(e){}
+      /* KHÔNG xoá khoá cũ ở đây. Bản trước xoá ngay tại chỗ này, nên nếu người dùng
+         bấm "Để sau" ở màn đăng ký tiếp theo thì mất luôn thiết bị đang chạy tốt.
+         Đăng ký thành công sẽ tự ghi đè khoá mới. */
       const email = (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.email : ADMIN_EMAIL;
+      done = true;
+      mfaCancelCurrent = null;
       resolve(await mfaRunEnroll(uid, email, ref));   /* đăng ký lại thiết bị + cấp mã dự phòng mới */
-    };
-    codeEl.onkeydown = e=>{ if(e.key === 'Enter') document.getElementById('mfa-restore-confirm').click(); };
+    });
+    codeEl.onkeydown = e=>{ if(e.key === 'Enter') confirmBtn.click(); };
   });
 }
 
@@ -22715,6 +22859,12 @@ async function loadMfaStatus(user){
    Trả về true nếu được phép xoá. Đăng nhập/tra cứu/tải lên không đụng tới hàm này,
    nên người dùng chỉ bị hỏi mã đúng lúc sắp xoá thật.
    Lần đầu tiên sẽ là màn hình cài đặt (quét QR), các lần sau chỉ nhập 6 số. */
+/* Chỉ cho phép MỘT luồng 2FA chạy tại một thời điểm. Trước đây bấm Xoá ở hai lô
+   liên tiếp (trong lúc còn đang chờ Firestore trả lời) sẽ mở hai luồng chồng nhau;
+   luồng sau gán đè onclick của luồng trước ⇒ lời hứa của luồng trước treo vĩnh viễn,
+   lô đó không bao giờ được xoá mà cũng không báo lỗi gì. Giờ luồng thứ hai chờ
+   luồng thứ nhất xong rồi dùng chung kết quả. */
+let mfaPending = null;
 async function requireAdminStepUp(){
   if(!HAS_FIREBASE) return true;                       /* chế độ lưu cục bộ, không có Firebase */
   const user = fsAuth && fsAuth.currentUser;
@@ -22723,29 +22873,38 @@ async function requireAdminStepUp(){
     return false;
   }
   if(Date.now() < mfaUnlockUntil) return true;         /* còn trong cửa sổ 5 phút */
-  if(!fsDb) return false;
-
-  const uid = user.uid;
-  const ref = fsDb.collection(MFA_COLLECTION).doc(uid);
-  let data = null;
-  try{
-    const snap = await ref.get();
-    data = snap.exists ? snap.data() : null;
-  }catch(e){
-    console.error('[2FA] không đọc được ' + MFA_COLLECTION + ':', e);
-    toast('Không đọc được cấu hình 2FA — kiểm tra Firestore Rules cho "' + MFA_COLLECTION + '".');
+  if(!fsDb){
+    toast('Đang khởi tạo kết nối bảo mật, chờ vài giây rồi bấm lại.');
     return false;
   }
-  mfaEnrolled = !!(data && data.enabled && data.recoveryHash);
+  if(mfaPending) return await mfaPending;              /* đã có luồng đang chạy */
 
-  let hasDevice = false;
-  try{ hasDevice = !!localStorage.getItem(mfaSecretKey(uid)); }catch(e){}
+  mfaPending = (async ()=>{
+    const uid = user.uid;
+    const ref = fsDb.collection(MFA_COLLECTION).doc(uid);
+    let data = null;
+    try{
+      const snap = await ref.get();
+      data = snap.exists ? snap.data() : null;
+    }catch(e){
+      console.error('[2FA] không đọc được ' + MFA_COLLECTION + ':', e);
+      toast('Không đọc được cấu hình 2FA — kiểm tra Firestore Rules cho "' + MFA_COLLECTION + '".');
+      return false;
+    }
+    mfaEnrolled = !!(data && data.enabled && data.recoveryHash);
 
-  if(mfaEnrolled){
-    return hasDevice ? await mfaRunVerify(uid, ref)
-                     : await mfaRunRestore(uid, data.recoveryHash, ref);
-  }
-  return await mfaRunEnroll(uid, user.email, ref);
+    let hasDevice = false;
+    try{ hasDevice = !!localStorage.getItem(mfaSecretKey(uid)); }catch(e){}
+
+    if(mfaEnrolled){
+      return hasDevice ? await mfaRunVerify(uid, ref)
+                       : await mfaRunRestore(uid, data.recoveryHash, ref);
+    }
+    return await mfaRunEnroll(uid, user.email, ref);
+  })();
+
+  try{ return await mfaPending; }
+  finally{ mfaPending = null; }
 }
 
 /* ==========================================================================
@@ -22794,7 +22953,8 @@ function securityPanelHtml(){
 
   return '<button class="modal-close" onclick="document.getElementById(\'modal-bg\').classList.remove(\'active\')">✕</button>' +
          '<h2 style="font-family:var(--font-display);margin:0 0 4px;">🛡️ Trạng thái bảo mật</h2>' +
-         '<div class="hint" style="margin-bottom:14px;">Tên miền đang chạy: <b>' + escapeHtml(location.hostname || '(file cục bộ)') + '</b></div>' +
+         '<div class="hint" style="margin-bottom:4px;">Tên miền đang chạy: <b>' + escapeHtml(location.hostname || '(file cục bộ)') + '</b></div>' +
+         '<div class="hint" style="margin-bottom:14px;">Phiên bản file đang chạy: <b style="color:var(--accent,#5bd9e8);">' + escapeHtml(APP_VERSION) + '</b></div>' +
          acHtml + mfaHtml + enforceHtml;
 }
 function updateSecurityPanel(){
@@ -22846,6 +23006,10 @@ function updateGate(){
     gate.classList.add('active');
     topbar.style.display = 'none';
     wrap.style.display = 'none';
+    /* mfa-gate có z-index cao hơn login-gate, nếu không đóng nó sẽ lơ lửng
+       đè lên màn hình đăng nhập sau khi đăng xuất giữa chừng. */
+    const mfaGate = document.getElementById('mfa-gate');
+    if(mfaGate) mfaGate.classList.remove('active');
   }
 }
 
@@ -22884,8 +23048,11 @@ window.removeShipment = async function(id){
   if(HAS_FIREBASE && !isAdmin){ toast('Chỉ tài khoản admin mới xoá được.'); return; }
   if(!confirm('Xoá lô dữ liệu này khỏi kho? Không thể hoàn tác.')) return;
   if(!await requireAdminStepUp()) return;
-  await deleteShipment(id);
-  toast('Đã xoá.');
+  if(!await deleteShipment(id)){
+    toast('XOÁ KHÔNG THÀNH CÔNG — máy chủ từ chối. Dữ liệu vẫn còn. Mở F12 > Console xem lỗi.');
+  }else{
+    toast('Đã xoá.');
+  }
   renderLibrary();
 };
 
