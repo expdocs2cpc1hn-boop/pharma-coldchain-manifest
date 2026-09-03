@@ -716,13 +716,17 @@ if(HAS_FIREBASE){
       fsAuth = firebase.auth();
       fsAuth.onAuthStateChanged(async user=>{
         isLoggedIn = !!user;
-        isAdmin = false;                 /* quyền admin chỉ được cấp sau khi qua 2FA */
+        /* Đăng nhập đúng email admin là thấy được nút xoá ngay. Mã 6 số chỉ được
+           hỏi đúng lúc bấm xoá (step-up), xem requireAdminStepUp() bên dưới. */
+        isAdmin = !!user && user.email === ADMIN_EMAIL;
+        mfaUnlockUntil = 0;
+        mfaEnrolled = null;
         updateAdminUI();
         updateGate();
         if(isLoggedIn) renderLibrary();
-        if(user && user.email === ADMIN_EMAIL){
-          try{ await ensureAdmin2FA(user); }
-          catch(e){ console.error('2FA error', e); toast('Lỗi kiểm tra 2FA: ' + (e.message||e)); }
+        if(isAdmin){
+          try{ await loadMfaStatus(user); }
+          catch(e){ console.error('2FA status error', e); }
           updateAdminUI();
         }
         if(typeof updateSecurityPanel === 'function') updateSecurityPanel();
@@ -22423,6 +22427,7 @@ window.openCountryGroup = async function(groupKey){
 window.removeShipmentFromGroup = async function(id, groupKey){
   if(!isAdmin){ toast('Chỉ tài khoản admin mới xoá được. Bấm "Đăng nhập admin" ở góc trên trước.'); return; }
   if(!confirm('Xoá lô dữ liệu này khỏi kho? Không thể hoàn tác.')) return;
+  if(!await requireAdminStepUp()) return;
   await deleteShipment(id);
   toast('Đã xoá.');
   renderLibrary();
@@ -22449,7 +22454,11 @@ window.removeShipmentFromGroup = async function(id, groupKey){
    ========================================================================== */
 const MFA_COLLECTION = 'admin_2fa';
 const mfaSecretKey = uid => 'coldroute_mfa_secret_' + uid;
-const mfaSessKey   = uid => 'coldroute_mfa_ok_' + uid;
+/* Sau khi nhập đúng mã, mở khoá quyền xoá trong 5 phút để xoá nhiều lô liên tiếp
+   không bị hỏi lại từng cái. Chỉ nằm trong bộ nhớ, tải lại trang là mất. */
+const MFA_UNLOCK_MS = 5 * 60 * 1000;
+let mfaUnlockUntil = 0;
+let mfaEnrolled = null;   /* null = chưa biết · true/false = đã đọc từ Firestore */
 
 const _B32A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 function b32encode(bytes){
@@ -22518,11 +22527,12 @@ function mfaShow(step){
 function mfaHide(){ document.getElementById('mfa-gate').classList.remove('active'); }
 function mfaGrant(uid){
   isAdmin = true;
-  try{ sessionStorage.setItem(mfaSessKey(uid), '1'); }catch(e){}
+  mfaEnrolled = true;
+  mfaUnlockUntil = Date.now() + MFA_UNLOCK_MS;
   mfaHide();
   updateAdminUI();
   if(typeof updateSecurityPanel === 'function') updateSecurityPanel();
-  toast('Đã xác thực 2 bước — quyền admin đã bật.');
+  toast('Đã xác thực — mở khoá quyền xoá trong 5 phút.');
 }
 async function renderMfaQr(uri){
   const box = document.getElementById('mfa-qr');
@@ -22641,14 +22651,37 @@ function mfaRunRestore(uid, recoveryHash, ref){
   });
 }
 
-/* Điểm vào: gọi sau khi đăng nhập thành công bằng đúng email admin. */
-async function ensureAdmin2FA(user){
-  if(!fsDb){ return false; }
-  const uid = user.uid;
-  let sess = null;
-  try{ sess = sessionStorage.getItem(mfaSessKey(uid)); }catch(e){}
-  if(sess === '1'){ isAdmin = true; return true; }
+/* Đọc xem tài khoản này đã bật 2FA chưa (1 lượt đọc nhẹ, chỉ để hiện trạng thái). */
+async function loadMfaStatus(user){
+  if(!fsDb) return null;
+  try{
+    const snap = await fsDb.collection(MFA_COLLECTION).doc(user.uid).get();
+    const d = snap.exists ? snap.data() : null;
+    mfaEnrolled = !!(d && d.enabled && d.recoveryHash);
+  }catch(e){
+    console.error('[2FA] không đọc được ' + MFA_COLLECTION + ':', e);
+    mfaEnrolled = null;
+    toast('Chưa có Firestore Rules cho "' + MFA_COLLECTION + '" — xem hướng dẫn.');
+  }
+  if(typeof updateSecurityPanel === 'function') updateSecurityPanel();
+  return mfaEnrolled;
+}
 
+/* ĐIỂM VÀO CHÍNH — gọi ngay trước mọi hành động XOÁ.
+   Trả về true nếu được phép xoá. Đăng nhập/tra cứu/tải lên không đụng tới hàm này,
+   nên người dùng chỉ bị hỏi mã đúng lúc sắp xoá thật.
+   Lần đầu tiên sẽ là màn hình cài đặt (quét QR), các lần sau chỉ nhập 6 số. */
+async function requireAdminStepUp(){
+  if(!HAS_FIREBASE) return true;                       /* chế độ lưu cục bộ, không có Firebase */
+  const user = fsAuth && fsAuth.currentUser;
+  if(!user || user.email !== ADMIN_EMAIL){
+    toast('Chỉ tài khoản admin mới xoá được.');
+    return false;
+  }
+  if(Date.now() < mfaUnlockUntil) return true;         /* còn trong cửa sổ 5 phút */
+  if(!fsDb) return false;
+
+  const uid = user.uid;
   const ref = fsDb.collection(MFA_COLLECTION).doc(uid);
   let data = null;
   try{
@@ -22656,13 +22689,15 @@ async function ensureAdmin2FA(user){
     data = snap.exists ? snap.data() : null;
   }catch(e){
     console.error('[2FA] không đọc được ' + MFA_COLLECTION + ':', e);
-    toast('Chưa có Firestore Rules cho "' + MFA_COLLECTION + '" — quyền admin đang tạm khoá. Xem hướng dẫn kèm theo.');
+    toast('Không đọc được cấu hình 2FA — kiểm tra Firestore Rules cho "' + MFA_COLLECTION + '".');
     return false;
   }
+  mfaEnrolled = !!(data && data.enabled && data.recoveryHash);
+
   let hasDevice = false;
   try{ hasDevice = !!localStorage.getItem(mfaSecretKey(uid)); }catch(e){}
 
-  if(data && data.enabled && data.recoveryHash){
+  if(mfaEnrolled){
     return hasDevice ? await mfaRunVerify(uid, ref)
                      : await mfaRunRestore(uid, data.recoveryHash, ref);
   }
@@ -22681,18 +22716,26 @@ function securityPanelHtml(){
   const acDot  = ac.ok ? 'sec-ok' : (APPCHECK_MODE === 'off' ? 'sec-warn' : 'sec-bad');
   const acHtml = _secRow(acDot, 'App Check (chặn bot dội request)', escapeHtml(ac.message));
 
-  let mfaDot = 'sec-bad', mfaMsg = 'Chưa đăng nhập bằng tài khoản admin.';
+  let mfaDot = 'sec-warn', mfaMsg = 'Chưa đăng nhập bằng tài khoản admin.';
   if(isLoggedIn && fsAuth && fsAuth.currentUser){
     const u = fsAuth.currentUser;
     if(u.email !== ADMIN_EMAIL){
       mfaDot = 'sec-ok';
       mfaMsg = 'Tài khoản thường — không có quyền xoá nên không cần 2FA.';
-    }else if(isAdmin){
+    }else if(mfaEnrolled === true){
+      const left = Math.max(0, Math.ceil((mfaUnlockUntil - Date.now()) / 60000));
       mfaDot = 'sec-ok';
-      mfaMsg = 'Đã bật và đã xác thực trong phiên này. Khoá TOTP nằm trên máy này, mã dự phòng đã băm SHA-256 trên Firestore.';
+      mfaMsg = 'Đã bật. Khoá TOTP nằm trên máy này, mã dự phòng đã băm SHA-256 trên Firestore. ' +
+               (left > 0 ? 'Quyền xoá đang mở khoá, còn ~' + left + ' phút.'
+                         : 'App sẽ hỏi mã 6 số đúng lúc bấm xoá.');
+    }else if(mfaEnrolled === false){
+      mfaDot = 'sec-bad';
+      mfaMsg = 'CHƯA bật. Ai lấy được mật khẩu là xoá sạch kho dữ liệu được. ' +
+               '<button class="btn btn-primary btn-sm" style="margin-top:8px;" ' +
+               'onclick="document.getElementById(\'modal-bg\').classList.remove(\'active\'); requireAdminStepUp();">Bật ngay (quét QR)</button>';
     }else{
       mfaDot = 'sec-warn';
-      mfaMsg = 'Đã đăng nhập nhưng chưa qua 2FA ⇒ chưa có quyền xoá. Đăng xuất rồi đăng nhập lại để nhập mã.';
+      mfaMsg = 'Không đọc được cấu hình 2FA từ Firestore — kiểm tra Rules cho collection "' + MFA_COLLECTION + '".';
     }
   }
   const mfaHtml = _secRow(mfaDot, '2FA cho tài khoản admin', mfaMsg);
@@ -22727,11 +22770,10 @@ function updateAdminUI(){
   if(isLoggedIn){
     const email = (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.email : '';
     const isAdminAccount = email === ADMIN_EMAIL;
-    const badge = isAdmin ? '🛡️ Admin' : (isAdminAccount ? '⚠️ Admin (chưa qua 2FA)' : '👤');
+    const badge = isAdminAccount ? (mfaEnrolled === false ? '⚠️ Admin (chưa bật 2FA)' : '🛡️ Admin') : '👤';
     btn.textContent = badge + ' (' + email + ') · Đăng xuất';
     btn.onclick = async ()=>{
-      const uid = (fsAuth.currentUser || {}).uid;
-      if(uid){ try{ sessionStorage.removeItem(mfaSessKey(uid)); }catch(e){} }
+      mfaUnlockUntil = 0;
       await fsAuth.signOut();
       toast('Đã đăng xuất.');
     };
@@ -22741,7 +22783,7 @@ function updateAdminUI(){
   }
   const secBtn = document.getElementById('security-btn');
   if(secBtn){
-    const ok = appCheckState.ok && (!isLoggedIn || isAdmin || (fsAuth && fsAuth.currentUser && fsAuth.currentUser.email !== ADMIN_EMAIL));
+    const ok = appCheckState.ok && mfaEnrolled !== false;
     secBtn.textContent = (ok ? '🛡️' : '⚠️') + ' Bảo mật';
   }
 }
@@ -22793,8 +22835,9 @@ document.getElementById('gate-pass').addEventListener('keydown', e=>{
 });
 
 window.removeShipment = async function(id){
-  if(HAS_FIREBASE && !isAdmin){ toast('Chỉ tài khoản admin đã qua xác thực 2 bước mới xoá được.'); return; }
+  if(HAS_FIREBASE && !isAdmin){ toast('Chỉ tài khoản admin mới xoá được.'); return; }
   if(!confirm('Xoá lô dữ liệu này khỏi kho? Không thể hoàn tác.')) return;
+  if(!await requireAdminStepUp()) return;
   await deleteShipment(id);
   toast('Đã xoá.');
   renderLibrary();
