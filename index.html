@@ -595,12 +595,24 @@ const ADMIN_EMAIL = "expdocs2.cpc1hn@gmail.com";
    Production cố định, và thêm nó vào danh sách Domains. */
 const RECAPTCHA_SITE_KEY = "6LcaYZstAAAAAPK0QSZ12xvRlqOBWP9lM7s4bh1p";
 
-/* 'auto' = tự dò (khuyến nghị) · 'enterprise' · 'v3' · 'off' = tắt hẳn App Check */
-const APPCHECK_MODE = 'auto';
+/* 'auto' = tự dò · 'enterprise' · 'v3' · 'off' = tắt hẳn App Check
+   ┌──────────────────────────────────────────────────────────────────────────┐
+   │ ĐANG ĐỂ 'off'. Site key 6LcaYZst... đã chết (Google trả về "Invalid site  │
+   │ key" cho cả hai kiểu), nên App Check không thể chạy. Tắt hẳn để khỏi tốn  │
+   │ 7 giây dò mỗi lần mở trang và khỏi rác console.                           │
+   │                                                                          │
+   │ MUỐN BẬT LẠI SAU NÀY — đúng 2 việc:                                       │
+   │   1. Tạo site key reCAPTCHA mới, nhớ thêm tên miền production của Vercel  │
+   │      vào danh sách Domains của key. Dán key mới vào RECAPTCHA_SITE_KEY     │
+   │      ngay bên dưới.                                                       │
+   │   2. Đổi dòng này thành:  const APPCHECK_MODE = 'auto';                   │
+   │   3. Mở web, bấm 🛡️ Bảo mật. Xanh thì mới vào Firebase bật Enforce.       │
+   └──────────────────────────────────────────────────────────────────────────┘ */
+const APPCHECK_MODE = 'off';
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v9 · 2026-09-03 · step-up 2FA + vá 8 lỗi';
+const APP_VERSION = 'v10 · 2026-09-03 · App Check tắt, 2FA hoạt động';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 const HAS_FIREBASE = (typeof firebase !== 'undefined') && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
