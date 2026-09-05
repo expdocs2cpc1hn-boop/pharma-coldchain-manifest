@@ -441,8 +441,9 @@
         <div class="quick-presets" id="lk-mode-presets">
           <button type="button" class="preset-btn active" data-mode="SEA">🚢 Đường biển (SEA)</button>
           <button type="button" class="preset-btn" data-mode="AIR">✈ Đường hàng không (AIR)</button>
+          <button type="button" class="preset-btn" data-mode="LAND">🚛 Đường bộ (LAND)</button>
         </div>
-        <div class="hint">Nhiệt độ trong container tàu biển và khoang hàng máy bay khác nhau nhiều — chọn đúng để ước tính chính xác hơn.</div>
+        <div class="hint">Nhiệt độ trong container tàu biển, khoang hàng máy bay và thùng xe tải khác nhau nhiều — chọn đúng để ước tính chính xác hơn.</div>
       </div>
 
       <div class="field">
@@ -500,6 +501,11 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
       Tải backup toàn bộ dữ liệu về máy
     </button>
+    <button class="btn btn-ghost btn-sm" id="btn-rebuild-index" style="margin-bottom:18px;margin-left:8px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6M3 22v-6h6"/><path d="M3.5 9a9 9 0 0114.9-3.4L21 8M20.5 15a9 9 0 01-14.9 3.4L3 16"/></svg>
+      Dựng lại danh sách
+    </button>
+    <div class="hint" style="margin:-8px 0 18px;">Dùng "Dựng lại danh sách" nếu bạn đã tải lô lên nhưng kho hiển thị trống — nó quét lại toàn bộ dữ liệu gốc và dựng lại mục lục. Không làm mất dữ liệu.</div>
     <div id="library-list"></div>
   </div>
 
@@ -612,7 +618,7 @@ const APPCHECK_MODE = 'off';
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v10 · 2026-09-03 · App Check tắt, 2FA hoạt động';
+const APP_VERSION = 'v13 · 2026-09-05 · LAND Lào-Campuchia + dựng lại kho';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 const HAS_FIREBASE = (typeof firebase !== 'undefined') && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
@@ -21543,7 +21549,65 @@ document.getElementById('tabs').addEventListener('click', e=>{
   if(btn.dataset.tab==='library') renderLibrary();
 });
 
-/* transport mode preset (AIR/SEA) */
+/* ==========================================================================
+   ĐIỂM ĐẾN ĐƯỜNG BỘ (LAND)
+   Hàng xuất đường bộ chỉ đi Lào và Campuchia, nên danh sách gợi ý chỉ gồm các
+   thành phố lớn / đầu mối của hai nước này — không lấy từ WORLD_PORTS (danh sách
+   đó là cảng biển và sân bay toàn cầu, đưa vào chỉ tổ rối).
+   Toạ độ để trống: resolvePortInput sẽ tự tra qua geocoder rồi nhớ lại.
+   Tên để nguyên tiếng Anh cho khớp cách geocoder tra cứu, giống mọi mục khác.
+   ========================================================================== */
+const LAND_CITIES = [
+  /* --- Lào --- */
+  {name:'Vientiane, Laos',        type:'land', country:'Laos'},
+  {name:'Savannakhet, Laos',      type:'land', country:'Laos'},
+  {name:'Pakse, Laos',            type:'land', country:'Laos'},
+  {name:'Luang Prabang, Laos',    type:'land', country:'Laos'},
+  {name:'Thakhek, Laos',          type:'land', country:'Laos'},
+  {name:'Paksan, Laos',           type:'land', country:'Laos'},
+  {name:'Phonsavan, Laos',        type:'land', country:'Laos'},
+  {name:'Vang Vieng, Laos',       type:'land', country:'Laos'},
+  {name:'Oudomxay, Laos',         type:'land', country:'Laos'},
+  {name:'Luang Namtha, Laos',     type:'land', country:'Laos'},
+  {name:'Salavan, Laos',          type:'land', country:'Laos'},
+  {name:'Attapeu, Laos',          type:'land', country:'Laos'},
+  /* --- Campuchia --- */
+  {name:'Phnom Penh, Cambodia',   type:'land', country:'Cambodia'},
+  {name:'Siem Reap, Cambodia',    type:'land', country:'Cambodia'},
+  {name:'Sihanoukville, Cambodia',type:'land', country:'Cambodia'},
+  {name:'Battambang, Cambodia',   type:'land', country:'Cambodia'},
+  {name:'Kampong Cham, Cambodia', type:'land', country:'Cambodia'},
+  {name:'Kampong Thom, Cambodia', type:'land', country:'Cambodia'},
+  {name:'Bavet, Cambodia',        type:'land', country:'Cambodia'},   /* cửa khẩu đối diện Mộc Bài */
+  {name:'Poipet, Cambodia',       type:'land', country:'Cambodia'},
+  {name:'Svay Rieng, Cambodia',   type:'land', country:'Cambodia'},
+  {name:'Takeo, Cambodia',        type:'land', country:'Cambodia'},
+  {name:'Kampot, Cambodia',       type:'land', country:'Cambodia'},
+  {name:'Kratie, Cambodia',       type:'land', country:'Cambodia'},
+  {name:'Stung Treng, Cambodia',  type:'land', country:'Cambodia'},
+  {name:'Pursat, Cambodia',       type:'land', country:'Cambodia'},
+];
+
+/* Mấy mục trong danh sách gốc bị gắn nhầm là cảng biển nhưng tên rõ ràng là sân
+   bay ("... Apt", "... Airport", "... Ap"). Lọc bỏ khi hiển thị danh sách cảng
+   biển để khỏi chọn nhầm. Ngoại lệ: "Macapa - Ap" — "Ap" ở đây là mã bang Amapá
+   của Brazil chứ không phải airport, và Macapá là cảng sông/biển thật. */
+const AIRPORTISH_RE = /\bApt\b|Airport|\bAp$/i;
+const AIRPORTISH_EXCEPTIONS = { 'Macapa - Ap, Brazil': 1 };
+function looksLikeAirportName(name){
+  if(AIRPORTISH_EXCEPTIONS[name]) return false;
+  const beforeComma = String(name).split(',')[0].trim();
+  return AIRPORTISH_RE.test(beforeComma);
+}
+
+/* portType: 'air' · 'sea' · 'land' · null (chưa chọn loại hình ⇒ hiện tất cả)
+   Đường bộ không có "cảng" riêng: điểm đến là THÀNH PHỐ nước bạn (Nam Ninh,
+   Côn Minh, Viêng Chăn, Bangkok...). Cùng một thành phố thường nằm hai lần
+   trong WORLD_PORTS (một dòng air, một dòng sea), nên với 'land' ta gộp trùng
+   theo tên và bỏ luôn nhãn ✈/🚢 vì chúng vô nghĩa với xe tải. */
+
+/* transport mode preset (SEA / AIR / LAND) */
+const MODE_TO_PORT_TYPE = { AIR:'air', SEA:'sea', LAND:'land' };
 let lkTransportMode = 'SEA';
 document.getElementById('lk-mode-presets').addEventListener('click', e=>{
   const btn = e.target.closest('.preset-btn');
@@ -21551,7 +21615,7 @@ document.getElementById('lk-mode-presets').addEventListener('click', e=>{
   document.querySelectorAll('#lk-mode-presets .preset-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   lkTransportMode = btn.dataset.mode;
-  populatePortDatalist(document.getElementById('lk-port-datalist'), lkTransportMode==='AIR' ? 'air' : 'sea');
+  populatePortDatalist(document.getElementById('lk-port-datalist'), MODE_TO_PORT_TYPE[lkTransportMode] || 'sea');
 });
 populatePortDatalist(document.getElementById('lk-port-datalist'), 'sea');
 
@@ -21584,22 +21648,35 @@ function resolveCountryInput(inputEl){
    listed either way since a plain country name isn't mode-specific. */
 const PORT_BY_NAME = {};
 WORLD_PORTS.forEach(p=>{ PORT_BY_NAME[p.name] = p; });
+/* Đăng ký sau WORLD_PORTS: nếu trùng tên thì bản đường bộ được ưu tiên. */
+LAND_CITIES.forEach(p=>{ PORT_BY_NAME[p.name] = p; });
 
 function populatePortDatalist(datalistEl, portType){
   datalistEl.innerHTML = '';
+  const add = (value, label)=>{
+    const opt = document.createElement('option');
+    opt.value = value;
+    if(label) opt.label = label;
+    datalistEl.appendChild(opt);
+  };
+
+  /* LAND: chỉ Lào + Campuchia, danh sách riêng, không đụng tới WORLD_PORTS. */
+  if(portType === 'land'){
+    LAND_CITIES.forEach(p=>add(p.name, '🚛'));
+    add('Laos'); add('Cambodia');
+    return;
+  }
+
   WORLD_PORTS.forEach(p=>{
     if(p.country === 'Vietnam') return;
     if(portType && p.type !== portType) return;
-    const opt = document.createElement('option');
-    opt.value = p.name;
-    opt.label = p.type==='air' ? '✈' : '🚢';
-    datalistEl.appendChild(opt);
+    /* danh sách cảng biển không nên chứa sân bay bị gắn nhầm loại */
+    if(portType === 'sea' && looksLikeAirportName(p.name)) return;
+    add(p.name, p.type==='air' ? '✈' : '🚢');
   });
   WORLD_COUNTRIES.forEach(c=>{
     if(c.name === 'Vietnam') return;
-    const opt = document.createElement('option');
-    opt.value = c.name;
-    datalistEl.appendChild(opt);
+    add(c.name);
   });
 }
 async function resolvePortInput(inputEl){
@@ -21758,6 +21835,7 @@ function renderPendingBody(cardId, file, parsed){
         <select id="meta-mode-${cardId}">
           <option value="">— Chọn loại hình —</option>
           <option value="AIR">AIR</option>
+          <option value="LAND">LAND (đường bộ)</option>
           <option value="LCL">LCL</option>
           <option value="FCL_COLD">FCL Lạnh</option>
           <option value="FCL_STD">FCL Thường</option>
@@ -21780,7 +21858,9 @@ function renderPendingBody(cardId, file, parsed){
   const metaPortDatalist = document.getElementById('meta-port-datalist-'+cardId);
   function refreshMetaPortDatalist(){
     const m = metaModeSelect.value;
-    const portType = m==='AIR' ? 'air' : (m ? 'sea' : null); // no mode chosen yet -> show both
+    // LCL / FCL_COLD / FCL_STD đều là hàng đường biển ⇒ danh sách cảng biển.
+    // Chưa chọn loại hình ⇒ null ⇒ hiện tất cả.
+    const portType = m ? (MODE_TO_PORT_TYPE[m] || 'sea') : null;
     populatePortDatalist(metaPortDatalist, portType);
   }
   refreshMetaPortDatalist();
@@ -22068,10 +22148,17 @@ async function runLookup(){
     const OFFSET_PRESETS = {
       SEA:  {transit: 5,  dwell: 12, min: 1},
       AIR:  {transit: 1,  dwell: 10, min: -1},
+      /* Đường bộ nằm giữa hai loại trên. Thùng xe tải kín phơi nắng nóng nhanh
+         và mạnh gần bằng container biển, nhưng hành trình ngắn hơn nhiều và ban
+         đêm xe chạy nên hạ nhiệt tốt hơn. Rủi ro lớn nhất của đường bộ là lúc
+         ĐỖ CHỜ: chờ thông quan ở cửa khẩu, nghỉ trưa, chờ giao hàng — xe tắt
+         máy, tắt lạnh, đứng giữa nắng. */
+      LAND: {transit: 4,  dwell: 8, min: 2},
     };
     const preset = OFFSET_PRESETS[lkTransportMode] || OFFSET_PRESETS.SEA;
     const offsetTransit = preset.transit, offsetMinC = preset.min;
     const isAir = lkTransportMode === 'AIR';
+    const isLand = lkTransportMode === 'LAND';
     // The greenhouse-effect heat gain of a sun-exposed shipment scales with how intense
     // the sun/heat actually is that day for BOTH SEA and AIR — but the ceiling is lower
     // for AIR: cargo only dwells on the tarmac for a few hours (not days) and is often
@@ -22083,6 +22170,16 @@ async function runLookup(){
         if(ambientMaxC < 20) return 2;   // mát/mùa đông
         if(ambientMaxC < 33) return 3;   // hè bình thường / thu
         return 5;                        // hè nắng gắt
+      }
+      if(isLand){
+        // Đường bộ chỉ đi Lào và Campuchia — hai nước này chung nền nhiệt với
+        // Việt Nam, KHÔNG có mùa đông lạnh thật. "Mùa mát" ở đây vẫn 22-28°C,
+        // nên mốc chia phải cao hơn hẳn hàng biển/hàng air (vốn đi khắp thế giới,
+        // có cả châu Âu mùa đông dưới 10°C). Để mốc <20°C thì gần như không bao
+        // giờ chạm tới, mọi chuyến đều bị tính theo mức nóng nhất.
+        if(ambientMaxC < 25) return 5;   // mùa mát (khoảng tháng 11-2)
+        if(ambientMaxC < 33) return 6;   // chuyển mùa
+        return 8;                        // mùa nóng, đỗ chờ thông quan giữa trưa
       }
       if(ambientMaxC < 20) return 3;   // mát/mùa đông
       if(ambientMaxC < 33) return 7;   // hè bình thường / thu
@@ -22208,7 +22305,7 @@ async function runLookup(){
         dayDates.push(new Date(depDate.getTime() + d*86400000));
       }
 
-      journey = { waypoints, dayDates, ambientMax, ambientMin, containerMax, containerMin, totalDays, isAir };
+      journey = { waypoints, dayDates, ambientMax, ambientMin, containerMax, containerMin, totalDays, isAir, isLand };
     }else if(!og || !ds){
       climateError = 'Không định vị được toạ độ cho tuyến này. Hãy chọn lại quốc gia đến.';
     }
@@ -22256,7 +22353,8 @@ function renderLookupResults(ctx){
     bannerHtml = verdictBlock(rec, worstMin, worstMax, reqMin, reqMax, `${exact.length} lô data logger thực tế đã lưu cho tuyến này`);
   }else if(jStats){
     const rec = recommend(reqMin, reqMax, jStats.contMin, jStats.contMax);
-    const sourceLabel = journey.isAir ? 'dự đoán nhiệt độ lô hàng lúc ở mặt đất theo hành trình' : 'dự đoán nhiệt độ trong container theo hành trình';
+    const sourceLabel = journey.isAir ? 'dự đoán nhiệt độ lô hàng lúc ở mặt đất theo hành trình'
+      : (journey.isLand ? 'dự đoán nhiệt độ trong thùng xe theo hành trình' : 'dự đoán nhiệt độ trong container theo hành trình');
     bannerHtml = verdictBlock(rec, jStats.contMin, jStats.contMax, reqMin, reqMax, sourceLabel + ' (chưa có data logger thực tế trùng khớp)');
   }
   if(!bannerHtml){
@@ -22317,8 +22415,9 @@ function renderLookupResults(ctx){
   }
 
   // ---- section: journey climate + shipment temperature estimate chart ----
-  const cargoTerm = journey && journey.isAir ? 'lô hàng' : 'container';
-  const cargoLineLabel = journey && journey.isAir ? 'Nhiệt độ lô hàng lúc ở mặt đất (ước tính)' : 'Nhiệt độ trong container (ước tính)';
+  const cargoTerm = journey && journey.isAir ? 'lô hàng' : (journey && journey.isLand ? 'thùng xe' : 'container');
+  const cargoLineLabel = journey && journey.isAir ? 'Nhiệt độ lô hàng lúc ở mặt đất (ước tính)'
+    : (journey && journey.isLand ? 'Nhiệt độ trong thùng xe (ước tính)' : 'Nhiệt độ trong container (ước tính)');
   html += `<div class="section-label"><span class="dot" style="background:var(--amber);box-shadow:0 0 8px var(--amber);"></span><h3>Dự đoán nhiệt độ theo hành trình</h3><small>Nguồn: khí hậu lịch sử Open-Meteo + ước tính chênh lệch ${cargoTerm}</small></div>`;
   if(climateError){
     html += `<div class="empty">${escapeHtml(climateError)}</div>`;
@@ -22331,7 +22430,7 @@ function renderLookupResults(ctx){
         <span><i style="background:#F2A65A"></i> Nhiệt độ ngoài trời (đỉnh/ngày)</span>
         <span><i style="background:#FF6E6E"></i> ${escapeHtml(cargoLineLabel)}</span>
         <span><i style="background:var(--safe);opacity:.5;"></i> Vùng ngưỡng bảo quản yêu cầu</span>
-        <span style="color:var(--amber)">┊ vạch cam = ${journey && journey.isAir ? 'sân bay đi/đến/trung chuyển' : 'cảng trung chuyển'}</span>
+        <span style="color:var(--amber)">┊ vạch cam = ${journey && journey.isAir ? 'sân bay đi/đến/trung chuyển' : (journey && journey.isLand ? 'điểm dừng/cửa khẩu' : 'cảng trung chuyển')}</span>
       </div>
     </div>
     <div class="journey-stats">
@@ -22343,7 +22442,9 @@ function renderLookupResults(ctx){
       <div class="journey-stat ${jStats.over35>0?'warn':''}"><b>${jStats.over35}/${jStats.totalDays+1}</b><span>Ngày &gt;35°C</span></div>
       <div class="journey-stat ${jStats.over40>0?'warn':''}"><b>${jStats.over40}/${jStats.totalDays+1}</b><span>Ngày &gt;40°C</span></div>
     </div>
-    ${journey.isAir
+    ${journey.isLand
+      ? `<div class="footnote">* Với LAND (chỉ áp dụng cho tuyến đi Lào và Campuchia): đường "ngoài trời" lấy nhiệt độ đỉnh trong ngày theo khí hậu lịch sử, nội suy dọc tuyến đường bộ (điểm đi → điểm dừng/cửa khẩu → điểm đến). Đường "trong thùng xe" = ngoài trời + độ chênh do thùng kín phơi nắng, **tự tăng theo mức nắng thật của từng ngày dừng đỗ** (mùa mát dưới 25°C: +5°C; chuyển mùa 25-33°C: +6°C; mùa nóng trên 33°C: +8°C). Mốc chia đặt cao hơn hàng biển/hàng air vì Lào và Campuchia chung nền nhiệt với Việt Nam, không có mùa đông lạnh thật — "mùa mát" ở đây vẫn 22-28°C. Lúc xe đang chạy thì chênh ít hơn (+4°C) nhờ gió lùa và chạy đêm. **Rủi ro lớn nhất của đường bộ là lúc đỗ chờ** — chờ thông quan ở cửa khẩu, nghỉ trưa, chờ giao hàng: xe tắt máy là tắt luôn hệ thống lạnh. Đây là ước tính kỹ thuật, không phải số đo thật — ưu tiên dùng data logger thực tế khi có.</div>`
+      : journey.isAir
       ? `<div class="footnote">* Với AIR: những ngày lô hàng thực sự nằm ở mặt đất (chờ ở sân bay đi/đến, hoặc trung chuyển) dùng nhiệt độ **đỉnh trong ngày** ngoài trời thật (phơi nắng trực tiếp trên bãi), cộng thêm độ chênh nhà kính **tự tăng theo mức nắng** (dưới 20°C: +2°C; 20-33°C: +3°C; trên 33°C nắng gắt: +5°C) — mức trần thấp hơn hàng biển vì hàng air chỉ nằm bãi vài giờ, không kín tuyệt đối như container. Những ngày còn lại (đang bay, hoặc nằm kho/thủ tục hải quan) dùng nhiệt độ **trung bình trong ngày** ngoài trời thật tại đúng vị trí trên hành trình (không phải số cố định — bay qua vùng nóng vẫn ra nhiệt độ cao hơn bay qua vùng ôn đới). Đây vẫn là ước tính kỹ thuật, không phải số đo thật — ưu tiên dùng data logger thực tế khi có.</div>`
       : `<div class="footnote">* Đường "ngoài trời" lấy nhiệt độ đỉnh trong ngày theo dữ liệu khí hậu lịch sử (nội suy dọc theo các điểm: cảng đi → cảng trung chuyển → cảng đến, năm gần nhất có đủ dữ liệu). Đường "trong container" = ngoài trời + độ chênh do hiệu ứng nhà kính khi container kín phơi nắng — độ chênh này **tự tăng theo cường độ nắng thật của từng ngày lưu bãi** (dưới 20°C ngoài trời: +3°C; 20-33°C: +7°C; trên 33°C nắng gắt: +11°C), lúc đang di chuyển có gió lùa thì chênh ít hơn (+5°C). Đây là ước tính kỹ thuật dựa theo hiệu ứng vật lý thường gặp, không phải số đo thật — ưu tiên dùng data logger thực tế khi có.</div>`}`;
   }else{
@@ -22374,11 +22475,72 @@ function renderLookupResults(ctx){
 
 /* ================= LIBRARY ================= */
 function transportModeLabel(m){
-  return {AIR:'✈ AIR', LCL:'📦 LCL', FCL_COLD:'❄ FCL Lạnh', FCL_STD:'🚛 FCL Thường'}[m] || '';
+  return {AIR:'✈ AIR', LAND:'🚛 LAND', LCL:'📦 LCL', FCL_COLD:'❄ FCL Lạnh', FCL_STD:'🚢 FCL Thường'}[m] || '';
 }
 function transportModeShort(m){
-  return {AIR:'AIR', LCL:'LCL', FCL_COLD:'FCL Lạnh', FCL_STD:'FCL Thường'}[m] || '';
+  return {AIR:'AIR', LAND:'LAND', LCL:'LCL', FCL_COLD:'FCL Lạnh', FCL_STD:'FCL Thường'}[m] || '';
 }
+
+/* ==========================================================================
+   DỰNG LẠI MỤC LỤC KHO DỮ LIỆU
+   Lô hàng được lưu thành HAI phần: nội dung đầy đủ ở collection coldroute_shared
+   (doc "shipment:<id>") và một dòng mục lục ở collection shipments_meta. Tab
+   "Kho dữ liệu" đọc mục lục. Nếu Firestore Rules thiếu quyền cho shipments_meta
+   thì phần ghi mục lục bị từ chối lặng lẽ ⇒ dữ liệu vẫn còn nguyên nhưng kho
+   trông như trống rỗng. Nút này quét lại coldroute_shared và dựng lại mục lục.
+   ========================================================================== */
+async function rebuildIndexFromShipments(){
+  if(!HAS_FIREBASE || !fsDb) throw new Error('Chỉ dùng được khi đang chạy với Firebase.');
+  const snap = await fsDb.collection(FS_COLLECTION).get();
+  let scanned = 0, restored = 0, failed = 0;
+  for(const doc of snap.docs){
+    if(!doc.id.startsWith('shipment:')) continue;   /* bỏ qua các key khác */
+    scanned++;
+    let rec = null;
+    try{
+      const raw = doc.data().value;
+      rec = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    }catch(e){ failed++; continue; }
+    if(!rec || !rec.id){ failed++; continue; }
+    const ok = await saveIndexEntry({
+      id: rec.id, fileName: rec.fileName,
+      origin: rec.origin, dest: rec.dest, destPort: rec.destPort,
+      originLat: rec.originLat, originLon: rec.originLon,
+      destLat: rec.destLat, destLon: rec.destLon,
+      drug: rec.drug, reqMin: rec.reqMin, reqMax: rec.reqMax,
+      deviceId: rec.deviceId, transportMode: rec.transportMode,
+      start: rec.start, stop: rec.stop,
+      min: rec.min, max: rec.max, avg: rec.avg,
+      months: rec.months, uploadedAt: rec.uploadedAt
+    });
+    if(ok) restored++; else failed++;
+  }
+  return { scanned, restored, failed };
+}
+
+document.getElementById('btn-rebuild-index').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btn-rebuild-index');
+  const old = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Đang quét…';
+  try{
+    const r = await rebuildIndexFromShipments();
+    await renderLibrary();
+    if(r.scanned === 0){
+      toast('Không tìm thấy lô nào trong kho gốc — có thể chưa lô nào lưu được lên Firebase.');
+    }else if(r.failed){
+      toast('Đã dựng lại ' + r.restored + '/' + r.scanned + ' lô. ' + r.failed + ' lô lỗi — mở F12 > Console xem chi tiết.');
+    }else{
+      toast('Đã dựng lại danh sách: ' + r.restored + ' lô.');
+    }
+  }catch(e){
+    console.error('rebuild index failed', e);
+    toast('Dựng lại thất bại: ' + (e.code || e.message) + '. Nhiều khả năng Firestore Rules chưa cho ghi collection "shipments_meta".');
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = old;
+  }
+});
 
 document.getElementById('btn-backup').addEventListener('click', async ()=>{
   const btn = document.getElementById('btn-backup');
@@ -22513,11 +22675,15 @@ window.openCountryGroup = async function(groupKey){
     }
     items = items.slice().sort((a,b)=> Math.abs(now-a.stop) - Math.abs(now-b.stop));
 
-    const seaItems = items.filter(r=>r.transportMode!=='AIR');
-    const airItems = items.filter(r=>r.transportMode==='AIR');
+    /* Trước đây gom "mọi thứ không phải AIR" vào đường biển — thêm LAND thì
+       lô đường bộ sẽ bị xếp nhầm vào mục đường biển, nên tách hẳn ra. */
+    const airItems  = items.filter(r=>r.transportMode==='AIR');
+    const landItems = items.filter(r=>r.transportMode==='LAND');
+    const seaItems  = items.filter(r=>r.transportMode!=='AIR' && r.transportMode!=='LAND');
 
     let html = sectionHtml('🚢 Đường biển (SEA)', 'var(--ice)', seaItems)
-             + sectionHtml('✈ Đường hàng không (AIR)', 'var(--amber)', airItems);
+             + sectionHtml('✈ Đường hàng không (AIR)', 'var(--amber)', airItems)
+             + sectionHtml('🚛 Đường bộ (LAND)', 'var(--safe)', landItems);
     if(!items.length){
       html = `<div class="empty" style="margin-top:18px;">Không có lô nào trong khoảng thời gian đã chọn.</div>`;
     }
@@ -22951,16 +23117,33 @@ function securityPanelHtml(){
                '<button class="btn btn-primary btn-sm" style="margin-top:8px;" ' +
                'onclick="document.getElementById(\'modal-bg\').classList.remove(\'active\'); requireAdminStepUp();">Bật ngay (quét QR)</button>';
     }else{
-      mfaDot = 'sec-warn';
-      mfaMsg = 'Không đọc được cấu hình 2FA từ Firestore — kiểm tra Rules cho collection "' + MFA_COLLECTION + '".';
+      mfaDot = 'sec-bad';
+      mfaMsg = 'Firestore TỪ CHỐI cho đọc collection "' + MFA_COLLECTION + '" ⇒ chưa bật 2FA được. ' +
+               'Vào Firebase Console > Firestore Database > Rules, kiểm tra có đúng khối này chưa rồi bấm Publish:' +
+               '<div style="font-family:var(--font-mono,monospace);font-size:11px;background:rgba(255,255,255,.05);' +
+               'border:1px solid var(--border-soft);border-radius:8px;padding:8px 10px;margin-top:8px;white-space:pre;overflow-x:auto;">' +
+               'match /' + escapeHtml(MFA_COLLECTION) + '/{uid} {\n' +
+               '  allow read, write: if request.auth != null\n' +
+               '    &amp;&amp; request.auth.uid == uid;\n' +
+               '}</div>';
     }
   }
   const mfaHtml = _secRow(mfaDot, '2FA cho tài khoản admin', mfaMsg);
 
-  const enforceDot = ac.ok ? 'sec-ok' : 'sec-warn';
-  const enforceMsg = ac.ok
-    ? 'An toàn để vào Firebase console > App Check > APIs, bấm Enforce cho Cloud Firestore và Firebase Authentication.'
-    : 'CHƯA nên bật Enforce — App Check đang lỗi, bật vào là app ngừng đăng nhập/lưu được.';
+  /* Ba trạng thái, không phải hai: chạy tốt · đang tắt có chủ ý · đang lỗi. */
+  let enforceDot, enforceMsg;
+  if(ac.ok){
+    enforceDot = 'sec-ok';
+    enforceMsg = 'ĐƯỢC. Vào Firebase console > App Check > APIs, bấm Enforce cho Cloud Firestore và Firebase Authentication.';
+  }else if(APPCHECK_MODE === 'off'){
+    enforceDot = 'sec-warn';
+    enforceMsg = 'KHÔNG. App Check đang tắt có chủ ý, nên Enforce sẽ chặn luôn chính app này — bật vào là ngừng đăng nhập/lưu được ngay. ' +
+                 'Muốn bật Enforce thì phải dựng lại App Check trước (tạo site key reCAPTCHA mới, đổi APPCHECK_MODE thành "auto"). ' +
+                 'Không bật Enforce cũng không sao: dữ liệu vẫn được Firestore Rules và 2FA bảo vệ.';
+  }else{
+    enforceDot = 'sec-bad';
+    enforceMsg = 'CHƯA. App Check đang lỗi (xem dòng trên), bật Enforce vào là app ngừng đăng nhập/lưu được.';
+  }
   const enforceHtml = _secRow(enforceDot, 'Có thể bật Enforce chưa?', enforceMsg);
 
   return '<button class="modal-close" onclick="document.getElementById(\'modal-bg\').classList.remove(\'active\')">✕</button>' +
