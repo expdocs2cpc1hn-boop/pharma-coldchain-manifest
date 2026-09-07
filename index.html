@@ -631,7 +631,7 @@ const APPCHECK_MODE = 'off';
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v14 · 2026-09-07 · gọn thanh đầu trang';
+const APP_VERSION = 'v16 · 2026-09-07 · lọc cả tên quốc gia theo loại hình';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 const HAS_FIREBASE = (typeof firebase !== 'undefined') && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
@@ -21605,6 +21605,29 @@ const LAND_CITIES = [
    bay ("... Apt", "... Airport", "... Ap"). Lọc bỏ khi hiển thị danh sách cảng
    biển để khỏi chọn nhầm. Ngoại lệ: "Macapa - Ap" — "Ap" ở đây là mã bang Amapá
    của Brazil chứ không phải airport, và Macapá là cảng sông/biển thật. */
+/* Danh sách gốc gắn "cảng biển" cho cả những nước KHÔNG GIÁP BIỂN — 502 mục ở 43
+   nước (Afghanistan 28, Nepal 44, Hungary 57, Bolivia 33...). Đó là lý do trước
+   đây chọn "Đường biển" vẫn ra được Gardez, Afghanistan — một tuyến không tồn tại.
+   Vài nước trong đây có cảng SÔNG thật (Hungary/Áo trên sông Danube, Paraguay/
+   Bolivia trên sông Paraná), nhưng hàng container đường biển từ Việt Nam thì
+   không bao giờ cập những chỗ đó — luôn phải qua một cảng biển rồi đi tiếp đường
+   bộ hoặc đường sắt. Nên bỏ hết khỏi danh sách cảng biển cho gọn và khỏi chọn nhầm.
+   Tên quốc gia vẫn chọn được bình thường (Afghanistan, Nepal... vẫn nằm trong
+   danh sách quốc gia), chỉ là không còn giả vờ có cảng biển nữa.
+   ⚠️ So khớp CHÍNH XÁC cả tên, không dùng "chứa chuỗi" — vì "Niger" (không giáp
+   biển) và "Nigeria" (có biển) chỉ khác nhau hai chữ cái. */
+const LANDLOCKED_COUNTRIES = {
+  'Afghanistan':1,'Andorra':1,'Armenia':1,'Austria':1,'Azerbaijan':1,'Belarus':1,
+  'Bhutan':1,'Bolivia':1,'Botswana':1,'Burkina Faso':1,'Burundi':1,
+  'Central African Republic':1,'Chad':1,'Czech Republic':1,'Czechia':1,
+  'Eswatini':1,'Swaziland':1,'Ethiopia':1,'Hungary':1,'Kazakhstan':1,'Kosovo':1,
+  'Kyrgyzstan':1,'Laos':1,'Lesotho':1,'Liechtenstein':1,'Luxembourg':1,'Malawi':1,
+  'Mali':1,'Moldova':1,'Mongolia':1,'Nepal':1,'Niger':1,'North Macedonia':1,
+  'Macedonia':1,'Paraguay':1,'Rwanda':1,'San Marino':1,'Serbia':1,'Slovakia':1,
+  'South Sudan':1,'Switzerland':1,'Tajikistan':1,'Turkmenistan':1,'Uganda':1,
+  'Uzbekistan':1,'Vatican City':1,'Zambia':1,'Zimbabwe':1,
+};
+
 const AIRPORTISH_RE = /\bApt\b|Airport|\bAp$/i;
 const AIRPORTISH_EXCEPTIONS = { 'Macapa - Ap, Brazil': 1 };
 function looksLikeAirportName(name){
@@ -21664,6 +21687,34 @@ WORLD_PORTS.forEach(p=>{ PORT_BY_NAME[p.name] = p; });
 /* Đăng ký sau WORLD_PORTS: nếu trùng tên thì bản đường bộ được ưu tiên. */
 LAND_CITIES.forEach(p=>{ PORT_BY_NAME[p.name] = p; });
 
+/* Một mục có được hiện trong danh sách của loại hình đang chọn hay không. */
+function portAllowedFor(p, portType){
+  if(p.country === 'Vietnam') return false;
+  if(portType && p.type !== portType) return false;
+  if(portType === 'sea'){
+    if(looksLikeAirportName(p.name)) return false;        /* sân bay bị gắn nhầm loại */
+    if(LANDLOCKED_COUNTRIES[p.country]) return false;     /* "cảng biển" ở nước không giáp biển */
+  }
+  return true;
+}
+/* Tên QUỐC GIA cũng phải lọc theo loại hình, chứ không chỉ lọc tên cảng: chọn
+   "Đường biển" mà vẫn gõ được "Afghanistan" thì vẫn ra tuyến vô lý y như cũ.
+   Quy tắc: một quốc gia chỉ xuất hiện nếu nó thực sự còn ít nhất MỘT địa điểm
+   hợp lệ của loại hình đó. Nước không giáp biển tự động biến mất khỏi danh sách
+   đường biển, và nước không có sân bay nào tự động biến mất khỏi đường hàng không.
+   Tính một lần rồi nhớ lại, vì danh sách gốc gần 20.000 mục. Bộ nhớ đệm gắn
+   thẳng vào hàm (không dùng const ở ngoài) để tránh lỗi "dùng trước khi khai
+   báo" — populatePortDatalist được gọi lần đầu ở phía TRÊN chỗ này. */
+function countriesForType(portType){
+  const cache = countriesForType._cache || (countriesForType._cache = Object.create(null));
+  const key = portType || '_all';
+  if(cache[key]) return cache[key];
+  const set = Object.create(null);
+  WORLD_PORTS.forEach(p=>{ if(portAllowedFor(p, portType)) set[p.country] = 1; });
+  cache[key] = set;
+  return set;
+}
+
 function populatePortDatalist(datalistEl, portType){
   datalistEl.innerHTML = '';
   const add = (value, label)=>{
@@ -21681,14 +21732,13 @@ function populatePortDatalist(datalistEl, portType){
   }
 
   WORLD_PORTS.forEach(p=>{
-    if(p.country === 'Vietnam') return;
-    if(portType && p.type !== portType) return;
-    /* danh sách cảng biển không nên chứa sân bay bị gắn nhầm loại */
-    if(portType === 'sea' && looksLikeAirportName(p.name)) return;
+    if(!portAllowedFor(p, portType)) return;
     add(p.name, p.type==='air' ? '✈' : '🚢');
   });
+  const allowedCountries = portType ? countriesForType(portType) : null;
   WORLD_COUNTRIES.forEach(c=>{
     if(c.name === 'Vietnam') return;
+    if(allowedCountries && !allowedCountries[c.name]) return;
     add(c.name);
   });
 }
