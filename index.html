@@ -303,6 +303,18 @@
     border-radius:10px;padding:14px;margin:10px 0;user-select:all;
   }
 
+  /* nút tròn nhỏ trên thanh đầu trang (tài khoản) */
+  .icon-btn{
+    margin-left:12px;width:34px;height:34px;flex:0 0 auto;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-size:15px;line-height:1;cursor:pointer;
+    background:var(--surface-3);color:var(--text-muted);
+    border:1px solid var(--border);border-radius:50%;
+    transition:border-color .15s, color .15s;
+  }
+  .icon-btn:hover{border-color:var(--accent,#5bd9e8);color:var(--text,#e8f4f8);}
+  .icon-btn.warn{border-color:var(--amber,#fbbf24);}
+
   /* ---- bảng trạng thái bảo mật ---- */
   .sec-row{
     display:flex;align-items:flex-start;gap:10px;
@@ -406,10 +418,11 @@
       </div>
       <div class="brand-text">
         <b>TUYẾN LẠNH</b>
-        <span id="sync-status">COLD‑CHAIN ROUTE ADVISOR</span>
+        <span id="sync-status" hidden></span>
       </div>
-      <button id="admin-login-btn" class="btn btn-ghost btn-sm" style="margin-left:14px;">🔒 Chưa đăng nhập</button>
-      <button id="security-btn" class="btn btn-ghost btn-sm" style="margin-left:8px;" title="Trạng thái App Check &amp; 2FA">🛡️ Bảo mật</button>
+      <!-- Gộp email + đăng xuất + bảng bảo mật vào một nút tròn nhỏ cho gọn thanh
+           đầu trang; bấm vào mới mở bảng chi tiết. -->
+      <button id="admin-login-btn" class="icon-btn" title="Tài khoản">👤</button>
     </div>
     <div class="tabs" id="tabs">
       <button class="tab-btn active" data-tab="lookup">
@@ -618,7 +631,7 @@ const APPCHECK_MODE = 'off';
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v13 · 2026-09-05 · LAND Lào-Campuchia + dựng lại kho';
+const APP_VERSION = 'v14 · 2026-09-07 · gọn thanh đầu trang';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 const HAS_FIREBASE = (typeof firebase !== 'undefined') && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
@@ -799,6 +812,7 @@ async function setupAppCheck(){
     console.error('[App Check] ' + appCheckState.message);
   }
   if(typeof updateSecurityPanel === 'function') updateSecurityPanel();
+  if(typeof updateAccountPanel === 'function') updateAccountPanel();
 }
 
 if(HAS_FIREBASE){
@@ -849,8 +863,10 @@ if(HAS_FIREBASE){
           updateAdminUI();
         }
         if(typeof updateSecurityPanel === 'function') updateSecurityPanel();
+  if(typeof updateAccountPanel === 'function') updateAccountPanel();
       });
       if(typeof updateSecurityPanel === 'function') updateSecurityPanel();
+  if(typeof updateAccountPanel === 'function') updateAccountPanel();
     })();
   }catch(e){ console.error('Firebase init failed', e); }
 }
@@ -21511,12 +21527,9 @@ function recommend(reqMin, reqMax, obsMin, obsMax){
 
 function verdictBlock(rec, obsMin, obsMax, reqMin, reqMax, sourceLabel){
   const reqTxt = `${reqMin!==null&&!isNaN(reqMin)?reqMin+'°C':'—'} ~ ${reqMax!==null&&!isNaN(reqMax)?reqMax+'°C':'—'}`;
-  if(rec.level==='unknown'){
-    return `<div class="verdict borderline">
-      <div class="verdict-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></div>
-      <div><h2>Chưa nhập ngưỡng bảo quản</h2><p>Nhập nhiệt độ bảo quản yêu cầu để nhận khuyến nghị container. Dưới đây vẫn là dữ liệu nhiệt độ thực tế trên tuyến (${sourceLabel}): thấp nhất ${fmt1(obsMin)}°C — cao nhất ${fmt1(obsMax)}°C.</p></div>
-    </div>`;
-  }
+  /* Chưa nhập ngưỡng bảo quản thì không hiện gì cả — biểu đồ và số liệu bên dưới
+     đã nói đủ, thêm một khối cảnh báo to nữa chỉ tổ rối mắt. */
+  if(rec.level==='unknown') return '';
   if(rec.level==='reefer'){
     const parts=[];
     if(rec.breachHigh) parts.push(`nhiệt độ cao nhất ghi nhận ${fmt1(obsMax)}°C vượt ngưỡng tối đa cho phép`);
@@ -22845,6 +22858,7 @@ function mfaGrant(uid){
   mfaHide();
   updateAdminUI();
   if(typeof updateSecurityPanel === 'function') updateSecurityPanel();
+  if(typeof updateAccountPanel === 'function') updateAccountPanel();
   toast('Đã xác thực — mở khoá quyền xoá trong 5 phút.');
   return true;
 }
@@ -23030,6 +23044,7 @@ async function loadMfaStatus(user){
     toast('Chưa có Firestore Rules cho "' + MFA_COLLECTION + '" — xem hướng dẫn.');
   }
   if(typeof updateSecurityPanel === 'function') updateSecurityPanel();
+  if(typeof updateAccountPanel === 'function') updateAccountPanel();
   return mfaEnrolled;
 }
 
@@ -23092,7 +23107,7 @@ function _secRow(dot, title, body){
   return '<div class="sec-row"><span class="sec-dot ' + dot + '"></span><div><b>' +
          escapeHtml(title) + '</b><div class="hint" style="margin-top:3px;">' + body + '</div></div></div>';
 }
-function securityPanelHtml(){
+function securityPanelHtml(embedded){
   const ac = appCheckState;
   const acDot  = ac.ok ? 'sec-ok' : (APPCHECK_MODE === 'off' ? 'sec-warn' : 'sec-bad');
   const acHtml = _secRow(acDot, 'App Check (chặn bot dội request)',
@@ -23146,8 +23161,10 @@ function securityPanelHtml(){
   }
   const enforceHtml = _secRow(enforceDot, 'Có thể bật Enforce chưa?', enforceMsg);
 
-  return '<button class="modal-close" onclick="document.getElementById(\'modal-bg\').classList.remove(\'active\')">✕</button>' +
-         '<h2 style="font-family:var(--font-display);margin:0 0 4px;">🛡️ Trạng thái bảo mật</h2>' +
+  return (embedded
+           ? '<div class="section-label"><span class="dot" style="background:var(--ice)"></span><h3>🛡️ Trạng thái bảo mật</h3></div>'
+           : '<button class="modal-close" onclick="document.getElementById(\'modal-bg\').classList.remove(\'active\')">✕</button>'
+             + '<h2 style="font-family:var(--font-display);margin:0 0 4px;">🛡️ Trạng thái bảo mật</h2>') +
          '<div class="hint" style="margin-bottom:4px;">Tên miền đang chạy: <b>' + escapeHtml(location.hostname || '(file cục bộ)') + '</b></div>' +
          '<div class="hint" style="margin-bottom:14px;">Phiên bản file đang chạy: <b style="color:var(--accent,#5bd9e8);">' + escapeHtml(APP_VERSION) + '</b></div>' +
          acHtml + mfaHtml + enforceHtml;
@@ -23171,21 +23188,49 @@ function updateAdminUI(){
   if(isLoggedIn){
     const email = (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.email : '';
     const isAdminAccount = email === ADMIN_EMAIL;
-    const badge = isAdminAccount ? (mfaEnrolled === false ? '⚠️ Admin (chưa bật 2FA)' : '🛡️ Admin') : '👤';
-    btn.textContent = badge + ' (' + email + ') · Đăng xuất';
-    btn.onclick = async ()=>{
-      mfaUnlockUntil = 0;
-      await fsAuth.signOut();
-      toast('Đã đăng xuất.');
-    };
+    const needsAttention = isAdminAccount && mfaEnrolled === false;
+    btn.textContent = isAdminAccount ? (needsAttention ? '⚠️' : '🛡️') : '👤';
+    btn.title = (isAdminAccount ? 'Admin' : 'Tài khoản') + ': ' + email;
+    btn.classList.toggle('warn', needsAttention);
+    btn.onclick = openAccountPanel;
   }else{
-    btn.textContent = '🔒 Chưa đăng nhập';
+    btn.textContent = '🔒';
+    btn.title = 'Chưa đăng nhập';
+    btn.classList.remove('warn');
     btn.onclick = null;
   }
-  const secBtn = document.getElementById('security-btn');
-  if(secBtn){
-    const ok = appCheckState.ok && mfaEnrolled !== false;
-    secBtn.textContent = (ok ? '🛡️' : '⚠️') + ' Bảo mật';
+}
+
+/* Bảng "Tài khoản": email, đăng xuất, và trạng thái bảo mật gộp chung — thay cho
+   hai nút to chiếm chỗ trên thanh đầu trang. */
+function openAccountPanel(){
+  const bg = document.getElementById('modal-bg');
+  bg.dataset.panel = 'account';
+  document.getElementById('modal-content').innerHTML = accountPanelHtml();
+  bg.classList.add('active');
+  const out = document.getElementById('acc-signout');
+  if(out) out.onclick = async ()=>{
+    bg.classList.remove('active');
+    mfaUnlockUntil = 0;
+    await fsAuth.signOut();
+    toast('Đã đăng xuất.');
+  };
+}
+function accountPanelHtml(){
+  const email = (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.email : '';
+  const isAdminAccount = email === ADMIN_EMAIL;
+  return '<button class="modal-close" onclick="document.getElementById(\'modal-bg\').classList.remove(\'active\')">✕</button>' +
+    '<h2 style="font-family:var(--font-display);margin:0 0 4px;">Tài khoản</h2>' +
+    '<div class="hint" style="margin-bottom:16px;">' + escapeHtml(email) +
+      (isAdminAccount ? ' · <b style="color:var(--accent,#5bd9e8);">Quản trị viên</b>' : ' · Tài khoản thường') + '</div>' +
+    '<button class="btn btn-ghost btn-sm" id="acc-signout">Đăng xuất</button>' +
+    '<div style="height:20px;"></div>' +
+    securityPanelHtml(true);
+}
+function updateAccountPanel(){
+  const bg = document.getElementById('modal-bg');
+  if(bg && bg.classList.contains('active') && bg.dataset.panel === 'account'){
+    openAccountPanel();
   }
 }
 
@@ -23287,18 +23332,13 @@ document.getElementById('modal-bg').addEventListener('click', e=>{
   if(e.target.id==='modal-bg') e.currentTarget.classList.remove('active');
 });
 
-document.getElementById('security-btn').addEventListener('click', openSecurityPanel);
-
 /* init */
 (function(){
-  const el = document.getElementById('sync-status');
+  /* Dòng trạng thái đồng bộ đã ẩn khỏi thanh đầu trang cho gọn — vẫn giữ phần
+     tử để không phải sửa chỗ khác, chỉ là không hiện ra nữa. */
   if(HAS_FIREBASE){
-    el.textContent = '🔗 ĐỒNG BỘ CHUNG (FIREBASE)';
-    el.style.color = 'var(--safe)';
     updateGate();
   }else{
-    el.textContent = '💾 LƯU CỤC BỘ (CHƯA DÙNG CHUNG)';
-    el.style.color = 'var(--amber)';
     document.getElementById('admin-login-btn').style.display = 'none';
   }
   updateAdminUI();
