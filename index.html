@@ -591,9 +591,32 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "240099162931",
   appId: "1:240099162931:web:58e3baaf05722b51049c46"
 };
-/* Email của tài khoản admin duy nhất được phép XOÁ dữ liệu.
-   Phải khớp đúng với email đặt trong Firestore Rules. */
-const ADMIN_EMAIL = "expdocs2.cpc1hn@gmail.com";
+/* ==========================================================================
+   TÀI KHOẢN QUẢN TRỊ
+   Các email được phép XOÁ dữ liệu và đặt lại mật khẩu. Có email thứ hai để
+   phòng trường hợp email chính gặp sự cố (mất tài khoản Google, khoá máy...).
+   ⚠️ Sửa ở đây thì PHẢI sửa cả Firestore Rules cho khớp, nếu không rules vẫn
+   chặn — rules mới là thứ có hiệu lực thật, code này chỉ điều khiển giao diện.
+   ⚠️ Email thứ hai cũng phải được tạo tài khoản thật trong
+   Firebase Console > Authentication > Users > Add user, nếu không thì không
+   đăng nhập được.
+   Mỗi admin có 2FA riêng của mình (khoá TOTP gắn theo uid), không dùng chung.
+   ========================================================================== */
+const ADMIN_EMAILS = [
+  "expdocs2.cpc1hn@gmail.com",
+  /* Thêm email quản trị dự phòng ở đây, VD:
+       "email-du-phong@gmail.com",
+     ⚠️ TUYỆT ĐỐI không để địa chỉ giả/placeholder: nếu tính năng tự đăng ký
+     trong Firebase Authentication còn bật, người lạ có thể tự tạo tài khoản
+     đúng địa chỉ đó và lập tức có quyền admin. */
+];
+/* Giữ tên cũ cho các chỗ chỉ cần một email làm nhãn mặc định. */
+const ADMIN_EMAIL = ADMIN_EMAILS[0];
+function isAdminEmail(email){
+  if(!email) return false;
+  const e = String(email).trim().toLowerCase();
+  return ADMIN_EMAILS.some(a => a.trim().toLowerCase() === e);
+}
 
 /* App Check — chặn bot/script tự động dội request vào Firebase (đăng nhập, Firestore).
    Khác với đăng nhập (xác minh NGƯỜI), App Check xác minh yêu cầu đến từ ĐÚNG trang web
@@ -631,7 +654,7 @@ const APPCHECK_MODE = 'off';
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v16 · 2026-09-07 · lọc cả tên quốc gia theo loại hình';
+const APP_VERSION = 'v21 · 2026-09-15 · gộp mọi lớp bảo vệ';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 const HAS_FIREBASE = (typeof firebase !== 'undefined') && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
@@ -851,7 +874,7 @@ if(HAS_FIREBASE){
         if(typeof mfaAbortFlow === 'function') mfaAbortFlow();
         /* Đăng nhập đúng email admin là thấy được nút xoá ngay. Mã 6 số chỉ được
            hỏi đúng lúc bấm xoá (step-up), xem requireAdminStepUp() bên dưới. */
-        isAdmin = !!user && user.email === ADMIN_EMAIL;
+        isAdmin = !!user && isAdminEmail(user.email);
         mfaUnlockUntil = 0;
         mfaEnrolled = null;
         updateAdminUI();
@@ -977,16 +1000,43 @@ async function safeDelete(key, shared=false){
    approach since that use case won't realistically reach thousands of entries. */
 const META_COLLECTION = 'shipments_meta';
 
-async function loadIndex(){
+/* ==========================================================================
+   ẨN THAY VÌ XOÁ — chống mất dữ liệu
+   Firestore Rules đặt allow delete: if false, nên KHÔNG AI xoá vĩnh viễn được
+   qua app hay qua API — kể cả tài khoản admin, kể cả người chiếm được tài khoản
+   đó. Nút "Xoá" trong app giờ chỉ gắn cờ hidden:true lên dòng mục lục: lô biến
+   khỏi mọi danh sách và khỏi phần tra cứu, nhưng dữ liệu vẫn nằm nguyên.
+   Bỏ ẩn lại được ngay trong app. Muốn xoá thật (để dọn dung lượng) thì vào
+   Firebase Console xoá tay — Console chạy bằng quyền quản trị nên không bị
+   rules chặn.
+   ========================================================================== */
+async function loadIndex(includeHidden){
+  let all;
   if(HAS_FIREBASE){
     try{
       const snap = await fsDb.collection(META_COLLECTION).get();
-      return snap.docs.map(d=>d.data());
+      all = snap.docs.map(d=>d.data());
     }catch(e){ console.error('loadIndex (firestore) failed', e); return []; }
+  }else{
+    const raw = await safeGet('shipment-index', false);
+    if(!raw) return [];
+    try{ all = JSON.parse(raw); }catch(e){ return []; }
   }
-  const raw = await safeGet('shipment-index', false);
-  if(!raw) return [];
-  try{ return JSON.parse(raw); }catch(e){ return []; }
+  return includeHidden ? all : all.filter(r=>!r.hidden);
+}
+/* Gắn/bỏ cờ ẩn. Đây là thao tác GHI ĐÈ (update), rules vẫn cho phép — chỉ có
+   xoá thật mới bị cấm. Trả về true nếu máy chủ nhận. */
+async function setShipmentHidden(id, hidden){
+  const all = await loadIndex(true);
+  const meta = all.find(r=>r.id === id);
+  if(!meta){ console.error('setShipmentHidden: không thấy lô', id); return false; }
+  const updated = Object.assign({}, meta, {
+    hidden: !!hidden,
+    hiddenAt: hidden ? Date.now() : null,
+    hiddenBy: hidden ? ((fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.email : '') : null
+  });
+  const ok = await saveIndexEntry(updated);
+  return ok !== null;
 }
 async function saveIndexEntry(meta){
   if(HAS_FIREBASE){
@@ -21183,15 +21233,34 @@ function lookupKnownPort(name){
   return best ? {lat:best.lat, lon:best.lon, label:best.label} : null;
 }
 
+/* Trả về toạ độ, hoặc null khi dịch vụ trả lời "không có địa danh này".
+   NÉM LỖI khi gọi hỏng (mất mạng, bị chặn, dính giới hạn tần suất 429, máy chủ
+   lỗi 5xx) — để phân biệt được "không tìm thấy" với "không hỏi được".
+   Bản trước không kiểm tra res.ok, nên 429/5xx cũng ra null y như không tìm thấy,
+   và người dùng luôn thấy đúng một câu "chưa xác định được toạ độ" dù nguyên nhân
+   hoàn toàn khác nhau — dẫn tới đi sửa nhầm chỗ (tưởng sai tên cảng). */
 async function geocodeRaw(name){
   const url = 'https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(name.trim()) + '&count=1&format=json';
-  const res = await fetch(url);
-  const data = await res.json();
+  let res;
+  try{
+    res = await fetch(url);
+  }catch(e){
+    const err = new Error('network'); err.kind = 'network'; throw err;
+  }
+  if(!res.ok){
+    const err = new Error('http ' + res.status);
+    err.kind = (res.status === 429) ? 'ratelimit' : 'server';
+    err.status = res.status;
+    throw err;
+  }
+  let data;
+  try{ data = await res.json(); }
+  catch(e){ const err = new Error('bad json'); err.kind = 'server'; throw err; }
   if(data && data.results && data.results.length){
     const r = data.results[0];
     return { lat:r.latitude, lon:r.longitude, label:[r.name,r.admin1,r.country].filter(Boolean).join(', ') };
   }
-  return null;
+  return null;   /* dịch vụ chạy tốt, chỉ là không có địa danh này */
 }
 async function geocode(name){
   if(!name || !name.trim()) return null;
@@ -21202,22 +21271,60 @@ async function geocode(name){
   const cached = await safeGet(cacheKey, false);
   if(cached){ try{ return JSON.parse(cached); }catch(e){} }
 
-  try{
-    // Open-Meteo requires the part after a comma (country/admin) to match EXACTLY.
-    // "Hải Phòng, Việt Nam" fails because "Việt Nam" isn't the indexed English form,
-    // even though "Hải Phòng" alone matches fine (name matching is diacritic-insensitive).
-    let out = await geocodeRaw(name);
-    if(!out && name.includes(',')){
-      const firstPart = name.split(',')[0].trim();
-      if(firstPart) out = await geocodeRaw(firstPart);
+  /* Open-Meteo requires the part after a comma (country/admin) to match EXACTLY.
+     "Hải Phòng, Việt Nam" fails because "Việt Nam" isn't the indexed English form,
+     even though "Hải Phòng" alone matches fine (name matching is diacritic-insensitive).
+     Thử lần lượt: nguyên chuỗi → bỏ phần sau dấu phẩy → bỏ dấu tiếng Việt. */
+  const attempts = [name];
+  if(name.includes(',')){
+    const firstPart = name.split(',')[0].trim();
+    if(firstPart) attempts.push(firstPart);
+  }
+  const stripped = norm(name).split(',')[0].trim();
+  if(stripped && attempts.indexOf(stripped) < 0) attempts.push(stripped);
+
+  let hardError = null;
+  for(const q of attempts){
+    try{
+      const out = await geocodeRaw(q);
+      if(out){
+        try{ await safeSet(cacheKey, JSON.stringify(out), false); }catch(e){}
+        geocode.lastFailure = null;
+        return out;
+      }
+    }catch(e){
+      hardError = e;                       /* nhớ lỗi nặng nhất gặp phải */
+      if(e.kind === 'ratelimit'){
+        /* dính giới hạn tần suất: chờ một nhịp rồi thử lại đúng truy vấn đó */
+        await new Promise(r=>setTimeout(r, 1200));
+        try{
+          const out = await geocodeRaw(q);
+          if(out){
+            try{ await safeSet(cacheKey, JSON.stringify(out), false); }catch(e2){}
+            geocode.lastFailure = null;
+            return out;
+          }
+        }catch(e2){ hardError = e2; }
+      }
     }
-    if(!out){
-      const stripped = norm(name).split(',')[0].trim();
-      if(stripped && stripped !== norm(name)) out = await geocodeRaw(stripped);
-    }
-    if(out) await safeSet(cacheKey, JSON.stringify(out), false);
-    return out;
-  }catch(e){ console.error('geocode failed', e); return null; }
+  }
+  /* Ghi lại vì sao hỏng để phần hiển thị nói đúng nguyên nhân, thay vì đổ hết
+     cho "sai tên cảng". */
+  geocode.lastFailure = hardError
+    ? { kind: hardError.kind, name: name }
+    : { kind: 'notfound', name: name };
+  console.error('[geocode] thất bại:', name, geocode.lastFailure);
+  return null;
+}
+/* Diễn giải nguyên nhân thành câu tiếng Việt nói rõ phải làm gì. */
+function geocodeErrorMessage(){
+  const f = geocode.lastFailure;
+  const who = f && f.name ? '"' + f.name + '"' : 'điểm đến';
+  if(!f) return 'Không định vị được toạ độ cho tuyến này.';
+  if(f.kind === 'network')   return 'Không kết nối được tới dịch vụ bản đồ (Open-Meteo) để tra toạ độ ' + who + '. Kiểm tra mạng, hoặc mạng công ty đang chặn — thử lại sau ít phút.';
+  if(f.kind === 'ratelimit') return 'Dịch vụ bản đồ đang giới hạn số lượt tra cứu (tra quá nhiều trong thời gian ngắn). Chờ khoảng 1 phút rồi bấm "Tìm khuyến nghị" lại.';
+  if(f.kind === 'server')    return 'Dịch vụ bản đồ (Open-Meteo) đang lỗi tạm thời khi tra ' + who + '. Thử lại sau ít phút.';
+  return 'Không tìm thấy ' + who + ' trong dữ liệu bản đồ — đây thường là địa danh quá nhỏ. Thử gõ một thành phố lớn gần đó (VD: thay cảng nhỏ bằng thành phố cảng chính của nước đó), hoặc chọn tên quốc gia.';
 }
 
 function pickYearForMonth(month){
@@ -22370,7 +22477,7 @@ async function runLookup(){
 
       journey = { waypoints, dayDates, ambientMax, ambientMin, containerMax, containerMin, totalDays, isAir, isLand };
     }else if(!og || !ds){
-      climateError = 'Không định vị được toạ độ cho tuyến này. Hãy chọn lại quốc gia đến.';
+      climateError = geocodeErrorMessage();
     }
 
     renderLookupResults({origin, dest, month, days, drug, reqMin, reqMax, exact, reference, journey, climateError, og, ds});
@@ -22420,8 +22527,14 @@ function renderLookupResults(ctx){
       : (journey.isLand ? 'dự đoán nhiệt độ trong thùng xe theo hành trình' : 'dự đoán nhiệt độ trong container theo hành trình');
     bannerHtml = verdictBlock(rec, jStats.contMin, jStats.contMax, reqMin, reqMax, sourceLabel + ' (chưa có data logger thực tế trùng khớp)');
   }
-  if(!bannerHtml){
-    bannerHtml = `<div class="verdict borderline"><div class="verdict-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></div><div><h2>Chưa đủ dữ liệu để khuyến nghị</h2><p>${climateError || 'Chưa có data logger phù hợp và chưa xác định được toạ độ khí hậu. Hãy kiểm tra lại tên cảng hoặc chọn tháng khởi hành.'}</p></div></div>`;
+  /* CHỈ báo "chưa đủ dữ liệu" khi THẬT SỰ không có gì: không có lô logger nào
+     khớp VÀ cũng không dựng được ước tính theo khí hậu.
+     Trước đây chỉ xét bannerHtml rỗng — mà từ v14, chưa nhập ngưỡng bảo quản thì
+     verdictBlock cố tình trả về chuỗi rỗng, nên rơi thẳng vào nhánh này và báo
+     "chưa xác định được toạ độ khí hậu" dù toạ độ hoàn toàn bình thường và biểu
+     đồ bên dưới vẫn vẽ đủ. Báo sai chỗ, dẫn tới đi sửa nhầm tên cảng. */
+  if(!bannerHtml && !exact.length && !jStats){
+    bannerHtml = `<div class="verdict borderline"><div class="verdict-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></div><div><h2>Chưa đủ dữ liệu để khuyến nghị</h2><p>${climateError || 'Chưa có data logger phù hợp và chưa dựng được ước tính khí hậu cho tuyến này. Kiểm tra lại tên cảng đến và ngày đi/ngày đến.'}</p></div></div>`;
   }
   html += bannerHtml;
 
@@ -22644,11 +22757,37 @@ document.getElementById('btn-backup').addEventListener('click', async ()=>{
   }
 });
 
+/* Khu "lô đã ẩn" — dựng riêng, gắn vào cuối tab Kho dữ liệu. */
+async function hiddenSectionHtml(){
+  const all = await loadIndex(true);
+  const hidden = all.filter(r=>r.hidden);
+  if(!hidden.length) return '';
+  hidden.sort((a,b)=>(b.hiddenAt||0)-(a.hiddenAt||0));
+  const rows = hidden.map(r=>{
+    const when = r.hiddenAt ? new Date(r.hiddenAt).toLocaleDateString('vi-VN') : '';
+    return `<div class="sec-row">
+      <span class="sec-dot sec-warn"></span>
+      <div style="flex:1;">
+        <b>${escapeHtml(r.dest || 'Không rõ')}</b>
+        <div class="hint" style="margin-top:3px;">${escapeHtml(r.fileName || '')}${when ? ' · ẩn ngày ' + when : ''}${r.hiddenBy ? ' · bởi ' + escapeHtml(r.hiddenBy) : ''}</div>
+      </div>
+      ${isAdmin ? `<button class="btn btn-ghost btn-sm" onclick="unhideShipment('${r.id}')">Bỏ ẩn</button>` : ''}
+    </div>`;
+  }).join('');
+  return `<details style="margin-top:26px;">
+    <summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">
+      ${hidden.length} lô đã ẩn — dữ liệu vẫn còn nguyên, bấm để xem
+    </summary>
+    <div style="margin-top:10px;">${rows}</div>
+  </details>`;
+}
+
 async function renderLibrary(){
   const el = document.getElementById('library-list');
   const idx = await loadIndex();
   if(!idx.length){
-    el.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg><div>Chưa có dữ liệu nào. Sang tab "Tải lên dữ liệu" để bắt đầu.</div></div>`;
+    el.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg><div>Chưa có dữ liệu nào. Sang tab "Tải lên dữ liệu" để bắt đầu.</div></div>`
+      + await hiddenSectionHtml();
     return;
   }
 
@@ -22681,7 +22820,7 @@ async function renderLibrary(){
         <button class="btn btn-ghost btn-sm">Xem tất cả lô →</button>
       </div>
     </div>`;
-  }).join('') + `</div>`;
+  }).join('') + `</div>` + await hiddenSectionHtml();
 }
 
 window.openCountryGroup = async function(groupKey){
@@ -22709,7 +22848,7 @@ window.openCountryGroup = async function(groupKey){
       </div>
       <div class="lib-foot" style="margin-top:8px;">
         <button class="btn btn-ghost btn-sm" onclick="openDetail('${r.id}')">Xem chi tiết &amp; biểu đồ</button>
-        ${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="removeShipmentFromGroup('${r.id}','${groupKey.replace(/'/g,"\\'")}')">Xoá</button>` : ''}
+        ${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="removeShipmentFromGroup('${r.id}','${groupKey.replace(/'/g,"\\'")}')">Ẩn</button>` : ''}
       </div>
     </div>`;
   }
@@ -22771,15 +22910,15 @@ window.openCountryGroup = async function(groupKey){
   render();
 };
 window.removeShipmentFromGroup = async function(id, groupKey){
-  if(!isAdmin){ toast('Chỉ tài khoản admin mới xoá được. Bấm "Đăng nhập admin" ở góc trên trước.'); return; }
-  if(!confirm('Xoá lô dữ liệu này khỏi kho? Không thể hoàn tác.')) return;
+  if(!isAdmin){ toast('Chỉ tài khoản admin mới ẩn được. Đăng nhập bằng tài khoản admin trước.'); return; }
+  if(!confirm('Ẩn lô này khỏi kho dữ liệu?\n\nDữ liệu KHÔNG bị xoá — vẫn nằm nguyên trên máy chủ và bỏ ẩn lại được bất cứ lúc nào.')) return;
   if(!await requireAdminStepUp()) return;
-  if(!await deleteShipment(id)){
-    toast('XOÁ KHÔNG THÀNH CÔNG — máy chủ từ chối. Dữ liệu vẫn còn. Mở F12 > Console xem lỗi.');
+  if(!await setShipmentHidden(id, true)){
+    toast('ẨN KHÔNG THÀNH CÔNG — máy chủ từ chối. Mở F12 > Console xem lỗi.');
     renderLibrary();
     return;
   }
-  toast('Đã xoá.');
+  toast('Đã ẩn. Dữ liệu vẫn còn, bỏ ẩn lại được ở tab Kho dữ liệu.');
   renderLibrary();
   const idx = await loadIndex();
   const remaining = idx.some(r=>norm(r.dest||'khac')===groupKey);
@@ -22897,7 +23036,7 @@ function mfaGrant(uid){
   const u = fsAuth && fsAuth.currentUser;
   /* Phiên có thể đã đổi trong lúc màn hình 2FA đang mở — không cấp quyền cho
      tài khoản khác với tài khoản đã bắt đầu luồng này. */
-  if(!u || u.uid !== uid || u.email !== ADMIN_EMAIL){
+  if(!u || u.uid !== uid || !isAdminEmail(u.email)){
     mfaHide();
     toast('Phiên đăng nhập đã thay đổi — hãy đăng nhập lại rồi thử lại.');
     return false;
@@ -23111,7 +23250,7 @@ let mfaPending = null;
 async function requireAdminStepUp(){
   if(!HAS_FIREBASE) return true;                       /* chế độ lưu cục bộ, không có Firebase */
   const user = fsAuth && fsAuth.currentUser;
-  if(!user || user.email !== ADMIN_EMAIL){
+  if(!user || !isAdminEmail(user.email)){
     toast('Chỉ tài khoản admin mới xoá được.');
     return false;
   }
@@ -23167,7 +23306,7 @@ function securityPanelHtml(embedded){
   let mfaDot = 'sec-warn', mfaMsg = 'Chưa đăng nhập bằng tài khoản admin.';
   if(isLoggedIn && fsAuth && fsAuth.currentUser){
     const u = fsAuth.currentUser;
-    if(u.email !== ADMIN_EMAIL){
+    if(!isAdminEmail(u.email)){
       mfaDot = 'sec-ok';
       mfaMsg = 'Tài khoản thường — không có quyền xoá nên không cần 2FA.';
     }else if(mfaEnrolled === true){
@@ -23237,7 +23376,7 @@ function updateAdminUI(){
   if(!btn) return;
   if(isLoggedIn){
     const email = (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.email : '';
-    const isAdminAccount = email === ADMIN_EMAIL;
+    const isAdminAccount = isAdminEmail(email);
     const needsAttention = isAdminAccount && mfaEnrolled === false;
     btn.textContent = isAdminAccount ? (needsAttention ? '⚠️' : '🛡️') : '👤';
     btn.title = (isAdminAccount ? 'Admin' : 'Tài khoản') + ': ' + email;
@@ -23268,7 +23407,7 @@ function openAccountPanel(){
 }
 function accountPanelHtml(){
   const email = (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.email : '';
-  const isAdminAccount = email === ADMIN_EMAIL;
+  const isAdminAccount = isAdminEmail(email);
   return '<button class="modal-close" onclick="document.getElementById(\'modal-bg\').classList.remove(\'active\')">✕</button>' +
     '<h2 style="font-family:var(--font-display);margin:0 0 4px;">Tài khoản</h2>' +
     '<div class="hint" style="margin-bottom:16px;">' + escapeHtml(email) +
@@ -23335,13 +23474,25 @@ document.getElementById('gate-pass').addEventListener('keydown', e=>{
 });
 
 window.removeShipment = async function(id){
-  if(HAS_FIREBASE && !isAdmin){ toast('Chỉ tài khoản admin mới xoá được.'); return; }
-  if(!confirm('Xoá lô dữ liệu này khỏi kho? Không thể hoàn tác.')) return;
+  if(HAS_FIREBASE && !isAdmin){ toast('Chỉ tài khoản admin mới ẩn được.'); return; }
+  if(!confirm('Ẩn lô này khỏi kho dữ liệu?\n\nDữ liệu KHÔNG bị xoá — vẫn nằm nguyên trên máy chủ và bỏ ẩn lại được bất cứ lúc nào.')) return;
   if(!await requireAdminStepUp()) return;
-  if(!await deleteShipment(id)){
-    toast('XOÁ KHÔNG THÀNH CÔNG — máy chủ từ chối. Dữ liệu vẫn còn. Mở F12 > Console xem lỗi.');
+  if(!await setShipmentHidden(id, true)){
+    toast('ẨN KHÔNG THÀNH CÔNG — máy chủ từ chối. Mở F12 > Console xem lỗi.');
   }else{
-    toast('Đã xoá.');
+    toast('Đã ẩn. Dữ liệu vẫn còn, bỏ ẩn lại được ở tab Kho dữ liệu.');
+  }
+  renderLibrary();
+};
+
+/* Bỏ ẩn — chỉ admin, nhưng không cần mã 2FA vì đây là thao tác KHÔI PHỤC,
+   không phá gì cả. */
+window.unhideShipment = async function(id){
+  if(HAS_FIREBASE && !isAdmin){ toast('Chỉ tài khoản admin mới bỏ ẩn được.'); return; }
+  if(!await setShipmentHidden(id, false)){
+    toast('Bỏ ẩn không thành công — mở F12 > Console xem lỗi.');
+  }else{
+    toast('Đã bỏ ẩn, lô quay lại kho dữ liệu.');
   }
   renderLibrary();
 };
