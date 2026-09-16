@@ -13,24 +13,27 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script>
 <style>
   :root{
-    --bg:#0A1420;
-    --surface:#0F1B2C;
-    --surface-2:#152238;
-    --surface-3:#1B2C46;
-    --border:#243652;
-    --border-soft:#1B2A42;
-    --text:#E7ECF3;
-    --text-muted:#8CA0BC;
-    --text-dim:#5D7290;
-    --ice:#5BD9E8;
-    --ice-dim:#2C8FA0;
-    --ice-glow:rgba(91,217,232,.15);
-    --amber:#F2A65A;
-    --danger:#FF6E6E;
-    --danger-dim:rgba(255,110,110,.12);
-    --safe:#67D99A;
-    --safe-dim:rgba(103,217,154,.12);
-    --warn-dim:rgba(242,166,90,.12);
+    /* Giao diện NỀN SÁNG. Màu chữ và viền chọn theo độ tương phản đọc được trên
+       nền trắng (chữ chính ~14:1, chữ phụ ~5:1). Mấy màu nhấn phải đậm hơn hẳn
+       bản nền tối — xanh/cam/đỏ kiểu neon sáng lên nền trắng là không đọc nổi. */
+    --bg:#F4F7FA;
+    --surface:#FFFFFF;
+    --surface-2:#FFFFFF;
+    --surface-3:#EDF1F7;
+    --border:#CFD9E6;
+    --border-soft:#E3E9F1;
+    --text:#16202E;
+    --text-muted:#54637A;
+    --text-dim:#7C8B9F;
+    --ice:#0E8296;
+    --ice-dim:#0B6678;
+    --ice-glow:rgba(14,130,150,.12);
+    --amber:#B4711A;
+    --danger:#C93636;
+    --danger-dim:rgba(201,54,54,.10);
+    --safe:#15804A;
+    --safe-dim:rgba(21,128,74,.10);
+    --warn-dim:rgba(180,113,26,.10);
     --radius:14px;
     --radius-sm:9px;
     --font-display:'Space Grotesk',sans-serif;
@@ -41,15 +44,15 @@
   html,body{margin:0;padding:0;}
   body{
     background:
-      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(91,217,232,.08), transparent 60%),
-      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(242,166,90,.05), transparent 55%),
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(14,130,150,.06), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(180,113,26,.04), transparent 55%),
       var(--bg);
     color:var(--text);
     font-family:var(--font-body);
     min-height:100vh;
     -webkit-font-smoothing:antialiased;
   }
-  ::selection{background:var(--ice);color:#04202a;}
+  ::selection{background:rgba(14,130,150,.22);color:var(--text);}
   a{color:var(--ice);}
   button{font-family:inherit;cursor:pointer;}
   input,select,textarea{font-family:inherit;}
@@ -60,7 +63,7 @@
   /* ---------- Header ---------- */
   .topbar{
     position:sticky;top:0;z-index:40;
-    background:rgba(10,20,32,.85);
+    background:rgba(255,255,255,.88);
     backdrop-filter:blur(10px);
     border-bottom:1px solid var(--border-soft);
   }
@@ -73,7 +76,7 @@
     width:38px;height:38px;border-radius:10px;
     background:linear-gradient(135deg,var(--ice) 0%, var(--ice-dim) 55%, #1c5c68 100%);
     display:flex;align-items:center;justify-content:center;
-    box-shadow:0 0 0 1px rgba(91,217,232,.25), 0 4px 18px -4px rgba(91,217,232,.5);
+    box-shadow:0 0 0 1px rgba(14,130,150,.25), 0 4px 14px -6px rgba(14,130,150,.45);
     flex-shrink:0;
   }
   .brand-mark svg{width:20px;height:20px;}
@@ -126,12 +129,12 @@
     padding:11px 20px;border-radius:9px;border:1px solid transparent;
     font-size:14px;font-weight:600;transition:.15s;
   }
-  .btn-primary{background:linear-gradient(180deg,#6EE3F0,var(--ice-dim));color:#04222b;box-shadow:0 4px 14px -4px rgba(91,217,232,.5);}
+  .btn-primary{background:linear-gradient(180deg,#128FA6,var(--ice-dim));color:#fff;box-shadow:0 4px 12px -5px rgba(14,130,150,.55);}
   .btn-primary:hover{filter:brightness(1.08);}
   .btn-primary:disabled{opacity:.5;cursor:not-allowed;filter:none;}
   .btn-ghost{background:var(--surface-3);color:var(--text);border-color:var(--border);}
   .btn-ghost:hover{border-color:var(--ice-dim);}
-  .btn-danger{background:transparent;color:var(--danger);border-color:rgba(255,110,110,.35);}
+  .btn-danger{background:transparent;color:var(--danger);border-color:rgba(201,54,54,.4);}
   .btn-danger:hover{background:var(--danger-dim);}
   .btn-sm{padding:7px 13px;font-size:12.5px;}
   .btn-block{width:100%;}
@@ -174,10 +177,10 @@
     border-radius:var(--radius);padding:22px 24px;border:1px solid;
     display:flex;align-items:center;gap:18px;margin-bottom:22px;
   }
-  .verdict.reefer{background:var(--danger-dim);border-color:rgba(255,110,110,.3);}
-  .verdict.standard{background:var(--safe-dim);border-color:rgba(103,217,154,.3);}
-  .verdict.borderline{background:var(--warn-dim);border-color:rgba(242,166,90,.3);}
-  .verdict-icon{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(255,255,255,.06);}
+  .verdict.reefer{background:var(--danger-dim);border-color:rgba(201,54,54,.35);}
+  .verdict.standard{background:var(--safe-dim);border-color:rgba(21,128,74,.35);}
+  .verdict.borderline{background:var(--warn-dim);border-color:rgba(180,113,26,.35);}
+  .verdict-icon{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(22,32,46,.05);}
   .verdict-icon svg{width:24px;height:24px;}
   .verdict h2{font-family:var(--font-display);font-size:20px;margin:0 0 4px;}
   .verdict p{margin:0;font-size:13.5px;color:var(--text-muted);line-height:1.5;}
@@ -233,7 +236,7 @@
   .preset-btn:hover{border-color:var(--ice-dim);color:var(--text);}
   .preset-btn.active{background:var(--ice-glow);border-color:var(--ice-dim);color:var(--ice);}
 
-  .spinner{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.25);border-top-color:currentColor;animation:spin .7s linear infinite;display:inline-block;}
+  .spinner{width:14px;height:14px;border-radius:50%;border:2px solid rgba(22,32,46,.32);border-top-color:currentColor;animation:spin .7s linear infinite;display:inline-block;}
   @keyframes spin{to{transform:rotate(360deg);}}
 
   .transit-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;}
@@ -259,7 +262,7 @@
     position:fixed;inset:0;z-index:500;display:none;
     align-items:center;justify-content:center;padding:20px;
     background:
-      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(91,217,232,.10), transparent 60%),
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(14,130,150,.07), transparent 60%),
       var(--bg);
   }
   .login-gate.active{display:flex;}
@@ -277,17 +280,17 @@
     width:100%;text-align:center;letter-spacing:.42em;
     font-family:var(--font-mono, ui-monospace, monospace);
     font-size:24px;padding:12px 10px;
-    background:rgba(255,255,255,.06);
-    color:var(--text, #e8f4f8);
+    background:rgba(22,32,46,.05);
+    color:var(--text, #16202E);
     border:1px solid var(--border-soft);border-radius:10px;
     outline:none;
   }
-  .mfa-code-input:focus{border-color:var(--accent, #5bd9e8);}
-  .mfa-code-input::placeholder{color:rgba(255,255,255,.25);}
+  .mfa-code-input:focus{border-color:var(--ice);}
+  .mfa-code-input::placeholder{color:rgba(22,32,46,.32);}
   .mfa-secret{
     font-family:var(--font-mono, ui-monospace, monospace);
     font-size:14px;letter-spacing:.08em;word-break:break-all;
-    background:rgba(255,255,255,.05);border:1px solid var(--border-soft);
+    background:rgba(22,32,46,.04);border:1px solid var(--border-soft);
     border-radius:8px;padding:10px 12px;margin:8px 0 4px;user-select:all;
   }
   .mfa-qr{
@@ -298,8 +301,8 @@
   .mfa-step.active{display:block;}
   .mfa-recovery{
     font-family:var(--font-mono, ui-monospace, monospace);font-size:18px;
-    letter-spacing:.12em;text-align:center;color:var(--amber, #fbbf24);
-    background:rgba(251,191,36,.10);border:1px dashed rgba(251,191,36,.5);
+    letter-spacing:.12em;text-align:center;color:var(--amber);
+    background:rgba(180,113,26,.10);border:1px dashed rgba(180,113,26,.5);
     border-radius:10px;padding:14px;margin:10px 0;user-select:all;
   }
 
@@ -312,7 +315,7 @@
     border:1px solid var(--border);border-radius:50%;
     transition:border-color .15s, color .15s;
   }
-  .icon-btn:hover{border-color:var(--accent,#5bd9e8);color:var(--text,#e8f4f8);}
+  .icon-btn:hover{border-color:var(--ice);color:var(--text);}
   .icon-btn.warn{border-color:var(--amber,#fbbf24);}
 
   /* ---- bảng trạng thái bảo mật ---- */
@@ -322,9 +325,9 @@
   }
   .sec-row:last-child{border-bottom:0;}
   .sec-dot{flex:0 0 auto;width:9px;height:9px;border-radius:50%;margin-top:6px;}
-  .sec-ok{background:var(--safe,#22c55e);}
-  .sec-warn{background:var(--amber,#fbbf24);}
-  .sec-bad{background:var(--danger,#ef4444);}
+  .sec-ok{background:var(--safe);}
+  .sec-warn{background:var(--amber);}
+  .sec-bad{background:var(--danger);}
 </style>
 </head>
 <body>
@@ -456,7 +459,11 @@
           <button type="button" class="preset-btn" data-mode="AIR">✈ Đường hàng không (AIR)</button>
           <button type="button" class="preset-btn" data-mode="LAND">🚛 Đường bộ (LAND)</button>
         </div>
-        <div class="hint">Nhiệt độ trong container tàu biển, khoang hàng máy bay và thùng xe tải khác nhau nhiều — chọn đúng để ước tính chính xác hơn.</div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Cảng đi (cảng xếp)</label>
+        <input type="text" id="lk-origin" list="lk-origin-datalist" placeholder="VD: Hải Phòng">
       </div>
 
       <div class="field">
@@ -477,7 +484,6 @@
 
       <div class="field">
         <label class="field-label">Cảng trung chuyển (transit) — tuỳ chọn</label>
-        <div class="hint" style="margin-bottom:10px;">Thêm các cảng tàu ghé/chuyển tải giữa đường, VD Cái Mép trước khi qua Campuchia. Khu vực này thường là nơi container lưu bãi lâu, dễ bị nóng nhất. Để trống "Ngày thứ mấy" — app sẽ tự ước tính dựa theo khoảng cách địa lý thật (không cần biết chính xác lịch tàu).</div>
         <div id="transit-list"></div>
         <button type="button" class="btn btn-ghost btn-sm" id="btn-add-transit" style="margin-top:4px;">+ Thêm cảng trung chuyển</button>
       </div>
@@ -530,6 +536,7 @@
 <div class="toast" id="toast"></div>
 <datalist id="country-datalist"></datalist>
 <datalist id="lk-port-datalist"></datalist>
+<datalist id="lk-origin-datalist"></datalist>
 
 <script>
 /* =========================================================================
@@ -654,7 +661,7 @@ const APPCHECK_MODE = 'off';
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v21 · 2026-09-15 · gộp mọi lớp bảo vệ';
+const APP_VERSION = 'v26 · 2026-09-16 · nền sáng, bỏ chú thích';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 const HAS_FIREBASE = (typeof firebase !== 'undefined') && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
@@ -21521,10 +21528,10 @@ function drawLoggerLineChart(canvas, points){
   ctx.textBaseline = 'middle';
   for(let g=gridStart; g<=vmax; g+=step){
     const py = yAt(g);
-    ctx.strokeStyle = 'rgba(231,236,243,.08)';
+    ctx.strokeStyle = 'rgba(22,32,46,.10)';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(leftPad, py); ctx.lineTo(leftPad+plotW, py); ctx.stroke();
-    ctx.fillStyle = 'rgba(140,160,188,.8)';
+    ctx.fillStyle = 'rgba(84,99,122,.9)';
     ctx.fillText(Math.round(g)+'°', leftPad-6, py);
   }
   ctx.textBaseline = 'alphabetic';
@@ -21534,13 +21541,13 @@ function drawLoggerLineChart(canvas, points){
     const px=xAt(i), py=yAt(p.c);
     if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
   });
-  ctx.strokeStyle = '#5BD9E8';
+  ctx.strokeStyle = '#0E8296';
   ctx.lineWidth = 1.6;
   ctx.lineJoin = 'round';
   ctx.stroke();
 
   ctx.font = '10px Inter, sans-serif';
-  ctx.fillStyle = 'rgba(231,236,243,.6)';
+  ctx.fillStyle = 'rgba(22,32,46,.5)';
   ctx.textAlign = 'left';
   ctx.fillText(new Date(points[0].t).toLocaleDateString('vi-VN'), leftPad, topPad+plotH+16);
   ctx.textAlign = 'right';
@@ -21677,6 +21684,75 @@ document.getElementById('tabs').addEventListener('click', e=>{
    Toạ độ để trống: resolvePortInput sẽ tự tra qua geocoder rồi nhớ lại.
    Tên để nguyên tiếng Anh cho khớp cách geocoder tra cứu, giống mọi mục khác.
    ========================================================================== */
+/* ==========================================================================
+   CẢNG ĐI (CẢNG XẾP) — phía Việt Nam
+   WORLD_PORTS không có mục nào của Việt Nam (danh sách gốc là điểm ĐẾN), nên
+   phải liệt kê riêng. Mấy cảng có sẵn toạ độ trong KNOWN_PORTS thì lấy luôn cho
+   chắc; số còn lại để trống toạ độ, resolvePortInput sẽ tự tra như mọi cảng khác.
+   ========================================================================== */
+const VN_ORIGINS = [
+  /* --- cảng biển --- */
+  {name:'Hải Phòng, Việt Nam',                    type:'sea', country:'Vietnam', lat:20.8449, lon:106.6881},
+  {name:'Cái Mép, Bà Rịa - Vũng Tàu, Việt Nam',   type:'sea', country:'Vietnam', lat:10.5417, lon:107.0333},
+  {name:'Cát Lái, TP. Hồ Chí Minh, Việt Nam',     type:'sea', country:'Vietnam', lat:10.7626, lon:106.7710},
+  {name:'Đà Nẵng, Việt Nam',                      type:'sea', country:'Vietnam', lat:16.0678, lon:108.2208},
+  {name:'Quy Nhơn, Việt Nam',                     type:'sea', country:'Vietnam', lat:13.7830, lon:109.2196},
+  {name:'Cần Thơ, Việt Nam',                      type:'sea', country:'Vietnam', lat:10.0452, lon:105.7469},
+  {name:'Nghi Sơn, Thanh Hoá, Việt Nam',          type:'sea', country:'Vietnam'},
+  {name:'Vũng Áng, Hà Tĩnh, Việt Nam',            type:'sea', country:'Vietnam'},
+  {name:'Chân Mây, Thừa Thiên Huế, Việt Nam',     type:'sea', country:'Vietnam'},
+  {name:'Dung Quất, Quảng Ngãi, Việt Nam',        type:'sea', country:'Vietnam'},
+  {name:'Nha Trang, Việt Nam',                    type:'sea', country:'Vietnam'},
+  /* --- sân bay --- */
+  {name:'Nội Bài, Hà Nội, Việt Nam',              type:'air', country:'Vietnam'},
+  {name:'Tân Sơn Nhất, TP. Hồ Chí Minh, Việt Nam',type:'air', country:'Vietnam'},
+  {name:'Đà Nẵng, Việt Nam',                      type:'air', country:'Vietnam', lat:16.0678, lon:108.2208},
+  /* --- đường bộ: điểm xuất phát + cửa khẩu --- */
+  {name:'TP. Hồ Chí Minh, Việt Nam',              type:'land', country:'Vietnam', lat:10.7769, lon:106.7009},
+  {name:'Hà Nội, Việt Nam',                       type:'land', country:'Vietnam', lat:21.0278, lon:105.8342},
+  {name:'Đà Nẵng, Việt Nam',                      type:'land', country:'Vietnam', lat:16.0678, lon:108.2208},
+  {name:'Mộc Bài, Tây Ninh, Việt Nam',            type:'land', country:'Vietnam'},
+  {name:'Lao Bảo, Quảng Trị, Việt Nam',           type:'land', country:'Vietnam'},
+  {name:'Cầu Treo, Hà Tĩnh, Việt Nam',            type:'land', country:'Vietnam'},
+  {name:'Bờ Y, Kon Tum, Việt Nam',                type:'land', country:'Vietnam'},
+  {name:'Xa Mát, Tây Ninh, Việt Nam',             type:'land', country:'Vietnam'},
+  {name:'Cha Lo, Quảng Bình, Việt Nam',           type:'land', country:'Vietnam'},
+  {name:'Tịnh Biên, An Giang, Việt Nam',          type:'land', country:'Vietnam'},
+  {name:'Hà Tiên, Kiên Giang, Việt Nam',          type:'land', country:'Vietnam'},
+];
+/* Cảng đi mặc định theo loại hình — điền sẵn cho khỏi phải gõ mỗi lần.
+   Người dùng đổi sang cảng khác thì giữ nguyên lựa chọn đó, chỉ ghi đè khi ô
+   đang trống hoặc đang là mặc định của loại hình khác. */
+const ORIGIN_DEFAULT = {
+  SEA:  'Hải Phòng, Việt Nam',
+  AIR:  'Nội Bài, Hà Nội, Việt Nam',
+  LAND: 'TP. Hồ Chí Minh, Việt Nam',
+};
+function applyOriginDefault(mode){
+  const el = document.getElementById('lk-origin');
+  if(!el) return;
+  const cur = el.value.trim();
+  const isSomeDefault = Object.keys(ORIGIN_DEFAULT).some(k=>ORIGIN_DEFAULT[k] === cur);
+  if(cur === '' || isSomeDefault) el.value = ORIGIN_DEFAULT[mode] || '';
+}
+function populateOriginDatalist(datalistEl, portType){
+  if(!datalistEl) return;
+  datalistEl.innerHTML = '';
+  const seen = Object.create(null);
+  VN_ORIGINS.forEach(p=>{
+    if(portType && p.type !== portType) return;
+    if(seen[p.name]) return;
+    seen[p.name] = 1;
+    const opt = document.createElement('option');
+    opt.value = p.name;
+    opt.label = p.type==='air' ? '✈' : (p.type==='land' ? '🚛' : '🚢');
+    datalistEl.appendChild(opt);
+  });
+  const opt = document.createElement('option');
+  opt.value = 'Việt Nam';
+  datalistEl.appendChild(opt);
+}
+
 const LAND_CITIES = [
   /* --- Lào --- */
   {name:'Vientiane, Laos',        type:'land', country:'Laos'},
@@ -21759,8 +21835,12 @@ document.getElementById('lk-mode-presets').addEventListener('click', e=>{
   btn.classList.add('active');
   lkTransportMode = btn.dataset.mode;
   populatePortDatalist(document.getElementById('lk-port-datalist'), MODE_TO_PORT_TYPE[lkTransportMode] || 'sea');
+  populateOriginDatalist(document.getElementById('lk-origin-datalist'), MODE_TO_PORT_TYPE[lkTransportMode] || 'sea');
+  applyOriginDefault(lkTransportMode);
 });
 populatePortDatalist(document.getElementById('lk-port-datalist'), 'sea');
+populateOriginDatalist(document.getElementById('lk-origin-datalist'), 'sea');
+applyOriginDefault('SEA');
 
 /* populate shared country datalist + lookup map (destination-only, so Vietnam is
    excluded from suggestions here too — export cargo never ships back to Vietnam). */
@@ -21793,6 +21873,7 @@ const PORT_BY_NAME = {};
 WORLD_PORTS.forEach(p=>{ PORT_BY_NAME[p.name] = p; });
 /* Đăng ký sau WORLD_PORTS: nếu trùng tên thì bản đường bộ được ưu tiên. */
 LAND_CITIES.forEach(p=>{ PORT_BY_NAME[p.name] = p; });
+VN_ORIGINS.forEach(p=>{ if(!PORT_BY_NAME[p.name]) PORT_BY_NAME[p.name] = p; });
 
 /* Một mục có được hiện trong danh sách của loại hình đang chọn hay không. */
 function portAllowedFor(p, portType){
@@ -22095,7 +22176,18 @@ function niceStep(range, targetCount){
 }
 
 function drawJourneyChart(canvas, journey, reqMin, reqMax){
-  const { ambientMax, containerMax, waypoints, totalDays } = journey;
+  const { ambientMax, containerMax, waypoints, totalDays, dayDates, preDays } = journey;
+  /* Ngày thật ứng với "ngày thứ i" của hành trình. */
+  function dateAtDay(i){
+    if(!dayDates || !dayDates.length) return null;
+    const k = Math.max(0, Math.min(dayDates.length-1, Math.round(i)));
+    return dayDates[k];
+  }
+  const fmtDay = d => d ? (d.getDate() + '/' + (d.getMonth()+1)) : '';
+  /* Chuyến dài thì thêm năm cho khỏi nhầm (VD đi 2 tháng, vắt qua giao thừa). */
+  const spansYear = dayDates && dayDates.length > 1 &&
+                    dayDates[0].getFullYear() !== dayDates[dayDates.length-1].getFullYear();
+  const fmtDayFull = d => d ? (fmtDay(d) + (spansYear ? '/' + String(d.getFullYear()).slice(2) : '')) : '';
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.clientWidth || 600, h = canvas.clientHeight || 220;
   canvas.width = w*dpr; canvas.height = h*dpr;
@@ -22113,7 +22205,7 @@ function drawJourneyChart(canvas, journey, reqMin, reqMax){
   vmin -= pad; vmax += pad;
 
   const n = ambientMax.length;
-  const leftPad=38, rightPad=8, topPad=14, botPad=28;
+  const leftPad=38, rightPad=8, topPad=14, botPad=58;   /* chỗ cho 2 hàng tên điểm + 1 hàng ngày */
   const plotW = w-leftPad-rightPad, plotH = h-topPad-botPad;
   const xAt = i => leftPad + (n<=1?0:(i/(n-1))*plotW);
   const yAt = v => topPad + plotH - ((v-vmin)/(vmax-vmin))*plotH;
@@ -22126,36 +22218,101 @@ function drawJourneyChart(canvas, journey, reqMin, reqMax){
   ctx.textBaseline = 'middle';
   for(let g=gridStart; g<=vmax; g+=step){
     const py = yAt(g);
-    ctx.strokeStyle = 'rgba(231,236,243,.08)';
+    ctx.strokeStyle = 'rgba(22,32,46,.10)';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(leftPad, py); ctx.lineTo(leftPad+plotW, py); ctx.stroke();
-    ctx.fillStyle = 'rgba(140,160,188,.8)';
+    ctx.fillStyle = 'rgba(84,99,122,.9)';
     ctx.fillText(Math.round(g)+'°', leftPad-6, py);
   }
   ctx.textBaseline = 'alphabetic';
 
-  if(reqMin!==null && !isNaN(reqMin) && reqMax!==null && !isNaN(reqMax)){
-    const yTop=yAt(reqMax), yBot=yAt(reqMin);
-    ctx.fillStyle='rgba(103,217,154,0.10)';
-    ctx.fillRect(leftPad, yTop, plotW, yBot-yTop);
-    ctx.strokeStyle='rgba(103,217,154,.3)'; ctx.setLineDash([3,3]); ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(leftPad,yTop); ctx.lineTo(leftPad+plotW,yTop); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(leftPad,yBot); ctx.lineTo(leftPad+plotW,yBot); ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
   waypoints.forEach(wp=>{
     const px = xAt(wp.offset);
-    ctx.strokeStyle = wp.type==='transit' ? 'rgba(242,166,90,.55)' : 'rgba(231,236,243,.2)';
+    ctx.strokeStyle = wp.type==='transit' ? 'rgba(180,113,26,.6)' : 'rgba(22,32,46,.22)';
     if(wp.type==='transit') ctx.setLineDash([3,3]);
     ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(px, topPad); ctx.lineTo(px, topPad+plotH); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = wp.type==='transit' ? '#F2A65A' : 'rgba(231,236,243,.75)';
-    ctx.font = '10px Inter, sans-serif';
-    ctx.textAlign = wp.offset < totalDays*0.12 ? 'left' : (wp.offset > totalDays*0.88 ? 'right' : 'center');
-    ctx.fillText((wp.name||'').split(',')[0].slice(0,16), px, topPad+plotH+15);
   });
+
+  /* Vạch ETD — ranh giới giữa "còn nằm bãi ở cảng xếp" và "tàu đã chạy".
+     Không có vạch này thì nhìn biểu đồ không biết đoạn đầu là gì. */
+  if(preDays > 0 && preDays < n){
+    const px = xAt(preDays);
+    ctx.strokeStyle = 'rgba(14,130,150,.7)';
+    ctx.setLineDash([5,3]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(px, topPad); ctx.lineTo(px, topPad+plotH); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#0E8296';
+    ctx.font = '600 9px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('ETD', px, topPad+9);
+  }
+
+  /* Tên các điểm mốc. Hai mốc sát nhau (VD Cái Mép chỉ cách cảng đi vài chục km
+     nên rơi vào gần cùng một ngày) sẽ bị chồng chữ — gặp vậy thì đẩy cái sau
+     xuống hàng dưới thay vì để đè lên nhau. */
+  ctx.font = '10px Inter, sans-serif';
+  const nameRows = [];   /* {x1,x2,row} của các nhãn đã vẽ */
+  waypoints.forEach(wp=>{
+    const px = xAt(Math.max(0, Math.min(n-1, Math.round(wp.offset))));
+    const label = (wp.name||'').split(',')[0].slice(0,16);
+    const tw = ctx.measureText(label).width;
+    const align = px < leftPad + tw*0.5 ? 'left' : (px > leftPad + plotW - tw*0.5 ? 'right' : 'center');
+    const x1 = align==='left' ? px : (align==='right' ? px-tw : px-tw/2);
+    const x2 = x1 + tw;
+    let row = 0;
+    while(nameRows.some(r=>r.row===row && x1 < r.x2+6 && x2 > r.x1-6)) row++;
+    nameRows.push({x1, x2, row});
+    ctx.textAlign = align;
+    ctx.fillStyle = wp.type==='transit' ? '#C87A17' : 'rgba(22,32,46,.82)';
+    ctx.fillText(label, px, topPad+plotH+14 + row*11);
+  });
+
+  /* ---- TRỤC NGÀY ----
+     Điểm mốc (cảng đi / trung chuyển / cảng đến) luôn được ghi ngày. Giữa các
+     mốc thì rải thêm ngày cho dễ đọc, số lượng tự co theo bề ngang biểu đồ —
+     chuyến 5 ngày ghi gần như từng ngày, chuyến 2 tháng chỉ ghi vài mốc, không
+     bao giờ chồng chữ lên nhau. */
+  (function drawDateAxis(){
+    if(!dayDates || !dayDates.length) return;
+    const maxNameRow = nameRows.length ? Math.max(...nameRows.map(r=>r.row)) : 0;
+    const rowY = topPad + plotH + 28 + maxNameRow*11;
+    const labelW = spansYear ? 62 : 52;          /* bề ngang tối thiểu mỗi nhãn */
+    const maxLabels = Math.max(2, Math.floor(plotW / labelW));
+    const stepDays = Math.max(1, Math.ceil((n-1) / Math.max(1, maxLabels-1)));
+
+    const marks = [];
+    waypoints.forEach(wp=>marks.push({ i: Math.max(0, Math.min(n-1, Math.round(wp.offset))), key: true }));
+    for(let i=0; i<n; i+=stepDays) marks.push({ i, key:false });
+    marks.push({ i: n-1, key:false });
+
+    /* mốc quan trọng được giữ trước, mốc thường bị loại nếu đứng quá sát */
+    marks.sort((a,b)=> a.i-b.i || (b.key?1:0)-(a.key?1:0));
+    const kept = [];
+    marks.forEach(m=>{
+      const px = xAt(m.i);
+      const clash = kept.find(k=>Math.abs(xAt(k.i)-px) < labelW*0.8);
+      if(clash){
+        /* mốc quan trọng thì đẩy mốc thường ra */
+        if(m.key && !clash.key) kept.splice(kept.indexOf(clash),1, m);
+        return;
+      }
+      kept.push(m);
+    });
+
+    ctx.font = '9px "IBM Plex Mono", monospace';
+    ctx.textBaseline = 'alphabetic';
+    kept.forEach(m=>{
+      const px = xAt(m.i);
+      const d = dateAtDay(m.i);
+      if(!d) return;
+      ctx.textAlign = px < leftPad + labelW*0.5 ? 'left'
+                    : (px > leftPad + plotW - labelW*0.5 ? 'right' : 'center');
+      ctx.fillStyle = m.key ? 'rgba(22,32,46,.82)' : 'rgba(84,99,122,.8)';
+      ctx.fillText(fmtDayFull(d), px, rowY);
+    });
+  })();
 
   function line(vals, color, width){
     ctx.beginPath();
@@ -22167,8 +22324,8 @@ function drawJourneyChart(canvas, journey, reqMin, reqMax){
     });
     ctx.strokeStyle=color; ctx.lineWidth=width; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.stroke();
   }
-  line(ambientMax, '#F2A65A', 2);
-  line(containerMax, '#FF6E6E', 2.3);
+  line(ambientMax, '#C87A17', 2);
+  line(containerMax, '#D22F2F', 2.3);
 
   // numeric value labels at each waypoint, for both lines
   ctx.font = '600 10px "IBM Plex Mono", monospace';
@@ -22179,11 +22336,11 @@ function drawJourneyChart(canvas, journey, reqMin, reqMax){
     ctx.textAlign = align;
     const cVal = containerMax[idx], aVal = ambientMax[idx];
     if(cVal!=null){
-      ctx.fillStyle = '#FF6E6E';
+      ctx.fillStyle = '#D22F2F';
       ctx.fillText(cVal.toFixed(1)+'°', px, yAt(cVal)-8);
     }
     if(aVal!=null){
-      ctx.fillStyle = '#F2A65A';
+      ctx.fillStyle = '#C87A17';
       ctx.fillText(aVal.toFixed(1)+'°', px, yAt(aVal)+16);
     }
   });
@@ -22225,9 +22382,9 @@ function drawClimateChart(canvas, tmax, tmin, tmean, reqMin, reqMax){
     vals.forEach((v,i)=>{ const px=xAt(i), py=yAt(v); if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); });
     ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin='round'; ctx.stroke();
   }
-  line(tmean, 'rgba(231,236,243,.4)', 1);
-  line(tmin, '#5BD9E8', 1.6);
-  line(tmax, '#FF8A65', 1.6);
+  line(tmean, 'rgba(22,32,46,.32)', 1);
+  line(tmin, '#0E8296', 1.6);
+  line(tmax, '#D2532F', 1.6);
 }
 
 async function runLookup(){
@@ -22235,7 +22392,9 @@ async function runLookup(){
   const destInput = document.getElementById('lk-dest');
   const etdRaw = document.getElementById('lk-etd').value;
   const etaRaw = document.getElementById('lk-eta').value;
-  const origin = 'Việt Nam';
+  /* Cảng đi (cảng xếp). Để trống thì lùi về "Việt Nam" như cũ, nhưng đó chỉ là
+     tâm nước — chọn đúng cảng thì ước tính sát hơn nhiều. */
+  const origin = (document.getElementById('lk-origin').value.trim() || 'Việt Nam');
   const drug = '', reqMin = null, reqMax = null;
 
   const resultsEl = document.getElementById('lookup-results');
@@ -22355,7 +22514,19 @@ async function runLookup(){
       if(ambientMaxC < 33) return 7;   // hè bình thường / thu
       return 11;                       // hè nắng gắt
     }
-    const totalDays = days > 0 ? days : 14;
+    const tripDays = days > 0 ? days : 14;
+
+    /* ===== GIAI ĐOẠN TRƯỚC ETD =====
+       ETD là ngày TÀU RỜI CẢNG, không phải ngày hàng rời kho. Trước đó container
+       đã kéo ra cảng, thông quan, hạ bãi, chờ cắt máng — thường 4-5 ngày với hàng
+       đi từ Việt Nam. Đó chính là quãng NÓNG NHẤT cả hành trình (container phơi
+       nắng ở bãi, nhiệt độ Việt Nam), mà bản trước bỏ sót hoàn toàn vì biểu đồ
+       bắt đầu đúng tại ETD.
+       Nay trục thời gian lùi về trước ETD: ngày 0 = hàng rời kho, ngày `preDays`
+       = ETD (tàu chạy). Toàn bộ quãng đó tính là LƯU BÃI tại cảng xếp. */
+    const PRE_DAYS_DEFAULT = { AIR:1, LAND:1, SEA:4 };
+    const preDays = PRE_DAYS_DEFAULT[lkTransportMode] != null ? PRE_DAYS_DEFAULT[lkTransportMode] : 4;
+    const totalDays = tripDays + preDays;
 
     if(og && ds){
       const transitGeo = await Promise.all(transitStops.map(t=>geocode(t.name)));
@@ -22364,13 +22535,20 @@ async function runLookup(){
       // heat risk window for air freight — the rest of the timeline is assumed
       // to be in-flight or in a climate-controlled facility.
       const groundDwell = isAir ? 1 : 0;
+
+      /* Cảng xếp chính là ĐIỂM ĐI người dùng chọn (VD Hải Phòng) — container nằm
+         bãi ở đó suốt mấy ngày trước ETD. Các cảng trung chuyển (VD Cái Mép) là
+         cảng tàu ghé GIỮA ĐƯỜNG, giữ nguyên vai trò của chúng. */
+      const transitAll = transitStops.map((t,i)=>({
+        type:'transit', name: t.name,
+        lat: transitGeo[i]?transitGeo[i].lat:null, lon: transitGeo[i]?transitGeo[i].lon:null,
+        offset: t.offset, dwell: t.dwell,
+      })).filter(w=>w.lat!=null);
+
       const rawWaypoints = [
-        {type:'origin', name: origin, lat:og.lat, lon:og.lon, offset:0, dwell:groundDwell},
-        ...transitStops.map((t,i)=>({
-          type:'transit', name: t.name,
-          lat: transitGeo[i]?transitGeo[i].lat:null, lon: transitGeo[i]?transitGeo[i].lon:null,
-          offset: t.offset, dwell: t.dwell,
-        })).filter(w=>w.lat!=null),
+        {type:'origin', name: origin, lat: og.lat, lon: og.lon,
+         offset: 0, dwell: Math.max(groundDwell, preDays)},
+        ...transitAll,
         {type:'dest', name: destLabel, lat:ds.lat, lon:ds.lon, offset: totalDays, dwell:groundDwell},
       ];
       // For any transit stop without an explicit day number, estimate its day
@@ -22389,7 +22567,12 @@ async function runLookup(){
         cumDist += legDists[i-1];
         const w = rawWaypoints[i];
         if(w.type==='transit' && w.offset===null){
-          w.offset = Math.round(totalDays * (cumDist/totalDist));
+          /* chỉ rải trên phần hành trình SAU ETD — mấy ngày trước ETD là lưu bãi
+             ở cảng xếp, không phải đang chạy */
+          w.offset = preDays + Math.round(tripDays * (cumDist/totalDist));
+        }else if(w.type==='transit'){
+          /* người dùng nhập "ngày thứ mấy" theo mốc ETD, nên dịch sang trục mới */
+          w.offset = preDays + w.offset;
         }
       }
       rawWaypoints.forEach(w=>{ w.offset = Math.max(0, Math.min(totalDays, w.offset)); });
@@ -22405,15 +22588,17 @@ async function runLookup(){
         if(!hintEl) return;
         const match = waypoints.find(w=>w.type==='transit' && w.name===nameVal);
         if(match){
+          const rel = match.offset - preDays;   /* quy về mốc ETD cho khớp ô nhập */
           hintEl.textContent = offsetInput.value.trim()===''
-            ? `≈ ngày thứ ${match.offset} (tự ước tính theo khoảng cách)`
-            : `Dùng đúng ngày ${match.offset} bạn nhập`;
+            ? `≈ ngày thứ ${rel} sau ETD (tự ước tính theo khoảng cách)`
+            : `Dùng đúng ngày ${rel} bạn nhập`;
         }else{
           hintEl.textContent = '';
         }
       });
 
-      const depDate = etd;
+      /* ngày 0 của biểu đồ = ETD lùi lại preDays ngày (lúc hàng rời kho) */
+      const depDate = new Date(etd.getTime() - preDays*86400000);
 
       await Promise.all(waypoints.map(async w=>{
         const wDate = new Date(depDate.getTime() + w.offset*86400000);
@@ -22475,7 +22660,7 @@ async function runLookup(){
         dayDates.push(new Date(depDate.getTime() + d*86400000));
       }
 
-      journey = { waypoints, dayDates, ambientMax, ambientMin, containerMax, containerMin, totalDays, isAir, isLand };
+      journey = { waypoints, dayDates, ambientMax, ambientMin, containerMax, containerMin, totalDays, isAir, isLand, preDays };
     }else if(!og || !ds){
       climateError = geocodeErrorMessage();
     }
@@ -22603,9 +22788,8 @@ function renderLookupResults(ctx){
     html += `<div class="journey-chart-card">
       <canvas id="journey-chart" style="width:100%;height:220px;display:block;"></canvas>
       <div class="journey-legend">
-        <span><i style="background:#F2A65A"></i> Nhiệt độ ngoài trời (đỉnh/ngày)</span>
-        <span><i style="background:#FF6E6E"></i> ${escapeHtml(cargoLineLabel)}</span>
-        <span><i style="background:var(--safe);opacity:.5;"></i> Vùng ngưỡng bảo quản yêu cầu</span>
+        <span><i style="background:#C87A17"></i> Nhiệt độ ngoài trời (đỉnh/ngày)</span>
+        <span><i style="background:#D22F2F"></i> ${escapeHtml(cargoLineLabel)}</span>
         <span style="color:var(--amber)">┊ vạch cam = ${journey && journey.isAir ? 'sân bay đi/đến/trung chuyển' : (journey && journey.isLand ? 'điểm dừng/cửa khẩu' : 'cảng trung chuyển')}</span>
       </div>
     </div>
@@ -22618,11 +22802,7 @@ function renderLookupResults(ctx){
       <div class="journey-stat ${jStats.over35>0?'warn':''}"><b>${jStats.over35}/${jStats.totalDays+1}</b><span>Ngày &gt;35°C</span></div>
       <div class="journey-stat ${jStats.over40>0?'warn':''}"><b>${jStats.over40}/${jStats.totalDays+1}</b><span>Ngày &gt;40°C</span></div>
     </div>
-    ${journey.isLand
-      ? `<div class="footnote">* Với LAND (chỉ áp dụng cho tuyến đi Lào và Campuchia): đường "ngoài trời" lấy nhiệt độ đỉnh trong ngày theo khí hậu lịch sử, nội suy dọc tuyến đường bộ (điểm đi → điểm dừng/cửa khẩu → điểm đến). Đường "trong thùng xe" = ngoài trời + độ chênh do thùng kín phơi nắng, **tự tăng theo mức nắng thật của từng ngày dừng đỗ** (mùa mát dưới 25°C: +5°C; chuyển mùa 25-33°C: +6°C; mùa nóng trên 33°C: +8°C). Mốc chia đặt cao hơn hàng biển/hàng air vì Lào và Campuchia chung nền nhiệt với Việt Nam, không có mùa đông lạnh thật — "mùa mát" ở đây vẫn 22-28°C. Lúc xe đang chạy thì chênh ít hơn (+4°C) nhờ gió lùa và chạy đêm. **Rủi ro lớn nhất của đường bộ là lúc đỗ chờ** — chờ thông quan ở cửa khẩu, nghỉ trưa, chờ giao hàng: xe tắt máy là tắt luôn hệ thống lạnh. Đây là ước tính kỹ thuật, không phải số đo thật — ưu tiên dùng data logger thực tế khi có.</div>`
-      : journey.isAir
-      ? `<div class="footnote">* Với AIR: những ngày lô hàng thực sự nằm ở mặt đất (chờ ở sân bay đi/đến, hoặc trung chuyển) dùng nhiệt độ **đỉnh trong ngày** ngoài trời thật (phơi nắng trực tiếp trên bãi), cộng thêm độ chênh nhà kính **tự tăng theo mức nắng** (dưới 20°C: +2°C; 20-33°C: +3°C; trên 33°C nắng gắt: +5°C) — mức trần thấp hơn hàng biển vì hàng air chỉ nằm bãi vài giờ, không kín tuyệt đối như container. Những ngày còn lại (đang bay, hoặc nằm kho/thủ tục hải quan) dùng nhiệt độ **trung bình trong ngày** ngoài trời thật tại đúng vị trí trên hành trình (không phải số cố định — bay qua vùng nóng vẫn ra nhiệt độ cao hơn bay qua vùng ôn đới). Đây vẫn là ước tính kỹ thuật, không phải số đo thật — ưu tiên dùng data logger thực tế khi có.</div>`
-      : `<div class="footnote">* Đường "ngoài trời" lấy nhiệt độ đỉnh trong ngày theo dữ liệu khí hậu lịch sử (nội suy dọc theo các điểm: cảng đi → cảng trung chuyển → cảng đến, năm gần nhất có đủ dữ liệu). Đường "trong container" = ngoài trời + độ chênh do hiệu ứng nhà kính khi container kín phơi nắng — độ chênh này **tự tăng theo cường độ nắng thật của từng ngày lưu bãi** (dưới 20°C ngoài trời: +3°C; 20-33°C: +7°C; trên 33°C nắng gắt: +11°C), lúc đang di chuyển có gió lùa thì chênh ít hơn (+5°C). Đây là ước tính kỹ thuật dựa theo hiệu ứng vật lý thường gặp, không phải số đo thật — ưu tiên dùng data logger thực tế khi có.</div>`}`;
+    `;
   }else{
     html += climateFetchHadNetworkError
       ? `<div class="empty">Không kết nối được tới dịch vụ dữ liệu khí hậu (Open-Meteo) sau ${3} lần thử — có thể do dịch vụ đang gián đoạn tạm thời hoặc mạng chập chờn.<br><button type="button" class="btn btn-primary btn-sm" style="margin-top:10px;" id="btn-retry-climate">↻ Thử lại</button></div>`
@@ -23324,7 +23504,7 @@ function securityPanelHtml(embedded){
       mfaDot = 'sec-bad';
       mfaMsg = 'Firestore TỪ CHỐI cho đọc collection "' + MFA_COLLECTION + '" ⇒ chưa bật 2FA được. ' +
                'Vào Firebase Console > Firestore Database > Rules, kiểm tra có đúng khối này chưa rồi bấm Publish:' +
-               '<div style="font-family:var(--font-mono,monospace);font-size:11px;background:rgba(255,255,255,.05);' +
+               '<div style="font-family:var(--font-mono,monospace);font-size:11px;background:rgba(22,32,46,.04);' +
                'border:1px solid var(--border-soft);border-radius:8px;padding:8px 10px;margin-top:8px;white-space:pre;overflow-x:auto;">' +
                'match /' + escapeHtml(MFA_COLLECTION) + '/{uid} {\n' +
                '  allow read, write: if request.auth != null\n' +
@@ -23355,7 +23535,7 @@ function securityPanelHtml(embedded){
            : '<button class="modal-close" onclick="document.getElementById(\'modal-bg\').classList.remove(\'active\')">✕</button>'
              + '<h2 style="font-family:var(--font-display);margin:0 0 4px;">🛡️ Trạng thái bảo mật</h2>') +
          '<div class="hint" style="margin-bottom:4px;">Tên miền đang chạy: <b>' + escapeHtml(location.hostname || '(file cục bộ)') + '</b></div>' +
-         '<div class="hint" style="margin-bottom:14px;">Phiên bản file đang chạy: <b style="color:var(--accent,#5bd9e8);">' + escapeHtml(APP_VERSION) + '</b></div>' +
+         '<div class="hint" style="margin-bottom:14px;">Phiên bản file đang chạy: <b style="color:var(--ice);">' + escapeHtml(APP_VERSION) + '</b></div>' +
          acHtml + mfaHtml + enforceHtml;
 }
 function updateSecurityPanel(){
@@ -23411,7 +23591,7 @@ function accountPanelHtml(){
   return '<button class="modal-close" onclick="document.getElementById(\'modal-bg\').classList.remove(\'active\')">✕</button>' +
     '<h2 style="font-family:var(--font-display);margin:0 0 4px;">Tài khoản</h2>' +
     '<div class="hint" style="margin-bottom:16px;">' + escapeHtml(email) +
-      (isAdminAccount ? ' · <b style="color:var(--accent,#5bd9e8);">Quản trị viên</b>' : ' · Tài khoản thường') + '</div>' +
+      (isAdminAccount ? ' · <b style="color:var(--ice);">Quản trị viên</b>' : ' · Tài khoản thường') + '</div>' +
     '<button class="btn btn-ghost btn-sm" id="acc-signout">Đăng xuất</button>' +
     '<div style="height:20px;"></div>' +
     securityPanelHtml(true);
