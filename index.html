@@ -109,6 +109,21 @@
     padding:22px;
   }
   .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+  @media (max-width:760px){ .grid-3{grid-template-columns:1fr;} }
+  /* Bảng báo cáo tháng — dựng giống bảng Excel đang dùng, đầu bảng nền vàng. */
+  .rp-month{margin-top:26px;}
+  .rp-month h3{font-family:var(--font-display);font-size:15px;margin:0 0 8px;}
+  .rp-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);}
+  table.rp-table{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--surface);}
+  table.rp-table th{background:#ffff00;color:#111;font-weight:700;text-align:center;padding:7px 8px;border:1px solid #999;white-space:nowrap;}
+  table.rp-table td{padding:6px 8px;border:1px solid #bbb;vertical-align:top;}
+  table.rp-table td.num{text-align:center;white-space:nowrap;}
+  table.rp-table tr:nth-child(even) td{background:rgba(0,0,0,.02);}
+  .lot-form{border:1px solid var(--border-soft);border-radius:var(--radius);background:var(--surface);padding:16px 16px 4px;margin-bottom:16px;}
+  .lg-card{border:1px solid var(--border-soft);border-radius:var(--radius);background:var(--surface);margin-top:12px;padding:13px 15px;}
+  .lg-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
+  .lg-name{font-family:var(--font-mono);font-size:12.5px;word-break:break-all;}
   .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
   @media(max-width:760px){.grid-2,.grid-3{grid-template-columns:1fr;}}
 
@@ -440,6 +455,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg>
         Kho dữ liệu
       </button>
+      <button class="tab-btn" data-tab="report">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 9h16M4 14h16M10 4v16"/></svg>
+        Báo cáo tháng
+      </button>
     </div>
   </div>
 </div>
@@ -500,16 +519,110 @@
   <!-- ================= UPLOAD TAB ================= -->
   <div class="panel" id="panel-upload">
     <h1 class="page-title">Tải lên dữ liệu data logger</h1>
-    <p class="page-sub">Tải file PDF xuất từ data logger (Tempaction OR / Shockactions...). Hệ thống tự đọc bảng nhiệt độ — bạn chỉ cần chọn nước đến và loại hình vận chuyển rồi lưu (cảng đi mặc định là Việt Nam). Dữ liệu được giữ trong trình duyệt này để dùng lại về sau.</p>
+    <p class="page-sub">Điền thông tin lô hàng, rồi thêm file PDF data logger của lô đó. Một lô có bao nhiêu logger thì thêm bấy nhiêu file.</p>
+
+    <div class="lot-form">
+      <div class="field">
+        <label class="field-label">Lô hàng (Sub mail TBXK)</label>
+        <input type="text" id="lot-submail" placeholder="TBXK chính thức - Chile - Ngày cần hàng: 10/07/2026">
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label class="field-label">Tên hàng xuất khẩu</label>
+          <input type="text" id="lot-product" placeholder="Nasaltrex 100ml">
+        </div>
+        <div class="field">
+          <label class="field-label">Loại hình vận chuyển</label>
+          <select id="lot-mode">
+            <option value="">— Chọn loại hình —</option>
+            <option value="AIR">AIR</option>
+            <option value="LAND">LAND (đường bộ)</option>
+            <option value="LCL">LCL</option>
+            <option value="FCL_COLD">FCL Lạnh</option>
+            <option value="FCL_STD">FCL Thường</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Cảng / nước đến</label>
+        <input type="text" id="lot-dest" list="lot-port-datalist" placeholder="Gõ tên cảng, sân bay hoặc quốc gia...">
+        <datalist id="lot-port-datalist"></datalist>
+      </div>
+      <div class="grid-3">
+        <div class="field">
+          <label class="field-label">Tháng ship hàng</label>
+          <input type="month" id="lot-shipmonth">
+        </div>
+        <div class="field">
+          <label class="field-label">ETA</label>
+          <input type="month" id="lot-eta">
+        </div>
+        <div class="field">
+          <label class="field-label">Tháng hàng đến thực tế</label>
+          <input type="month" id="lot-arrival">
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Note</label>
+        <input type="text" id="lot-note" placeholder="Kiện 125 Nasaltrex">
+      </div>
+      <div class="grid-3">
+        <div class="field">
+          <label class="field-label">DOC phụ trách</label>
+          <input type="text" id="lot-docowner" placeholder="Tuyến">
+        </div>
+        <div class="field">
+          <label class="field-label">Tình trạng</label>
+          <select id="lot-status"></select>
+        </div>
+        <div class="field">
+          <label class="field-label">Tháng update thông tin data logger</label>
+          <input type="month" id="lot-updatemonth">
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Ghi chú</label>
+        <input type="text" id="lot-remark" placeholder="04/09: Hàng đã tới, khách chưa gửi lại">
+      </div>
+    </div>
 
     <div class="dropzone" id="dropzone">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
-      <b>Kéo thả file PDF vào đây, hoặc bấm để chọn</b>
-      <span>Hỗ trợ nhiều file cùng lúc · chỉ .pdf</span>
+      <b>Kéo thả file PDF data logger vào đây, hoặc bấm để chọn</b>
+      <span>Thêm được nhiều file cho cùng một lô · chỉ .pdf</span>
       <input type="file" id="file-input" accept="application/pdf" multiple style="display:none">
     </div>
 
+    <button type="button" class="btn btn-ghost btn-sm" id="btn-add-logger" style="margin-top:10px;">+ Thêm file data logger</button>
+
     <div id="pending-list"></div>
+    <div id="lot-summary"></div>
+    <button class="btn btn-primary btn-block" id="btn-save-lot" style="margin-top:18px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+      Lưu lô hàng vào kho dữ liệu
+    </button>
+  </div>
+
+  <!-- ================= REPORT TAB ================= -->
+  <div class="panel" id="panel-report">
+    <h1 class="page-title">Báo cáo tháng</h1>
+    <p class="page-sub">Tổng hợp các lô đã lưu, gom theo tháng ship hàng.</p>
+    <div id="pending-lots-box"></div>
+    <div class="grid-2">
+      <div class="field">
+        <label class="field-label">Từ tháng</label>
+        <input type="month" id="rp-from">
+      </div>
+      <div class="field">
+        <label class="field-label">Đến tháng</label>
+        <input type="month" id="rp-to">
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btn-export-xlsx">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+      Tải báo cáo Excel
+    </button>
+    <div id="report-body"></div>
   </div>
 
   <!-- ================= LIBRARY TAB ================= -->
@@ -600,29 +713,34 @@ const FIREBASE_CONFIG = {
 };
 /* ==========================================================================
    TÀI KHOẢN QUẢN TRỊ
-   Các email được phép XOÁ dữ liệu và đặt lại mật khẩu. Có email thứ hai để
-   phòng trường hợp email chính gặp sự cố (mất tài khoản Google, khoá máy...).
+   Nhận diện admin bằng MÃ TÀI KHOẢN (uid), KHÔNG bằng email — để trong file
+   này không còn địa chỉ email thật nào. Ai xem nguồn trang cũng không đọc
+   được email của người quản trị nữa.
+
+   uid là chuỗi ngẫu nhiên do Firebase tự cấp cho mỗi tài khoản. Từ uid không
+   suy ngược ra được email, và uid không dùng để đăng nhập, nên để công khai ở
+   đây là an toàn.
+
+   Lấy uid ở: Firebase Console > Authentication > tab Users > cột "User UID".
+
    ⚠️ Sửa ở đây thì PHẢI sửa cả Firestore Rules cho khớp, nếu không rules vẫn
    chặn — rules mới là thứ có hiệu lực thật, code này chỉ điều khiển giao diện.
-   ⚠️ Email thứ hai cũng phải được tạo tài khoản thật trong
-   Firebase Console > Authentication > Users > Add user, nếu không thì không
-   đăng nhập được.
+   ⚠️ Thêm admin dự phòng: tạo tài khoản thật ở Firebase Console >
+   Authentication > Users > Add user, rồi chép uid của tài khoản đó vào đây.
    Mỗi admin có 2FA riêng của mình (khoá TOTP gắn theo uid), không dùng chung.
    ========================================================================== */
-const ADMIN_EMAILS = [
-  "expdocs2.cpc1hn@gmail.com",
-  /* Thêm email quản trị dự phòng ở đây, VD:
-       "email-du-phong@gmail.com",
-     ⚠️ TUYỆT ĐỐI không để địa chỉ giả/placeholder: nếu tính năng tự đăng ký
-     trong Firebase Authentication còn bật, người lạ có thể tự tạo tài khoản
-     đúng địa chỉ đó và lập tức có quyền admin. */
+const ADMIN_UIDS = [
+  "JKoOlb5yN7cgVtZpP9OGUFkeWMr1",
+  /* Thêm uid quản trị dự phòng ở đây, VD:
+       "aB3dE7gHiJ2kLmN4oPqR5sTuV6w1", */
 ];
-/* Giữ tên cũ cho các chỗ chỉ cần một email làm nhãn mặc định. */
-const ADMIN_EMAIL = ADMIN_EMAILS[0];
-function isAdminEmail(email){
-  if(!email) return false;
-  const e = String(email).trim().toLowerCase();
-  return ADMIN_EMAILS.some(a => a.trim().toLowerCase() === e);
+function isAdminUid(uid){
+  if(!uid) return false;
+  const u = String(uid).trim();
+  return ADMIN_UIDS.some(a => a.trim() === u);
+}
+function isAdminUser(user){
+  return !!user && isAdminUid(user.uid);
 }
 
 /* App Check — chặn bot/script tự động dội request vào Firebase (đăng nhập, Firestore).
@@ -661,7 +779,7 @@ const APPCHECK_MODE = 'off';
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v26 · 2026-09-16 · nền sáng, bỏ chú thích';
+const APP_VERSION = 'v32 · 2026-09-21 · chỉ người tạo lô + admin sửa được lô, khoá PDF gốc, bỏ email người tải lên';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 const HAS_FIREBASE = (typeof firebase !== 'undefined') && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
@@ -881,7 +999,7 @@ if(HAS_FIREBASE){
         if(typeof mfaAbortFlow === 'function') mfaAbortFlow();
         /* Đăng nhập đúng email admin là thấy được nút xoá ngay. Mã 6 số chỉ được
            hỏi đúng lúc bấm xoá (step-up), xem requireAdminStepUp() bên dưới. */
-        isAdmin = !!user && isAdminEmail(user.email);
+        isAdmin = isAdminUser(user);
         mfaUnlockUntil = 0;
         mfaEnrolled = null;
         updateAdminUI();
@@ -905,8 +1023,13 @@ async function fsGet(key){
   const doc = await fsDb.collection(FS_COLLECTION).doc(key).get();
   return doc.exists ? doc.data().value : null;
 }
-async function fsSet(key, value){
-  await fsDb.collection(FS_COLLECTION).doc(key).set({ value, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+/* extra: các trường ghi thêm ở NGOÀI chuỗi value — hiện chỉ dùng cho "owner",
+   vì Firestore Rules không đọc được bên trong chuỗi JSON nên phải để chủ lô ở
+   ngoài thì rules mới kiểm tra được ai là chủ. */
+async function fsSet(key, value, extra){
+  await fsDb.collection(FS_COLLECTION).doc(key).set(
+    Object.assign({ value, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, extra || {})
+  );
   return true;
 }
 async function fsDelete(key){
@@ -992,6 +1115,38 @@ async function safeSet(key, value, shared=false){
     return null;
   }
 }
+/* Giống safeSet nhưng KHÔNG nuốt lỗi — dùng cho lưu lô hàng, để khi máy chủ từ
+   chối (ví dụ sửa lô của người khác) thì giao diện báo đúng là KHÔNG lưu được,
+   thay vì báo "Đã lưu" trong khi dữ liệu không hề thay đổi. */
+async function strictSet(key, value, extra){
+  if(HAS_FIREBASE) return await fsSet(key, value, extra);
+  const ok = await safeSet(key, value, false);
+  if(ok === null) throw new Error('Không lưu được vào trình duyệt.');
+  return ok;
+}
+async function strictIndexEntry(meta){
+  if(HAS_FIREBASE){ await fsDb.collection(META_COLLECTION).doc(meta.id).set(meta); return true; }
+  const ok = await saveIndexEntry(meta);
+  if(ok === null) throw new Error('Không lưu được mục lục.');
+  return ok;
+}
+function currentUid(){
+  return (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.uid : '';
+}
+/* Ai được sửa lô: chính người tạo lô, hoặc admin. Phải khớp với firestore.rules. */
+function canEditLot(r){
+  if(isAdmin) return true;
+  const me = currentUid();
+  return !!(r && r.uploadedByUid && me && r.uploadedByUid === me);
+}
+/* Lỗi bị máy chủ từ chối vì không đủ quyền → câu báo dễ hiểu. */
+function saveErrorMessage(e){
+  const code = e && (e.code || '');
+  if(code === 'permission-denied' || /permission/i.test(String(e && e.message))){
+    return 'Máy chủ không cho lưu — chỉ người tạo lô hoặc admin mới sửa được lô này.';
+  }
+  return 'Lưu không thành công: ' + (code || (e && e.message) || e);
+}
 async function safeDelete(key, shared=false){
   try{
     if(HAS_FIREBASE) return await fsDelete(key);
@@ -1040,7 +1195,9 @@ async function setShipmentHidden(id, hidden){
   const updated = Object.assign({}, meta, {
     hidden: !!hidden,
     hiddenAt: hidden ? Date.now() : null,
-    hiddenBy: hidden ? ((fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.email : '') : null
+    /* Lưu MÃ TÀI KHOẢN (uid), không lưu email — trước đây lưu email nên mọi
+       người đăng nhập đều đọc được email của nhau ở danh sách lô đã ẩn. */
+    hiddenBy: hidden ? ((fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.uid : '') : null
   });
   const ok = await saveIndexEntry(updated);
   return ok !== null;
@@ -1064,10 +1221,149 @@ async function deleteIndexEntry(id){
   await safeSet('shipment-index', JSON.stringify(idx), false);
   return true;
 }
-async function saveShipment(record){
-  await safeSet('shipment:'+record.id, JSON.stringify(record), false);
-  await saveIndexEntry({
-    id: record.id, fileName: record.fileName,
+/* ==========================================================================
+   MỘT LÔ HÀNG = MỘT "SUB MAIL TBXK", BÊN TRONG CÓ THỂ CÓ NHIỀU DATA LOGGER
+   Trước v28: một file PDF = một lô. Từ v28: một lô chứa cả danh sách logger.
+
+   PDF của từng logger lưu thành BẢN GHI RIÊNG ('pdf:<id lô>:<id logger>'),
+   KHÔNG nhét chung vào bản ghi lô. Lý do: Firestore chỉ cho mỗi bản ghi tối đa
+   1 MiB — gộp 2-3 file PDF vào một chỗ là vượt ngay, lưu hỏng.
+   ========================================================================== */
+function pdfKey(shipmentId, lid){ return 'pdf:' + shipmentId + ':' + lid; }
+
+/* Gộp số liệu nhiều logger thành một dòng của lô.
+   Cao nhất  = cao nhất trong tất cả logger
+   Thấp nhất = thấp nhất trong tất cả logger
+   Trung bình = tính trên TOÀN BỘ điểm đo của mọi logger, không phải trung bình
+   của các trung bình — logger đo dài ngắn khác nhau nên hai cách ra số khác nhau. */
+function aggregateLoggers(loggers){
+  const out = { min:null, max:null, avg:null, start:null, stop:null, months:[], deviceId:null };
+  if(!Array.isArray(loggers) || !loggers.length) return out;
+  let sum = 0, n = 0;
+  const monthSet = new Set();
+  loggers.forEach(lg=>{
+    if(typeof lg.max === 'number') out.max = (out.max === null) ? lg.max : Math.max(out.max, lg.max);
+    if(typeof lg.min === 'number') out.min = (out.min === null) ? lg.min : Math.min(out.min, lg.min);
+    if(typeof lg.start === 'number') out.start = (out.start === null) ? lg.start : Math.min(out.start, lg.start);
+    if(typeof lg.stop === 'number')  out.stop  = (out.stop  === null) ? lg.stop  : Math.max(out.stop,  lg.stop);
+    (lg.months || []).forEach(m=>monthSet.add(m));
+    const pts = lg.points || [];
+    if(pts.length){ pts.forEach(p=>{ if(typeof p.c === 'number'){ sum += p.c; n++; } }); }
+    else if(typeof lg.avg === 'number'){ sum += lg.avg; n++; }
+  });
+  out.avg = n ? (sum / n) : null;
+  out.months = Array.from(monthSet).sort((a,b)=>a-b);
+  const ids = loggers.map(l=>l.deviceId).filter(Boolean);
+  out.deviceId = ids.length ? ids.join(', ') : null;
+  return out;
+}
+
+/* Bản ghi kiểu cũ (v27 trở về trước) không có mảng loggers. Dựng tạm một logger
+   từ chính nó, để phần hiển thị mới dùng chung một kiểu dữ liệu duy nhất. */
+function normalizeShipment(rec){
+  if(!rec) return rec;
+  if(!Array.isArray(rec.loggers)){
+    rec.loggers = [{
+      lid: 'legacy',
+      fileName: rec.fileName || '',
+      deviceId: rec.deviceId || null,
+      min: rec.min, max: rec.max, avg: rec.avg,
+      start: rec.start, stop: rec.stop,
+      months: rec.months || [],
+      points: rec.points || [],
+      pdfInRecord: !!rec.pdfBase64,
+    }];
+  }
+  if(typeof rec.loggerCount !== 'number') rec.loggerCount = rec.loggers.length;
+  if(!Array.isArray(rec.points) || !rec.points.length){
+    rec.points = rec.loggers
+      .reduce((all, lg)=>all.concat(lg.points || []), [])
+      .sort((a,b)=>a.t - b.t);
+  }
+  return rec;
+}
+
+/* ==========================================================================
+   TÌNH TRẠNG LÔ HÀNG
+   Bỏ hai mục "Chưa gửi mail / Đã gửi mail" của file Excel cũ — từ khi có web
+   này thì không cần xin qua mail nữa.
+   ========================================================================== */
+const LOT_STATUSES = [
+  'Đã có data logger',
+  'Hàng chưa tới',
+  'Lỗi / Không xin được',
+];
+/* Hai tình trạng này được phép lưu lô KHÔNG có file data logger nào. */
+const LOT_STATUS_NO_LOGGER = ['Hàng chưa tới', 'Lỗi / Không xin được'];
+function statusColor(s){
+  if(s === 'Lỗi / Không xin được') return 'var(--danger)';
+  if(s === 'Hàng chưa tới') return 'var(--amber)';
+  if(s === 'Đã có data logger') return 'var(--safe)';
+  return 'var(--text-dim)';
+}
+/* Lô không có logger nào thì không dùng làm căn cứ số đo thật khi tra cứu. */
+function hasRealLogger(r){
+  if(!r) return false;
+  if(typeof r.loggerCount === 'number') return r.loggerCount > 0;
+  return true;   /* bản ghi cũ chưa có trường này — đều là lô có logger */
+}
+
+/* Ô nhập type="month" trả về dạng '2026-09'. Bảng báo cáo cần '09/2026'. */
+function fmtMonth(v){
+  if(!v) return '';
+  const m = String(v).match(/^(\d{4})-(\d{2})$/);
+  return m ? (m[2] + '/' + m[1]) : String(v);
+}
+/* Dòng mô tả gọn của một lô. Tên người tải lên CHỈ hiện với tài khoản admin. */
+function lotInfoLine(r){
+  const bits = [];
+  if(r.productName) bits.push(r.productName);
+  bits.push(((typeof r.loggerCount === 'number') ? r.loggerCount : 1) + ' data logger');
+  if(r.shipMonth) bits.push('Ship ' + fmtMonth(r.shipMonth));
+  if(r.eta) bits.push('ETA ' + fmtMonth(r.eta));
+  if(r.actualArrivalMonth) bits.push('Đến thực tế ' + fmtMonth(r.actualArrivalMonth));
+  if(r.deviceId) bits.push('Device ' + r.deviceId);
+  if(r.docOwner) bits.push('DOC ' + r.docOwner);
+  if(r.note) bits.push(r.note);
+  if(r.remark) bits.push(r.remark);
+  return bits.join(' · ');
+}
+/* Bảng số của từng logger trong lô — lô chỉ có một logger thì không cần hiện. */
+function loggerBreakdownHtml(r){
+  const list = r.loggers || [];
+  if(list.length < 2) return '';
+  const rows = list.map((lg,i)=>`<tr>
+    <td class="num">${i+1}</td>
+    <td>${escapeHtml(lg.fileName||'')}</td>
+    <td class="num">${fmt1(lg.max)}</td>
+    <td class="num">${fmt1(lg.min)}</td>
+    <td class="num">${fmt1(lg.avg)}</td>
+    <td class="num">${lg.start?new Date(lg.start).toLocaleDateString('vi-VN'):''} – ${lg.stop?new Date(lg.stop).toLocaleDateString('vi-VN'):''}</td>
+  </tr>`).join('');
+  return `<div class="rp-wrap" style="margin-top:14px;">
+    <table class="rp-table">
+      <tr><th>#</th><th>File data logger</th><th>Cao nhất</th><th>Thấp nhất</th><th>Trung bình</th><th>Thời gian</th></tr>
+      ${rows}
+    </table>
+  </div>`;
+}
+
+/* Dòng mục lục. Tab "Kho dữ liệu" và "Báo cáo tháng" đều đọc chỗ này, nên mọi
+   cột của bảng báo cáo phải có mặt ở đây — không thì báo cáo ra trống. */
+function shipmentMeta(record){
+  return {
+    id: record.id, fileName: record.fileName || '',
+    subMail: record.subMail || '', productName: record.productName || '',
+    shipMonth: record.shipMonth || '', eta: record.eta || '',
+    actualArrivalMonth: record.actualArrivalMonth || '', note: record.note || '',
+    docOwner: record.docOwner || '', status: record.status || '',
+    remark: record.remark || '', loggerUpdateMonth: record.loggerUpdateMonth || '',
+    loggerCount: (typeof record.loggerCount === 'number')
+      ? record.loggerCount
+      : (Array.isArray(record.loggers) ? record.loggers.length : 1),
+    /* Chỉ lưu MÃ người tạo lô, không lưu email — tên người phụ trách đã có ở
+       cột "DOC phụ trách". firestore.rules dùng trường này để biết ai được sửa. */
+    uploadedByUid: record.uploadedByUid || '',
     origin: record.origin, dest: record.dest, destPort: record.destPort,
     originLat: record.originLat, originLon: record.originLon,
     destLat: record.destLat, destLon: record.destLon,
@@ -1075,12 +1371,60 @@ async function saveShipment(record){
     deviceId: record.deviceId, transportMode: record.transportMode,
     start: record.start, stop: record.stop,
     min: record.min, max: record.max, avg: record.avg,
-    months: record.months, uploadedAt: record.uploadedAt
+    months: record.months || [], uploadedAt: record.uploadedAt
+  };
+}
+
+/* PDF gốc bị firestore.rules khoá "ghi một lần, không ai sửa được". Nếu lần lưu
+   trước đã ghi xong file này (ví dụ bấm lưu lại sau khi mạng chập chờn) thì máy
+   chủ sẽ từ chối ghi đè — lúc đó kiểm tra file đã có sẵn thì coi như ổn, đi tiếp. */
+async function writePdfOnce(key, b64){
+  try{
+    await strictSet(key, b64, { owner: currentUid() });
+  }catch(e){
+    const existing = await safeGet(key, false);
+    if(existing) return;
+    throw e;
+  }
+}
+async function saveShipment(record){
+  /* Lưu PDF từng logger ra bản ghi riêng trước. */
+  for(const lg of (record.loggers || [])){
+    if(lg.pdfBase64) await writePdfOnce(pdfKey(record.id, lg.lid), lg.pdfBase64);
+  }
+  /* Bản ghi kiểu cũ giữ PDF ngay trong lô. Khi lưu lại (ví dụ lúc sửa thông tin
+     lô) phải chuyển nó ra bản ghi riêng TRƯỚC, không thì dòng xoá pdfBase64 bên
+     dưới sẽ làm mất luôn file PDF gốc. */
+  if(record.pdfBase64 && (record.loggers || []).length){
+    const first = record.loggers[0];
+    if(!first.pdfBase64) await writePdfOnce(pdfKey(record.id, first.lid), record.pdfBase64);
+  }
+  /* Rồi mới lưu bản ghi lô, đã gỡ hết PDF ra. */
+  const loggers = (record.loggers || []).map(lg=>{
+    const copy = Object.assign({}, lg);
+    delete copy.pdfBase64;
+    return copy;
   });
+  const toStore = Object.assign({}, record, { loggers, loggerCount: loggers.length });
+  delete toStore.pdfBase64;
+  delete toStore.uploadedByEmail;   /* không bao giờ lưu email người dùng vào dữ liệu lô */
+  /* points ở cấp lô là số liệu dựng lại được từ loggers — không lưu bản sao thứ hai. */
+  delete toStore.points;
+  /* "owner" ghi ở ngoài chuỗi value để firestore.rules đọc được. Luôn là người
+     TẠO lô — admin sửa lô của người khác thì chủ lô vẫn giữ nguyên. */
+  await strictSet('shipment:'+record.id, JSON.stringify(toStore), { owner: record.uploadedByUid || '' });
+  await strictIndexEntry(shipmentMeta(toStore));
 }
 async function getShipment(id){
   const raw = await safeGet('shipment:'+id, false);
-  return raw ? JSON.parse(raw) : null;
+  return raw ? normalizeShipment(JSON.parse(raw)) : null;
+}
+/* Lấy PDF của một logger. Bản ghi cũ giữ PDF ngay trong lô nên phải thử cả hai chỗ. */
+async function getLoggerPdf(shipmentId, lid){
+  const sep = await safeGet(pdfKey(shipmentId, lid), false);
+  if(sep) return sep;
+  const rec = await getShipment(shipmentId);
+  return (rec && rec.pdfBase64) ? rec.pdfBase64 : null;
 }
 /* Trả về true nếu xoá THẬT SỰ thành công. Trước đây hàm này nuốt lỗi rồi vẫn để
    giao diện báo "Đã xoá." — khi Firestore Rules hoặc App Check từ chối, người dùng
@@ -21674,6 +22018,7 @@ document.getElementById('tabs').addEventListener('click', e=>{
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
   if(btn.dataset.tab==='library') renderLibrary();
+  if(btn.dataset.tab==='report') renderReport();
 });
 
 /* ==========================================================================
@@ -22008,9 +22353,13 @@ fileInput.addEventListener('change', e=>{
   fileInput.value = '';
 });
 
-function handleFiles(files){
-  files.forEach(processFile);
-}
+/* ==========================================================================
+   TẢI LÊN: MỘT LÔ HÀNG — NHIỀU DATA LOGGER
+   Người dùng điền thông tin lô ở khung trên, rồi thả bao nhiêu file PDF cũng
+   được. Mỗi file được đọc riêng và hiện số của riêng nó; phần "Tổng hợp cả lô"
+   là số gộp, chính là số sẽ lên bảng báo cáo tháng.
+   ========================================================================== */
+let pendingLoggers = [];   /* [{lid, file, parsed}] — các logger đang chờ lưu */
 
 async function fileToBase64(file){
   const buf = await file.arrayBuffer();
@@ -22036,38 +22385,62 @@ function openPdfFromBase64(base64, fileName){
     toast('Không mở được file PDF gốc (có thể chưa được lưu khi tải lên).');
   }
 }
-window.openPdfById = async function(id){
-  const full = await getShipment(id);
-  if(!full || !full.pdfBase64){ toast('Lô này chưa có file PDF gốc được lưu.'); return; }
-  openPdfFromBase64(full.pdfBase64, full.fileName);
+/* Mở PDF của một logger trong lô. Không truyền lid thì mở logger đầu tiên. */
+window.openPdfById = async function(id, lid){
+  const rec = await getShipment(id);
+  if(!rec){ toast('Không tìm thấy lô này.'); return; }
+  const list = rec.loggers || [];
+  const target = lid ? list.find(l=>l.lid === lid) : list[0];
+  if(!target){ toast('Lô này chưa có file PDF gốc được lưu.'); return; }
+  const b64 = await getLoggerPdf(id, target.lid);
+  if(!b64){ toast('Lô này chưa có file PDF gốc được lưu.'); return; }
+  openPdfFromBase64(b64, target.fileName);
 };
 
-async function processFile(file){
-  const cardId = uid();
+function handleFiles(files){
+  files.forEach(addLoggerFile);
+}
+
+async function addLoggerFile(file){
+  const lid = uid();
   const list = document.getElementById('pending-list');
   const card = document.createElement('div');
-  card.className = 'pending-card';
+  card.className = 'lg-card';
+  card.id = 'lg-' + lid;
   card.innerHTML = `
-    <div class="pending-head">
-      <span class="fname">${escapeHtml(file.name)}</span>
-      <span class="status-chip status-parsing" id="chip-${cardId}"><span class="spinner"></span> Đang đọc PDF…</span>
+    <div class="lg-head">
+      <span class="lg-name">${escapeHtml(file.name)}</span>
+      <span class="status-chip status-parsing" id="chip-${lid}"><span class="spinner"></span> Đang đọc PDF…</span>
     </div>
-    <div class="pending-body" id="body-${cardId}"></div>
+    <div id="body-${lid}"></div>
   `;
-  list.prepend(card);
+  list.appendChild(card);
 
   try{
     const parsed = await parsePdf(file);
-    document.getElementById('chip-'+cardId).outerHTML = `<span class="status-chip status-ok" id="chip-${cardId}">✓ Đã đọc ${parsed.pointCount} điểm dữ liệu</span>`;
-    renderPendingBody(cardId, file, parsed);
+    pendingLoggers.push({ lid, file, parsed });
+    const chip = document.getElementById('chip-'+lid);
+    if(chip) chip.outerHTML = `<button type="button" class="btn btn-danger btn-sm" onclick="removePendingLogger('${lid}')">Bỏ file này</button>`;
+    renderLoggerBody(lid, parsed);
+    renderLotSummary();
   }catch(err){
-    document.getElementById('chip-'+cardId).outerHTML = `<span class="status-chip status-error">✕ Lỗi</span>`;
-    document.getElementById('body-'+cardId).innerHTML = `<p style="color:var(--danger);font-size:13.5px;">${escapeHtml(err.message || String(err))}</p>`;
+    const chip = document.getElementById('chip-'+lid);
+    if(chip) chip.outerHTML = `<span class="status-chip status-error">✕ Lỗi</span>`;
+    const body = document.getElementById('body-'+lid);
+    if(body) body.innerHTML = `<p style="color:var(--danger);font-size:13.5px;">${escapeHtml(err.message || String(err))}</p>`;
   }
 }
 
-function renderPendingBody(cardId, file, parsed){
-  const body = document.getElementById('body-'+cardId);
+window.removePendingLogger = function(lid){
+  pendingLoggers = pendingLoggers.filter(l=>l.lid !== lid);
+  const el = document.getElementById('lg-'+lid);
+  if(el) el.remove();
+  renderLotSummary();
+};
+
+function renderLoggerBody(lid, parsed){
+  const body = document.getElementById('body-'+lid);
+  if(!body) return;
   const startD = new Date(parsed.start), stopD = new Date(parsed.stop);
   const tripDays = ((parsed.stop - parsed.start)/86400000).toFixed(1);
   body.innerHTML = `
@@ -22077,88 +22450,175 @@ function renderPendingBody(cardId, file, parsed){
       <div class="stat-item"><b>${fmt1(parsed.avg)}°C</b><span>Trung bình</span></div>
       <div class="stat-item"><b>${tripDays}</b><span>Ngày hành trình</span></div>
     </div>
-    <div class="ribbon-wrap"><canvas class="ribbon" id="ribbon-${cardId}"></canvas></div>
-    <div class="hint" style="margin-bottom:16px;">Từ ${startD.toLocaleString('vi-VN')} đến ${stopD.toLocaleString('vi-VN')} · Các tháng trong hành trình: ${parsed.months.map(m=>MONTH_NAMES[m]).join(', ')}</div>
+    <div class="ribbon-wrap"><canvas class="ribbon" id="ribbon-${lid}"></canvas></div>
+    <div class="hint" style="margin-top:8px;">Từ ${startD.toLocaleString('vi-VN')} đến ${stopD.toLocaleString('vi-VN')}</div>
+  `;
+  requestAnimationFrame(()=>{
+    const cv = document.getElementById('ribbon-'+lid);
+    if(cv) drawRibbon(cv, parsed.points);
+  });
+}
 
-    <div class="grid-2">
-      <div class="field">
-        <label class="field-label">Loại hình vận chuyển</label>
-        <select id="meta-mode-${cardId}">
-          <option value="">— Chọn loại hình —</option>
-          <option value="AIR">AIR</option>
-          <option value="LAND">LAND (đường bộ)</option>
-          <option value="LCL">LCL</option>
-          <option value="FCL_COLD">FCL Lạnh</option>
-          <option value="FCL_STD">FCL Thường</option>
-        </select>
-      </div>
-      <div class="field">
-        <label class="field-label">Cảng / nước đến</label>
-        <input type="text" id="meta-dest-${cardId}" list="meta-port-datalist-${cardId}" placeholder="Gõ tên cảng, sân bay hoặc quốc gia...">
-        <datalist id="meta-port-datalist-${cardId}"></datalist>
+function renderLotSummary(){
+  const el = document.getElementById('lot-summary');
+  if(!el) return;
+  if(!pendingLoggers.length){ el.innerHTML = ''; return; }
+  const agg = aggregateLoggers(pendingLoggers.map(l=>l.parsed));
+  el.innerHTML = `
+    <div class="lg-card" style="margin-top:18px;">
+      <div class="stat-strip">
+        <div class="stat-item"><b>${pendingLoggers.length}</b><span>Số lượng data logger</span></div>
+        <div class="stat-item"><b>${fmt1(agg.max)}°C</b><span>Nhiệt độ cao nhất</span></div>
+        <div class="stat-item"><b>${fmt1(agg.min)}°C</b><span>Nhiệt độ thấp nhất</span></div>
+        <div class="stat-item"><b>${fmt1(agg.avg)}°C</b><span>Nhiệt độ trung bình</span></div>
       </div>
     </div>
-    <button class="btn btn-primary" id="save-${cardId}">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
-      Lưu vào kho dữ liệu
-    </button>
   `;
-  requestAnimationFrame(()=>drawRibbon(document.getElementById('ribbon-'+cardId), parsed.points));
+}
 
-  const metaModeSelect = document.getElementById('meta-mode-'+cardId);
-  const metaPortDatalist = document.getElementById('meta-port-datalist-'+cardId);
-  function refreshMetaPortDatalist(){
-    const m = metaModeSelect.value;
-    // LCL / FCL_COLD / FCL_STD đều là hàng đường biển ⇒ danh sách cảng biển.
-    // Chưa chọn loại hình ⇒ null ⇒ hiện tất cả.
-    const portType = m ? (MODE_TO_PORT_TYPE[m] || 'sea') : null;
-    populatePortDatalist(metaPortDatalist, portType);
+function lotFormValues(){
+  const v = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+  return {
+    subMail: (v('lot-submail')||'').trim(),
+    productName: (v('lot-product')||'').trim(),
+    transportMode: v('lot-mode'),
+    shipMonth: v('lot-shipmonth'),
+    eta: v('lot-eta'),
+    actualArrivalMonth: v('lot-arrival'),
+    note: (v('lot-note')||'').trim(),
+    docOwner: (v('lot-docowner')||'').trim(),
+    status: v('lot-status'),
+    remark: (v('lot-remark')||'').trim(),
+    loggerUpdateMonth: v('lot-updatemonth'),
+  };
+}
+
+function resetLotForm(){
+  pendingLoggers = [];
+  const list = document.getElementById('pending-list');
+  if(list) list.innerHTML = '';
+  const sum = document.getElementById('lot-summary');
+  if(sum) sum.innerHTML = '';
+  ['lot-submail','lot-product','lot-dest','lot-note','lot-shipmonth','lot-eta','lot-arrival',
+   'lot-docowner','lot-remark','lot-updatemonth'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+  const mode = document.getElementById('lot-mode');
+  if(mode) mode.value = '';
+  const st = document.getElementById('lot-status');
+  if(st) st.value = LOT_STATUSES[0];
+  refreshLotPortDatalist();
+}
+
+async function saveLotFromForm(){
+  const btn = document.getElementById('btn-save-lot');
+  const f = lotFormValues();
+
+  if(!f.subMail){ toast('Điền "Lô hàng (Sub mail TBXK)" trước đã.'); return; }
+  if(!f.transportMode){ toast('Chọn loại hình vận chuyển.'); return; }
+  /* Lô không có file logger nào vẫn lưu được — nhưng phải nói rõ vì sao không
+     có, để khỏi lưu nhầm lô do quên thả file. */
+  if(!pendingLoggers.length && LOT_STATUS_NO_LOGGER.indexOf(f.status) < 0){
+    toast('Lô chưa có file data logger. Chọn Tình trạng "' + LOT_STATUS_NO_LOGGER.join('" hoặc "') + '" thì mới lưu được.');
+    return;
   }
-  refreshMetaPortDatalist();
-  metaModeSelect.addEventListener('change', refreshMetaPortDatalist);
 
-  document.getElementById('save-'+cardId).addEventListener('click', async ()=>{
-    const btn = document.getElementById('save-'+cardId);
-    const destInput = document.getElementById('meta-dest-'+cardId);
-    const destResolved = await resolvePortInput(destInput);
-    const modeSelect = document.getElementById('meta-mode-'+cardId);
-    const transportMode = modeSelect.value;
-    if(!destResolved){ toast('Gõ tên cảng/sân bay/quốc gia rồi chọn đúng tên trong danh sách gợi ý nhé.'); return; }
+  const destInput = document.getElementById('lot-dest');
+  const destResolved = await resolvePortInput(destInput);
+  if(!destResolved){ toast('Gõ tên cảng/sân bay/quốc gia rồi chọn đúng tên trong danh sách gợi ý nhé.'); return; }
+
+  /* Nhớ nội dung nút để trả lại sau khi lưu — kể cả khi lưu THÀNH CÔNG. Bản v30,
+     v31 quên bước này nên lưu xong một lô là nút kẹt ở "Đang lưu…" và bị khoá. */
+  const btnHtml = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Đang lưu…'; }
+  try{
     const dest = destResolved.country;
     const destPort = destResolved.type ? destResolved.label : null;
-
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Đang lưu…';
-
-    const destLat = destResolved.lat, destLon = destResolved.lon;
     const origin = 'Việt Nam';
     const og = await geocode(origin);
 
-    let pdfBase64 = null;
-    try{ pdfBase64 = await fileToBase64(file); }
-    catch(e){ console.error('pdf to base64 failed', e); }
+    const loggers = [];
+    for(const item of pendingLoggers){
+      let pdfBase64 = null;
+      try{ pdfBase64 = await fileToBase64(item.file); }
+      catch(e){ console.error('pdf to base64 failed', e); }
+      loggers.push({
+        lid: item.lid,
+        fileName: item.file.name,
+        deviceId: item.parsed.deviceId,
+        min: item.parsed.min, max: item.parsed.max, avg: item.parsed.avg,
+        start: item.parsed.start, stop: item.parsed.stop,
+        months: item.parsed.months,
+        points: item.parsed.points,
+        pdfBase64,
+      });
+    }
+    const agg = aggregateLoggers(loggers);
+    const user = (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser : null;
 
     const record = {
       id: uid(),
-      fileName: file.name,
-      deviceId: parsed.deviceId,
+      subMail: f.subMail, productName: f.productName,
+      shipMonth: f.shipMonth, eta: f.eta, actualArrivalMonth: f.actualArrivalMonth,
+      note: f.note,
+      docOwner: f.docOwner, status: f.status, remark: f.remark,
+      loggerUpdateMonth: f.loggerUpdateMonth,
+      fileName: loggers.map(l=>l.fileName).join(' · '),
+      loggers, loggerCount: loggers.length,
+      deviceId: agg.deviceId,
       origin, dest, destPort,
-      originLat: og?og.lat:null, originLon: og?og.lon:null,
-      destLat, destLon,
-      transportMode,
-      drug: '', reqMin: null, reqMax: null,
-      points: parsed.points,
-      min: parsed.min, max: parsed.max, avg: parsed.avg,
-      start: parsed.start, stop: parsed.stop,
-      months: parsed.months,
+      originLat: og ? og.lat : null, originLon: og ? og.lon : null,
+      destLat: destResolved.lat, destLon: destResolved.lon,
+      transportMode: f.transportMode,
+      drug: f.productName, reqMin: null, reqMax: null,
+      min: agg.min, max: agg.max, avg: agg.avg,
+      start: agg.start, stop: agg.stop,
+      months: agg.months,
       uploadedAt: Date.now(),
-      pdfBase64,
+      /* Mã người tạo lô — firestore.rules dùng để quyết định ai được sửa lô.
+         Không lưu email: tên người phụ trách đã có ở ô "DOC phụ trách". */
+      uploadedByUid: user ? user.uid : '',
     };
     await saveShipment(record);
-    toast('Đã lưu "'+file.name+'" vào kho dữ liệu.');
-    btn.outerHTML = '<span class="status-chip status-saved">✓ Đã lưu vào kho dữ liệu</span>';
-  });
+    toast(loggers.length
+      ? ('Đã lưu lô "' + f.subMail + '" với ' + loggers.length + ' data logger.')
+      : ('Đã lưu lô "' + f.subMail + '" (không có data logger — ' + f.status + ').'));
+    resetLotForm();
+  }catch(e){
+    console.error('save lot failed', e);
+    toast(saveErrorMessage(e));
+  }finally{
+    if(btn){ btn.disabled = false; btn.innerHTML = btnHtml; }
+  }
 }
+
+/* Danh sách cảng gợi ý của khung lô — lọc theo loại hình vận chuyển đang chọn. */
+const lotModeSelect = document.getElementById('lot-mode');
+const lotPortDatalist = document.getElementById('lot-port-datalist');
+function refreshLotPortDatalist(){
+  if(!lotModeSelect || !lotPortDatalist) return;
+  const m = lotModeSelect.value;
+  const portType = m ? (MODE_TO_PORT_TYPE[m] || 'sea') : null;
+  populatePortDatalist(lotPortDatalist, portType);
+}
+if(lotModeSelect) lotModeSelect.addEventListener('change', refreshLotPortDatalist);
+refreshLotPortDatalist();
+
+const btnAddLogger = document.getElementById('btn-add-logger');
+if(btnAddLogger) btnAddLogger.addEventListener('click', ()=>fileInput.click());
+
+/* Đổ danh sách Tình trạng vào ô chọn, cả ở khung tải lên lẫn bảng sửa lô. */
+function fillStatusSelect(sel, current){
+  if(!sel) return;
+  sel.innerHTML = LOT_STATUSES.map(s=>
+    `<option value="${escapeHtml(s)}"${s === current ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('');
+}
+fillStatusSelect(document.getElementById('lot-status'), LOT_STATUSES[0]);
+
+const btnSaveLot = document.getElementById('btn-save-lot');
+if(btnSaveLot) btnSaveLot.addEventListener('click', saveLotFromForm);
+
 
 /* ================= LOOKUP FLOW ================= */
 document.getElementById('btn-run-lookup').addEventListener('click', runLookup);
@@ -22441,6 +22901,9 @@ async function runLookup(){
     const idx = await loadIndex();
     const nDest = norm(dest);
     const sameCountry = idx.filter(rec=>{
+      /* Lô không xin được logger thì không có số đo thật nào — đưa vào đây chỉ
+         làm loãng phần khuyến nghị. Nó vẫn nằm đủ trong báo cáo tháng. */
+      if(!hasRealLogger(rec)) return false;
       const rDest = norm(rec.dest||'');
       return rDest && (rDest.includes(nDest) || nDest.includes(rDest));
     });
@@ -22458,7 +22921,7 @@ async function runLookup(){
     await Promise.all([...exact, ...reference].map(async r=>{
       const full = await getShipment(r.id);
       if(full && full.points) r.dayStats = computeDayStats(full.points);
-      r.hasPdf = !!(full && full.pdfBase64);
+      r.hasPdf = !!(full && (full.loggers || []).length);
     }));
 
     // ---- 3. build day-by-day journey: origin -> transit stops -> destination ----
@@ -22858,17 +23321,7 @@ async function rebuildIndexFromShipments(){
       rec = typeof raw === 'string' ? JSON.parse(raw) : raw;
     }catch(e){ failed++; continue; }
     if(!rec || !rec.id){ failed++; continue; }
-    const ok = await saveIndexEntry({
-      id: rec.id, fileName: rec.fileName,
-      origin: rec.origin, dest: rec.dest, destPort: rec.destPort,
-      originLat: rec.originLat, originLon: rec.originLon,
-      destLat: rec.destLat, destLon: rec.destLon,
-      drug: rec.drug, reqMin: rec.reqMin, reqMax: rec.reqMax,
-      deviceId: rec.deviceId, transportMode: rec.transportMode,
-      start: rec.start, stop: rec.stop,
-      min: rec.min, max: rec.max, avg: rec.avg,
-      months: rec.months, uploadedAt: rec.uploadedAt
-    });
+    const ok = await saveIndexEntry(shipmentMeta(normalizeShipment(rec)));
     if(ok) restored++; else failed++;
   }
   return { scanned, restored, failed };
@@ -22909,11 +23362,19 @@ document.getElementById('btn-backup').addEventListener('click', async ()=>{
     for(let i=0; i<idx.length; i++){
       btn.innerHTML = `<span class="spinner"></span> Đang tải ${i+1}/${idx.length}…`;
       const full = await getShipment(idx[i].id);
-      if(full) records.push(full);
+      if(full){
+        /* PDF nằm ở bản ghi riêng nên phải lấy thêm, không thì file backup chỉ
+           có số liệu mà không có file PDF gốc. */
+        for(const lg of (full.loggers || [])){
+          try{ lg.pdfBase64 = await getLoggerPdf(full.id, lg.lid); }
+          catch(e){ console.error('backup: không lấy được PDF', full.id, lg.lid, e); }
+        }
+        records.push(full);
+      }
     }
     const payload = {
       exportedAt: new Date().toISOString(),
-      appVersion: 'tuyen-lanh-v1',
+      appVersion: 'tuyen-lanh-v2',
       count: records.length,
       shipments: records,
     };
@@ -22949,7 +23410,7 @@ async function hiddenSectionHtml(){
       <span class="sec-dot sec-warn"></span>
       <div style="flex:1;">
         <b>${escapeHtml(r.dest || 'Không rõ')}</b>
-        <div class="hint" style="margin-top:3px;">${escapeHtml(r.fileName || '')}${when ? ' · ẩn ngày ' + when : ''}${r.hiddenBy ? ' · bởi ' + escapeHtml(r.hiddenBy) : ''}</div>
+        <div class="hint" style="margin-top:3px;">${escapeHtml(r.fileName || '')}${when ? ' · ẩn ngày ' + when : ''}</div>
       </div>
       ${isAdmin ? `<button class="btn btn-ghost btn-sm" onclick="unhideShipment('${r.id}')">Bỏ ẩn</button>` : ''}
     </div>`;
@@ -22985,7 +23446,10 @@ async function renderLibrary(){
   groupList.sort((a,b)=> Math.min(...a.items.map(closest)) - Math.min(...b.items.map(closest)));
 
   el.innerHTML = `<div class="lib-grid">` + groupList.map(g=>{
-    const allMax = g.items.map(r=>r.max), allMin = g.items.map(r=>r.min);
+    /* Bỏ qua lô không có logger — nhiệt độ của chúng để trống, đưa vào Math.max
+       sẽ ra 0° trông như số đo thật. */
+    const allMax = g.items.map(r=>r.max).filter(v=>typeof v === 'number');
+    const allMin = g.items.map(r=>r.min).filter(v=>typeof v === 'number');
     const modeCounts = {};
     g.items.forEach(r=>{ const m=r.transportMode||'—'; modeCounts[m]=(modeCounts[m]||0)+1; });
     const modeSummary = Object.entries(modeCounts).map(([m,c])=>`${m==='—'?'Chưa gắn loại':transportModeLabel(m)} ×${c}`).join(' · ');
@@ -22993,8 +23457,8 @@ async function renderLibrary(){
       <div class="route">${escapeHtml(g.label)}</div>
       <div class="period">${g.items.length} lô data logger · ${modeSummary}</div>
       <div class="stat-strip" style="gap:16px;">
-        <div class="stat-item"><b>${fmt1(Math.max(...allMax))}°</b><span>Max toàn bộ</span></div>
-        <div class="stat-item"><b>${fmt1(Math.min(...allMin))}°</b><span>Min toàn bộ</span></div>
+        <div class="stat-item"><b>${allMax.length ? fmt1(Math.max(...allMax)) + '°' : '—'}</b><span>Max toàn bộ</span></div>
+        <div class="stat-item"><b>${allMin.length ? fmt1(Math.min(...allMin)) + '°' : '—'}</b><span>Min toàn bộ</span></div>
       </div>
       <div class="lib-foot">
         <button class="btn btn-ghost btn-sm">Xem tất cả lô →</button>
@@ -23011,15 +23475,19 @@ window.openCountryGroup = async function(groupKey){
   const label = allItems[0].dest || 'Khác';
 
   function rowHtml(r){
-    const tripDays = ((r.stop-r.start)/86400000).toFixed(0);
+    /* Lô không có logger thì không có ngày bắt đầu/kết thúc — đừng hiện "NaN ngày". */
+    const tripDays = (typeof r.start === 'number' && typeof r.stop === 'number')
+      ? ((r.stop - r.start)/86400000).toFixed(0) + ' ngày · ' : '';
     const modeSuffix = r.transportMode ? ` (${transportModeShort(r.transportMode)})` : '';
     const destLabel = r.destPort || r.dest || '?';
     return `<div class="match-card" style="margin-bottom:10px;">
       <div class="match-head">
         <div>
           <div class="match-route">${escapeHtml(r.origin||'Việt Nam')}<span class="arrow">→</span>${escapeHtml(destLabel)}${escapeHtml(modeSuffix)}</div>
-          <div class="match-meta">${new Date(r.start).toLocaleDateString('vi-VN')} – ${new Date(r.stop).toLocaleDateString('vi-VN')} · ${tripDays} ngày · ${escapeHtml(r.fileName)}</div>
+          ${r.subMail ? `<div class="match-meta" style="font-weight:600;">${escapeHtml(r.subMail)}</div>` : ''}
+          <div class="match-meta">${(typeof r.start === 'number' && typeof r.stop === 'number') ? (new Date(r.start).toLocaleDateString('vi-VN') + ' – ' + new Date(r.stop).toLocaleDateString('vi-VN') + ' · ') : ''}${tripDays}${escapeHtml(lotInfoLine(r))}</div>
         </div>
+        ${r.status ? `<span class="tag" style="color:${statusColor(r.status)};border-color:${statusColor(r.status)};">${escapeHtml(r.status)}</span>` : ''}
       </div>
       <div class="stat-strip" style="margin-top:12px;margin-bottom:4px;">
         <div class="stat-item"><b>${fmt1(r.max)}°C</b><span>Cao nhất</span></div>
@@ -23028,6 +23496,7 @@ window.openCountryGroup = async function(groupKey){
       </div>
       <div class="lib-foot" style="margin-top:8px;">
         <button class="btn btn-ghost btn-sm" onclick="openDetail('${r.id}')">Xem chi tiết &amp; biểu đồ</button>
+        ${canEditLot(r) ? `<button class="btn btn-ghost btn-sm" onclick="openEditLot('${r.id}')">Sửa thông tin lô</button>` : ''}
         ${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="removeShipmentFromGroup('${r.id}','${groupKey.replace(/'/g,"\\'")}')">Ẩn</button>` : ''}
       </div>
     </div>`;
@@ -23216,7 +23685,7 @@ function mfaGrant(uid){
   const u = fsAuth && fsAuth.currentUser;
   /* Phiên có thể đã đổi trong lúc màn hình 2FA đang mở — không cấp quyền cho
      tài khoản khác với tài khoản đã bắt đầu luồng này. */
-  if(!u || u.uid !== uid || !isAdminEmail(u.email)){
+  if(!u || u.uid !== uid || !isAdminUid(u.uid)){
     mfaHide();
     toast('Phiên đăng nhập đã thay đổi — hãy đăng nhập lại rồi thử lại.');
     return false;
@@ -23262,7 +23731,7 @@ function mfaRunEnroll(uid, email, ref){
     mfaCancelCurrent = ()=>finish(false);
 
     const secret = newTotpSecret();
-    const label  = 'TUYEN LANH:' + (email || ADMIN_EMAIL);
+    const label  = 'TUYEN LANH:' + (email || 'admin');
     const uri = 'otpauth://totp/' + encodeURIComponent(label) +
                 '?secret=' + secret + '&issuer=' + encodeURIComponent('TUYEN LANH') +
                 '&algorithm=SHA1&digits=6&period=30';
@@ -23303,7 +23772,7 @@ function mfaRunEnroll(uid, email, ref){
           await ref.set({
             enabled: true,
             recoveryHash: await sha256hex(normRecovery(rec)),
-            email: email || ADMIN_EMAIL,
+            email: email || '',
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           });
         }catch(e){
@@ -23391,7 +23860,7 @@ function mfaRunRestore(uid, recoveryHash, ref){
       /* KHÔNG xoá khoá cũ ở đây. Bản trước xoá ngay tại chỗ này, nên nếu người dùng
          bấm "Để sau" ở màn đăng ký tiếp theo thì mất luôn thiết bị đang chạy tốt.
          Đăng ký thành công sẽ tự ghi đè khoá mới. */
-      const email = (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.email : ADMIN_EMAIL;
+      const email = (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.email : '';
       done = true;
       mfaCancelCurrent = null;
       resolve(await mfaRunEnroll(uid, email, ref));   /* đăng ký lại thiết bị + cấp mã dự phòng mới */
@@ -23430,7 +23899,7 @@ let mfaPending = null;
 async function requireAdminStepUp(){
   if(!HAS_FIREBASE) return true;                       /* chế độ lưu cục bộ, không có Firebase */
   const user = fsAuth && fsAuth.currentUser;
-  if(!user || !isAdminEmail(user.email)){
+  if(!isAdminUser(user)){
     toast('Chỉ tài khoản admin mới xoá được.');
     return false;
   }
@@ -23486,7 +23955,7 @@ function securityPanelHtml(embedded){
   let mfaDot = 'sec-warn', mfaMsg = 'Chưa đăng nhập bằng tài khoản admin.';
   if(isLoggedIn && fsAuth && fsAuth.currentUser){
     const u = fsAuth.currentUser;
-    if(!isAdminEmail(u.email)){
+    if(!isAdminUid(u.uid)){
       mfaDot = 'sec-ok';
       mfaMsg = 'Tài khoản thường — không có quyền xoá nên không cần 2FA.';
     }else if(mfaEnrolled === true){
@@ -23555,8 +24024,9 @@ function updateAdminUI(){
   const btn = document.getElementById('admin-login-btn');
   if(!btn) return;
   if(isLoggedIn){
-    const email = (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.email : '';
-    const isAdminAccount = isAdminEmail(email);
+    const curUser = (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser : null;
+    const email = curUser ? (curUser.email || '') : '';
+    const isAdminAccount = isAdminUser(curUser);
     const needsAttention = isAdminAccount && mfaEnrolled === false;
     btn.textContent = isAdminAccount ? (needsAttention ? '⚠️' : '🛡️') : '👤';
     btn.title = (isAdminAccount ? 'Admin' : 'Tài khoản') + ': ' + email;
@@ -23586,8 +24056,9 @@ function openAccountPanel(){
   };
 }
 function accountPanelHtml(){
-  const email = (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.email : '';
-  const isAdminAccount = isAdminEmail(email);
+  const curUser = (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser : null;
+  const email = curUser ? (curUser.email || '') : '';
+  const isAdminAccount = isAdminUser(curUser);
   return '<button class="modal-close" onclick="document.getElementById(\'modal-bg\').classList.remove(\'active\')">✕</button>' +
     '<h2 style="font-family:var(--font-display);margin:0 0 4px;">Tài khoản</h2>' +
     '<div class="hint" style="margin-bottom:16px;">' + escapeHtml(email) +
@@ -23686,8 +24157,9 @@ window.openDetail = async function(id){
   modal.innerHTML = `
     <button class="modal-close" onclick="document.getElementById('modal-bg').classList.remove('active')">✕</button>
     <h2 style="font-family:var(--font-display);margin:0 0 4px;">${escapeHtml(r.origin||'?')} → ${escapeHtml(r.dest||'?')}</h2>
-    <div class="hint" style="margin-bottom:16px;">${escapeHtml(r.fileName)} · Device ${escapeHtml(r.deviceId||'N/A')} · ${tripDays} ngày</div>
-    <div class="ribbon-wrap"><canvas id="modal-linechart" style="width:100%;height:220px;display:block;"></canvas></div>
+    ${r.subMail ? `<div class="hint" style="margin-bottom:4px;"><b>${escapeHtml(r.subMail)}</b></div>` : ''}
+    <div class="hint" style="margin-bottom:16px;">${escapeHtml(lotInfoLine(r))}</div>
+    ${(r.points && r.points.length) ? `<div class="ribbon-wrap"><canvas id="modal-linechart" style="width:100%;height:220px;display:block;"></canvas></div>` : ''}
     <div class="stat-strip">
       <div class="stat-item"><b>${fmt1(r.max)}°C</b><span>Cao nhất</span></div>
       <div class="stat-item"><b>${fmt1(r.min)}°C</b><span>Thấp nhất</span></div>
@@ -23695,23 +24167,417 @@ window.openDetail = async function(id){
     </div>
     ${r.drug?`<div class="hint">Thuốc / lô hàng: ${escapeHtml(r.drug)}</div>`:''}
     ${(r.reqMin!=null||r.reqMax!=null)?`<div class="hint">Ngưỡng yêu cầu: ${r.reqMin!=null?r.reqMin+'°C':'—'} ~ ${r.reqMax!=null?r.reqMax+'°C':'—'}</div>`:''}
-    <div style="display:flex;gap:10px;margin-top:14px;">
-      ${r.pdfBase64
-        ? `<button class="btn btn-primary btn-sm" id="btn-open-pdf"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg> Mở file PDF gốc</button>`
+    ${loggerBreakdownHtml(r)}
+    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+      ${(r.loggers||[]).length
+        ? (r.loggers||[]).map(lg=>`<button class="btn btn-primary btn-sm" onclick="openPdfById('${r.id}','${lg.lid}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg> ${escapeHtml(lg.fileName || 'PDF')}</button>`).join('')
         : `<span class="hint">(File PDF gốc chưa được lưu — lô này tải lên trước khi có tính năng này)</span>`}
     </div>
   `;
   modalBg.dataset.panel = '';
   modalBg.classList.add('active');
-  requestAnimationFrame(()=>drawLoggerLineChart(document.getElementById('modal-linechart'), r.points));
-  if(r.pdfBase64){
-    const btnPdf = document.getElementById('btn-open-pdf');
-    if(btnPdf) btnPdf.addEventListener('click', ()=>openPdfFromBase64(r.pdfBase64, r.fileName));
-  }
+  requestAnimationFrame(()=>{
+    const cv = document.getElementById('modal-linechart');
+    if(cv && r.points && r.points.length) drawLoggerLineChart(cv, r.points);
+  });
 };
 document.getElementById('modal-bg').addEventListener('click', e=>{
   if(e.target.id==='modal-bg') e.currentTarget.classList.remove('active');
 });
+
+/* ==========================================================================
+   SỬA THÔNG TIN LÔ
+   Dùng nhiều nhất cho ô "Tháng hàng đến thực tế" — thường chỉ biết sau khi hàng
+   đã tới nơi. Không đụng gì tới file data logger đã lưu.
+   ========================================================================== */
+window.openEditLot = async function(id){
+  const rec = await getShipment(id);
+  if(!rec){ toast('Không tìm thấy lô này.'); return; }
+  if(!canEditLot(rec)){ toast('Chỉ người tạo lô hoặc admin mới sửa được lô này.'); return; }
+  const v = s => escapeHtml(s || '');
+  const modal = document.getElementById('modal-content');
+  modal.innerHTML = `
+    <button class="modal-close" onclick="document.getElementById('modal-bg').classList.remove('active')">✕</button>
+    <h2 style="font-family:var(--font-display);margin:0 0 14px;">Sửa thông tin lô</h2>
+    <div class="field"><label class="field-label">Lô hàng (Sub mail TBXK)</label><input type="text" id="ed-submail" value="${v(rec.subMail)}"></div>
+    <div class="field"><label class="field-label">Tên hàng xuất khẩu</label><input type="text" id="ed-product" value="${v(rec.productName || rec.drug)}"></div>
+    <div class="grid-3">
+      <div class="field"><label class="field-label">Tháng ship hàng</label><input type="month" id="ed-shipmonth" value="${v(rec.shipMonth)}"></div>
+      <div class="field"><label class="field-label">ETA</label><input type="month" id="ed-eta" value="${v(rec.eta)}"></div>
+      <div class="field"><label class="field-label">Tháng hàng đến thực tế</label><input type="month" id="ed-arrival" value="${v(rec.actualArrivalMonth)}"></div>
+    </div>
+    <div class="field"><label class="field-label">Note</label><input type="text" id="ed-note" value="${v(rec.note)}"></div>
+    <div class="grid-3">
+      <div class="field"><label class="field-label">DOC phụ trách</label><input type="text" id="ed-docowner" value="${v(rec.docOwner)}"></div>
+      <div class="field"><label class="field-label">Tình trạng</label><select id="ed-status"></select></div>
+      <div class="field"><label class="field-label">Tháng update thông tin data logger</label><input type="month" id="ed-updatemonth" value="${v(rec.loggerUpdateMonth)}"></div>
+    </div>
+    <div class="field"><label class="field-label">Ghi chú</label><input type="text" id="ed-remark" value="${v(rec.remark)}"></div>
+    <button class="btn btn-primary" id="ed-save">Lưu thay đổi</button>
+  `;
+  fillStatusSelect(document.getElementById('ed-status'), rec.status || LOT_STATUSES[0]);
+  const bg = document.getElementById('modal-bg');
+  bg.dataset.panel = '';
+  bg.classList.add('active');
+  document.getElementById('ed-save').addEventListener('click', async ()=>{
+    const btn = document.getElementById('ed-save');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Đang lưu…';
+    rec.subMail = document.getElementById('ed-submail').value.trim();
+    rec.productName = document.getElementById('ed-product').value.trim();
+    rec.drug = rec.productName;
+    rec.shipMonth = document.getElementById('ed-shipmonth').value;
+    rec.eta = document.getElementById('ed-eta').value;
+    rec.actualArrivalMonth = document.getElementById('ed-arrival').value;
+    rec.note = document.getElementById('ed-note').value.trim();
+    rec.docOwner = document.getElementById('ed-docowner').value.trim();
+    rec.status = document.getElementById('ed-status').value;
+    rec.remark = document.getElementById('ed-remark').value.trim();
+    rec.loggerUpdateMonth = document.getElementById('ed-updatemonth').value;
+    try{
+      await saveShipment(rec);
+      toast('Đã lưu thay đổi.');
+      bg.classList.remove('active');
+      await renderLibrary();
+      const rp = document.getElementById('panel-report');
+      if(rp && rp.classList.contains('active')) await renderReport();
+    }catch(e){
+      console.error('edit lot failed', e);
+      toast(saveErrorMessage(e));
+      btn.disabled = false; btn.textContent = 'Lưu thay đổi';
+    }
+  });
+};
+
+/* ==========================================================================
+   BÁO CÁO THÁNG
+   Gom các lô theo THÁNG SHIP HÀNG, đúng thứ tự cột của bảng báo cáo đang dùng.
+   Cột "Phương tiện" trong bảng cũ không đưa vào đây theo yêu cầu — loại hình
+   vận chuyển vẫn được giữ trong app vì phần tính khuyến nghị cont cần đến nó.
+   ========================================================================== */
+const REPORT_COLUMNS = ['TT','Lô hàng (Sub mail TBXK)','Tên hàng xuất khẩu','Tháng ship hàng','ETA',
+  'Tháng hàng đến thực tế','Cảng đến','Số lượng data logger','Nhiệt độ cao nhất','Nhiệt độ thấp nhất',
+  'Nhiệt độ trung bình','Note','DOC phụ trách','Tình trạng','Ghi chú','Tháng update thông tin data logger'];
+/* Các cột căn giữa / là số: TT, số lượng logger, 3 cột nhiệt độ. */
+const REPORT_NUM_COLS = [0, 7, 8, 9, 10];
+/* Ba cột nhiệt độ — làm tròn 1 chữ số thập phân khi hiện và khi xuất Excel. */
+const REPORT_TEMP_COLS = [8, 9, 10];
+
+function monthTitle(key){
+  if(!key) return 'Chưa điền tháng ship hàng';
+  const m = String(key).match(/^(\d{4})-(\d{2})$/);
+  return m ? ('Tháng ' + Number(m[2]) + '/' + m[1]) : ('Tháng ' + key);
+}
+
+function reportRowsFor(items){
+  return items.map((r, i)=>[
+    i + 1,
+    r.subMail || '',
+    r.productName || r.drug || '',
+    fmtMonth(r.shipMonth),
+    fmtMonth(r.eta),
+    fmtMonth(r.actualArrivalMonth),
+    r.destPort || r.dest || '',
+    /* Đừng dùng "|| 1" — số 0 cũng bị coi là rỗng, lô không có logger sẽ hiện thành 1. */
+    (typeof r.loggerCount === 'number') ? r.loggerCount : 1,
+    (typeof r.max === 'number') ? r.max : null,
+    (typeof r.min === 'number') ? r.min : null,
+    (typeof r.avg === 'number') ? r.avg : null,
+    r.note || '',
+    r.docOwner || '',
+    r.status || '',
+    r.remark || '',
+    fmtMonth(r.loggerUpdateMonth)
+  ]);
+}
+
+async function reportGroups(){
+  const idx = await loadIndex();
+  const fromEl = document.getElementById('rp-from');
+  const toEl = document.getElementById('rp-to');
+  const from = fromEl ? fromEl.value : '';
+  const to = toEl ? toEl.value : '';
+  let items = idx.slice();
+  if(from || to){
+    items = items.filter(r=>{
+      const m = r.shipMonth || '';
+      if(!m) return false;                 /* chưa điền tháng ship thì không lọc theo tháng được */
+      if(from && m < from) return false;
+      if(to && m > to) return false;
+      return true;
+    });
+  }
+  const map = new Map();
+  items.forEach(r=>{
+    const k = r.shipMonth || '';
+    if(!map.has(k)) map.set(k, []);
+    map.get(k).push(r);
+  });
+  const keys = Array.from(map.keys()).sort((a,b)=>{
+    if(!a) return 1;                        /* nhóm "chưa điền tháng" xuống cuối */
+    if(!b) return -1;
+    return b.localeCompare(a);              /* tháng mới nhất lên trước */
+  });
+  return keys.map(k=>({ key:k, title: monthTitle(k), items: map.get(k) }));
+}
+
+function reportCellText(value, colIndex){
+  if(value === null || value === undefined) return '';
+  if(typeof value === 'number') return (REPORT_TEMP_COLS.indexOf(colIndex) >= 0) ? fmt1(value) : String(value);
+  return String(value);
+}
+
+/* ==========================================================================
+   KHUNG "ĐANG CHỜ DATA LOGGER"
+   Gom mọi lô có Tình trạng "Hàng chưa tới", bất kể tháng nào, và CỐ Ý không
+   chịu ảnh hưởng của ô lọc Từ tháng / Đến tháng — để lô tháng cũ còn treo vẫn
+   đập vào mắt khi đang làm báo cáo tháng mới. Ship tháng cũ nhất xếp lên trên.
+   Không có lô nào đang chờ thì khung tự ẩn đi cho gọn.
+   ========================================================================== */
+async function renderPendingLotsBox(){
+  const el = document.getElementById('pending-lots-box');
+  if(!el) return;
+  const idx = await loadIndex();
+  const waiting = idx.filter(r => r.status === 'Hàng chưa tới');
+  if(!waiting.length){ el.innerHTML = ''; return; }
+  waiting.sort((a, b)=> String(a.shipMonth || '').localeCompare(String(b.shipMonth || '')));
+  const rows = waiting.map(r=>{
+    const meta = [
+      r.shipMonth ? 'ship ' + fmtMonth(r.shipMonth) : '',
+      r.eta ? 'ETA ' + fmtMonth(r.eta) : '',
+      r.destPort || r.dest || '',
+      r.docOwner || ''
+    ].filter(Boolean).map(escapeHtml).join(' · ');
+    return `<div class="sec-row">
+      <span class="sec-dot sec-warn"></span>
+      <div style="flex:1;">
+        <b>${escapeHtml(r.subMail || r.productName || 'Lô chưa đặt tên')}</b>
+        <div class="hint" style="margin-top:3px;">${meta}</div>
+      </div>
+      ${canEditLot(r) ? `<button class="btn btn-ghost btn-sm" onclick="openEditLot('${r.id}')">Cập nhật</button>` : ''}
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div class="lg-card" style="margin:4px 0 18px;border-color:var(--amber);">
+    <div class="section-label" style="margin:0 0 6px;">
+      <span class="dot" style="background:var(--amber);box-shadow:0 0 8px var(--amber);"></span>
+      <h3>Đang chờ data logger</h3>
+      <small>${waiting.length} lô</small>
+    </div>
+    ${rows}
+  </div>`;
+}
+
+async function renderReport(){
+  await renderPendingLotsBox();
+  const el = document.getElementById('report-body');
+  if(!el) return;
+  const groups = await reportGroups();
+  if(!groups.length){
+    el.innerHTML = `<div class="empty" style="margin-top:18px;">Chưa có lô nào để báo cáo.</div>`;
+    return;
+  }
+  el.innerHTML = groups.map(g=>{
+    const rows = reportRowsFor(g.items).map(row=>
+      `<tr>${row.map((c, i)=>
+        `<td class="${REPORT_NUM_COLS.indexOf(i) >= 0 ? 'num' : ''}">${escapeHtml(reportCellText(c, i))}</td>`
+      ).join('')}</tr>`
+    ).join('');
+    return `<div class="rp-month">
+      <h3>${escapeHtml(g.title)}:</h3>
+      <div class="rp-wrap"><table class="rp-table">
+        <tr>${REPORT_COLUMNS.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr>
+        ${rows}
+      </table></div>
+    </div>`;
+  }).join('');
+}
+
+/* ==========================================================================
+   GHI FILE EXCEL (.xlsx) KHÔNG CẦN THƯ VIỆN NGOÀI
+   File .xlsx thực chất là một file ZIP chứa mấy file XML. Ở đây tự ghép ZIP ở
+   dạng "store" (không nén) — Excel, WPS, Google Sheets đều mở bình thường.
+   Làm vậy để app giữ đúng nguyên tắc một file duy nhất, không thêm phụ thuộc
+   vào thư viện bên ngoài, và vẫn chạy được cả khi mất mạng.
+   ========================================================================== */
+const CRC_TABLE = (function(){
+  const t = new Uint32Array(256);
+  for(let n = 0; n < 256; n++){
+    let c = n;
+    for(let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes){
+  let c = 0xFFFFFFFF;
+  for(let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function zipStore(files){
+  const enc = new TextEncoder();
+  const parts = [], central = [];
+  let offset = 0;
+  files.forEach(f=>{
+    const nameBytes = enc.encode(f.name);
+    const crc = crc32(f.data);
+    const local = new Uint8Array(30 + nameBytes.length);
+    const dv = new DataView(local.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(6, 0x0800, true);      /* tên file mã UTF-8 */
+    dv.setUint16(8, 0, true);           /* không nén */
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, f.data.length, true);
+    dv.setUint32(22, f.data.length, true);
+    dv.setUint16(26, nameBytes.length, true);
+    local.set(nameBytes, 30);
+    parts.push(local, f.data);
+
+    const cen = new Uint8Array(46 + nameBytes.length);
+    const cv = new DataView(cen.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true); cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0x0800, true);
+    cv.setUint16(10, 0, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, f.data.length, true);
+    cv.setUint32(24, f.data.length, true);
+    cv.setUint16(28, nameBytes.length, true);
+    cv.setUint32(42, offset, true);
+    cen.set(nameBytes, 46);
+    central.push(cen);
+    offset += local.length + f.data.length;
+  });
+  const centralSize = central.reduce((a, c)=>a + c.length, 0);
+  const end = new Uint8Array(22);
+  const ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, centralSize, true);
+  ev.setUint32(16, offset, true);
+  return new Blob(parts.concat(central, [end]),
+    {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+function xmlEsc(s){
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+function xlsxColName(i){
+  let s = '', n = i + 1;
+  while(n > 0){ const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+/* rows: mảng các dòng; mỗi ô là {t:'chữ', s:kiểu} hoặc {n:số, s:kiểu} */
+function xlsxSheetXml(rows, colWidths){
+  const cols = colWidths && colWidths.length
+    ? '<cols>' + colWidths.map((w, i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('') + '</cols>'
+    : '';
+  const body = rows.map((row, ri)=>{
+    const cells = (row || []).map((cell, ci)=>{
+      const ref = xlsxColName(ci) + (ri + 1);
+      const style = (cell && cell.s) ? cell.s : 0;
+      if(cell && cell.n !== undefined && cell.n !== null && cell.n !== ''){
+        return `<c r="${ref}" s="${style}"><v>${cell.n}</v></c>`;
+      }
+      const txt = cell ? (cell.t || '') : '';
+      if(txt === '') return `<c r="${ref}" s="${style}"/>`;
+      return `<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(txt)}</t></is></c>`;
+    }).join('');
+    return `<row r="${ri + 1}">${cells}</row>`;
+  }).join('');
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${cols}<sheetData>${body}</sheetData></worksheet>`;
+}
+const XLSX_STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
+<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill></fills>
+<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="4">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+</cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+function xlsxBlob(rows, colWidths){
+  const enc = new TextEncoder();
+  const f = (name, str)=>({ name, data: enc.encode(str) });
+  return zipStore([
+    f('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>`),
+    f('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`),
+    f('xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets><sheet name="Bao cao thang" sheetId="1" r:id="rId1"/></sheets></workbook>`),
+    f('xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`),
+    f('xl/styles.xml', XLSX_STYLES),
+    f('xl/worksheets/sheet1.xml', xlsxSheetXml(rows, colWidths)),
+  ]);
+}
+
+async function exportReportXlsx(){
+  const btn = document.getElementById('btn-export-xlsx');
+  const groups = await reportGroups();
+  if(!groups.length){ toast('Chưa có lô nào để xuất.'); return; }
+  const old = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Đang tạo file…'; }
+  try{
+    const rows = [];
+    groups.forEach(g=>{
+      rows.push([{ t: g.title + ':', s: 3 }]);
+      rows.push(REPORT_COLUMNS.map(c=>({ t: c, s: 1 })));
+      reportRowsFor(g.items).forEach(r=>{
+        rows.push(r.map((c, i)=>{
+          if(typeof c === 'number') return { n: (REPORT_TEMP_COLS.indexOf(i) >= 0 ? Math.round(c * 10) / 10 : c), s: 2 };
+          return { t: (c === null || c === undefined) ? '' : String(c), s: 2 };
+        }));
+      });
+      rows.push([]);
+    });
+    const widths = [5, 38, 22, 12, 10, 14, 20, 11, 11, 11, 12, 22, 14, 18, 30, 16];
+    const blob = xlsxBlob(rows, widths);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'bao-cao-tuyen-lanh-' + new Date().toISOString().slice(0, 10) + '.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Đã tải file Excel về máy.');
+  }catch(e){
+    console.error('export xlsx failed', e);
+    toast('Không tạo được file Excel: ' + (e.message || e));
+  }finally{
+    if(btn){ btn.disabled = false; btn.innerHTML = old; }
+  }
+}
+
+(function wireReportTab(){
+  const btnX = document.getElementById('btn-export-xlsx');
+  if(btnX) btnX.addEventListener('click', exportReportXlsx);
+  ['rp-from','rp-to'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('change', renderReport);
+  });
+})();
 
 /* init */
 (function(){
