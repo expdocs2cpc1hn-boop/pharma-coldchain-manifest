@@ -779,7 +779,7 @@ const APPCHECK_MODE = 'off';
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v32 · 2026-09-21 · chỉ người tạo lô + admin sửa được lô, khoá PDF gốc, bỏ email người tải lên';
+const APP_VERSION = 'v36 · 2026-09-28 · khí hậu trung bình 10 năm + dùng dự báo thật cho 2 tuần tới';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 const HAS_FIREBASE = (typeof firebase !== 'undefined') && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
@@ -21693,6 +21693,132 @@ async function fetchWithTimeout(url, ms){
   }finally{ clearTimeout(timer); }
 }
 
+/* ==========================================================================
+   KHÍ HẬU TRUNG BÌNH 10 NĂM  (thay cho "lấy số liệu năm ngoái")
+
+   Dự báo thời tiết thật chỉ nhìn xa được khoảng 2 tuần, mà lô hàng thường tra
+   trước cả 1-2 tháng — nên phần lớn hành trình không có dự báo nào tồn tại.
+   Khi đó phải nhìn vào quá khứ. Bản trước chỉ lấy DUY NHẤT năm ngoái, nên một
+   ngày nắng bất thường của riêng năm đó làm lệch cả dự đoán.
+
+   Nay lấy 10 năm gần nhất, tính trung bình cho TỪNG NGÀY trong năm:
+     • tmax/tmin/tmean = trung bình 10 năm của đúng ngày đó
+     • hiMax = ngày NÓNG NHẤT từng ghi nhận trong 10 năm của tháng đó
+       (dùng cho ô "mức xấu nhất" — đáng tin hơn đỉnh của riêng một năm)
+
+   Một lần gọi lấy đủ 10 năm cho cả 12 tháng, rồi lưu lại. Lần tra cứu đầu của
+   một địa điểm mới sẽ chậm hơn, từ lần sau là nhanh như cũ.
+   ========================================================================== */
+async function fetchClimateNormals(lat, lon){
+  const endYear = new Date().getFullYear() - 1;
+  const startYear = endYear - 9;
+  const cacheKey = `normals:${lat.toFixed(2)}:${lon.toFixed(2)}:${startYear}-${endYear}`;
+  const cached = await safeGet(cacheKey, false);
+  if(cached){ try{ return JSON.parse(cached); }catch(e){} }
+
+  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}`
+            + `&start_date=${startYear}-01-01&end_date=${endYear}-12-31`
+            + `&daily=temperature_2m_max,temperature_2m_min,temperature_2m_mean&timezone=auto`;
+
+  const ATTEMPTS = 3;
+  for(let attempt=1; attempt<=ATTEMPTS; attempt++){
+    try{
+      const res = await fetchWithTimeout(url, 25000);
+      const data = await res.json();
+      if(!data || !data.daily || !data.daily.time) throw new Error('no daily data in response');
+      const times = data.daily.time;
+      const aMax = data.daily.temperature_2m_max || [];
+      const aMin = data.daily.temperature_2m_min || [];
+      const aMean = data.daily.temperature_2m_mean || [];
+
+      /* Gom mọi năm lại theo (tháng, ngày): ngày 27/9 của 10 năm nằm chung một rổ. */
+      const bucket = {};
+      for(let i=0;i<times.length;i++){
+        const iso = times[i];
+        if(!iso) continue;
+        const m = +iso.slice(5,7), dd = +iso.slice(8,10);
+        const k = m + '-' + dd;
+        if(!bucket[k]) bucket[k] = { mx:[], mn:[], me:[] };
+        if(typeof aMax[i] === 'number') bucket[k].mx.push(aMax[i]);
+        if(typeof aMin[i] === 'number') bucket[k].mn.push(aMin[i]);
+        if(typeof aMean[i] === 'number') bucket[k].me.push(aMean[i]);
+      }
+
+      const r1 = v => Math.round(v*10)/10;
+      const mean = arr => arr.reduce((a,b)=>a+b,0)/arr.length;
+      const byMonth = {};
+      for(let m=1;m<=12;m++){
+        let lastDd = 0;
+        for(let dd=31; dd>=1; dd--){ if(bucket[m+'-'+dd]){ lastDd = dd; break; } }
+        if(!lastDd) continue;
+        const tmax=[], tmin=[], tmean=[];
+        let allMax=[], allMin=[];
+        for(let dd=1; dd<=lastDd; dd++){
+          const s = bucket[m+'-'+dd];
+          if(s && s.mx.length){
+            tmax.push(r1(mean(s.mx)));
+            tmin.push(s.mn.length ? r1(mean(s.mn)) : (tmin[tmin.length-1] ?? null));
+            tmean.push(s.me.length ? r1(mean(s.me)) : (tmean[tmean.length-1] ?? null));
+            allMax = allMax.concat(s.mx);
+            allMin = allMin.concat(s.mn);
+          }else{
+            /* Ngày thiếu dữ liệu (ví dụ 29/2 các năm không nhuận): lấy tạm ngày liền trước. */
+            tmax.push(tmax[tmax.length-1] ?? null);
+            tmin.push(tmin[tmin.length-1] ?? null);
+            tmean.push(tmean[tmean.length-1] ?? null);
+          }
+        }
+        if(!allMax.length) continue;
+        byMonth[m] = {
+          month: m, days: tmax.length, tmax, tmin, tmean,
+          avgMax: r1(mean(tmax.filter(v=>v!=null))),
+          avgMin: r1(mean(tmin.filter(v=>v!=null))),
+          avgMean: r1(mean(tmean.filter(v=>v!=null))),
+          hiMax: r1(Math.max(...allMax)),
+          loMin: allMin.length ? r1(Math.min(...allMin)) : null,
+          over30: tmax.filter(t=>t!=null&&t>30).length,
+          over35: tmax.filter(t=>t!=null&&t>35).length,
+          over40: tmax.filter(t=>t!=null&&t>40).length,
+        };
+      }
+      const out = { startYear, endYear, years: endYear-startYear+1, byMonth };
+      await safeSet(cacheKey, JSON.stringify(out), false);
+      return out;
+    }catch(e){
+      console.error(`normals fetch failed (attempt ${attempt}/${ATTEMPTS})`, e);
+      if(attempt < ATTEMPTS) await new Promise(r=>setTimeout(r, 800*attempt));
+      else { climateFetchHadNetworkError = true; return null; }
+    }
+  }
+}
+
+/* Dự báo thật cho khoảng 2 tuần tới. Dự báo đổi từng ngày nên KHÔNG lưu vào
+   Firebase — chỉ nhớ trong phiên làm việc hiện tại. */
+const _forecastCache = new Map();
+async function fetchForecastDaily(lat, lon){
+  const key = lat.toFixed(2)+','+lon.toFixed(2);
+  if(_forecastCache.has(key)) return _forecastCache.get(key);
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`
+            + `&daily=temperature_2m_max,temperature_2m_min,temperature_2m_mean&forecast_days=16&timezone=auto`;
+  try{
+    const res = await fetchWithTimeout(url, 10000);
+    const data = await res.json();
+    if(!data || !data.daily || !data.daily.time) throw new Error('no daily');
+    const out = {
+      dates: data.daily.time,
+      tmax: data.daily.temperature_2m_max || [],
+      tmin: data.daily.temperature_2m_min || [],
+      tmean: data.daily.temperature_2m_mean || [],
+    };
+    _forecastCache.set(key, out);
+    return out;
+  }catch(e){
+    console.error('forecast fetch failed', e);
+    _forecastCache.set(key, null);
+    return null;
+  }
+}
+
 async function fetchMonthClimate(lat, lon, year, month){
   const cacheKey = `climate:${lat.toFixed(2)}:${lon.toFixed(2)}:${year}:${month}`;
   const cached = await safeGet(cacheKey, false);
@@ -22975,7 +23101,11 @@ async function runLookup(){
       }
       if(ambientMaxC < 20) return 3;   // mát/mùa đông
       if(ambientMaxC < 33) return 7;   // hè bình thường / thu
-      return 11;                       // hè nắng gắt
+      /* Hè nắng gắt. Hạ từ +11 xuống +7 theo yêu cầu 2026-09-25: mức +11 cho ra
+         45°C cho một ngày đầu tháng 10 ở Hải Phòng, cao hơn hẳn mọi số đo thật
+         của hàng biển trong kho dữ liệu (lô Chile đo được 35,8°C).
+         ĐỪNG tự đổi lại — đây là con số nghiệp vụ do chủ dự án quyết. */
+      return 7;
     }
     const tripDays = days > 0 ? days : 14;
 
@@ -23063,15 +23193,39 @@ async function runLookup(){
       /* ngày 0 của biểu đồ = ETD lùi lại preDays ngày (lúc hàng rời kho) */
       const depDate = new Date(etd.getTime() - preDays*86400000);
 
+      /* ==================================================================
+         Nạp khí hậu cho MỌI THÁNG mà hành trình đi qua, tại MỌI điểm mốc.
+
+         Bản trước chỉ nạp ĐÚNG MỘT tháng cho mỗi điểm mốc (tháng ứng với ngày
+         điểm mốc đó), rồi lấy thời tiết theo SỐ THỨ TỰ NGÀY của hành trình —
+         ngày thứ 0 đọc nhằm ngày 1 của tháng, ngày thứ 1 đọc ngày 2... đi quá
+         30 ngày thì quay vòng đọc lại từ đầu tháng. Hành trình bắt đầu 27/9 lại
+         bị gán thời tiết ngày 1/9, và chuyến 2 tháng thì cả biểu đồ là "một ngày
+         nào đó tháng 9 ở cảng đi" trộn với "một ngày nào đó tháng 11 ở cảng đến",
+         lặp đi lặp lại. Đó là lý do đáy nhiệt độ tụt xuống mức không có thật và
+         đường biểu đồ răng cưa vô lý.
+         ================================================================== */
       await Promise.all(waypoints.map(async w=>{
+        /* Khí hậu trung bình 10 năm — một lần gọi là đủ cả 12 tháng. */
+        w.normals = await fetchClimateNormals(w.lat, w.lon);
+        w.climByMonth = (w.normals && w.normals.byMonth) ? w.normals.byMonth : {};
+        /* Dự báo thật cho khoảng 2 tuần tới (nếu ETD gần). Không có cũng không sao. */
+        w.fc = await fetchForecastDaily(w.lat, w.lon);
+        /* w.clim = tháng của chính điểm mốc, cho các chỗ khác đang dùng. */
         const wDate = new Date(depDate.getTime() + w.offset*86400000);
         const m = wDate.getMonth()+1;
-        const y = pickYearForMonth(m);
-        w.clim = await fetchMonthClimate(w.lat, w.lon, y, m);
-        w.month = m; w.yearUsed = y;
+        w.clim = w.climByMonth[m] || null;
+        w.month = m;
+        w.yearUsed = (w.normals ? (w.normals.startYear + '–' + w.normals.endYear) : null);
       }));
 
       const dayDates=[], ambientMax=[], ambientMin=[], containerMax=[], containerMin=[];
+      /* Mức xấu nhất của cả hành trình, tính riêng khỏi biểu đồ (xem chú thích dưới).
+         worstContainer giữ từng ngày để mấy ô "số ngày >30/35/40" cũng tính theo
+         cùng một thước đo với ô "cao nhất" — không thì ô này báo 41°C mà ô kia
+         báo "0 ngày trên 40°C", nhìn mâu thuẫn. */
+      let peakAmbient = null, peakContainer = null;
+      const worstContainer = [];
       for(let d=0; d<=totalDays; d++){
         let L = waypoints[0], R = waypoints[waypoints.length-1];
         for(let i=0;i<waypoints.length-1;i++){
@@ -23081,10 +23235,39 @@ async function runLookup(){
         const wR = (R===L) ? 0 : (d - L.offset)/span;
         const wL = 1 - wR;
 
-        const sample = (w, arr) => (!w || !w.clim || !arr || !arr.length) ? null : arr[((d % arr.length)+arr.length)%arr.length];
-        const lMax = sample(L, L.clim&&L.clim.tmax), rMax = sample(R, R.clim&&R.clim.tmax);
-        const lMin = sample(L, L.clim&&L.clim.tmin), rMin = sample(R, R.clim&&R.clim.tmin);
-        const lMean = sample(L, L.clim&&L.clim.tmean), rMean = sample(R, R.clim&&R.clim.tmean);
+        /* Ngày THẬT trên lịch của ngày thứ d trong hành trình — lấy đúng thời
+           tiết của ngày đó, tại đúng tháng đó, ở đúng vị trí container đang ở. */
+        const dDate = new Date(depDate.getTime() + d*86400000);
+        const dMonth = dDate.getMonth()+1;
+        const dIdx = dDate.getDate() - 1;
+        const dIso = dDate.getFullYear() + '-'
+          + String(dMonth).padStart(2,'0') + '-'
+          + String(dDate.getDate()).padStart(2,'0');
+        const climOf = w => (!w) ? null : ((w.climByMonth && w.climByMonth[dMonth]) || w.clim || null);
+        const sample = (w, pick) => {
+          const c = climOf(w);
+          if(!c) return null;
+          const arr = pick(c);
+          if(!arr || !arr.length) return null;
+          const v = arr[Math.min(dIdx, arr.length-1)];
+          return (typeof v === 'number') ? v : null;
+        };
+        /* Ngày nào nằm trong tầm dự báo thật (khoảng 2 tuần tới) thì ưu tiên dùng
+           dự báo; xa hơn thì dùng trung bình 10 năm. */
+        const fcVal = (w, key) => {
+          if(!w || !w.fc || !w.fc.dates) return null;
+          const i = w.fc.dates.indexOf(dIso);
+          if(i < 0) return null;
+          const v = (w.fc[key] || [])[i];
+          return (typeof v === 'number') ? v : null;
+        };
+        const pick = (w, fcKey, climKey) => {
+          const f = fcVal(w, fcKey);
+          return (f != null) ? f : sample(w, c=>c[climKey]);
+        };
+        const lMax = pick(L,'tmax','tmax'), rMax = pick(R,'tmax','tmax');
+        const lMin = pick(L,'tmin','tmin'), rMin = pick(R,'tmin','tmin');
+        const lMean = pick(L,'tmean','tmean'), rMean = pick(R,'tmean','tmean');
         let amMax = (lMax!=null && rMax!=null) ? (wL*lMax+wR*rMax) : (lMax!=null?lMax:rMax);
         let amMin = (lMin!=null && rMin!=null) ? (wL*lMin+wR*rMin) : (lMin!=null?lMin:rMin);
         const amMean = (lMean!=null && rMean!=null) ? (wL*lMean+wR*rMean) : (lMean!=null?lMean:rMean);
@@ -23098,10 +23281,20 @@ async function runLookup(){
         // specifically the highest-risk moment, so it should reflect the worst realistic
         // day that location sees that month, not a random sample that might land on a
         // mild day and understate the risk.
-        if(inDwell){
-          const lHi = L.clim && L.clim.hiMax, rHi = R.clim && R.clim.hiMax;
+        /* ĐƯỜNG BIỂU ĐỒ luôn đi theo nhiệt độ của ĐÚNG NGÀY — kể cả ngày nằm bãi.
+           Nhiệt độ ĐỈNH THÁNG chỉ dùng cho ô "cao nhất" tổng kết bên dưới, gom
+           riêng ở peakAmbient/peakContainer, không đổ vào biểu đồ.
+           (Yêu cầu 2026-09-25: "chỗ cao nhất ở dưới thì lấy đỉnh, còn biểu đồ
+           phải đúng ngày".) */
+        let dwellPeakAmbient = null;
+        /* Có dự báo thật cho ngày này thì tin dự báo, KHÔNG lôi kỷ lục 10 năm ra
+           nữa — biết trước mấy hôm tới mát thì không việc gì phải tính theo ngày
+           nóng nhất lịch sử. Chỉ những ngày ngoài tầm dự báo mới dùng kỷ lục. */
+        const hasForecast = (fcVal(L,'tmax') != null) || (fcVal(R,'tmax') != null);
+        if(inDwell && !hasForecast){
+          const lHi = (climOf(L) || {}).hiMax, rHi = (climOf(R) || {}).hiMax;
           const hiInterp = (lHi!=null && rHi!=null) ? (wL*lHi+wR*rHi) : (lHi!=null?lHi:rHi);
-          if(hiInterp!=null) amMax = hiInterp;
+          if(hiInterp!=null) dwellPeakAmbient = hiInterp;
         }
 
         // For AIR, ground-dwell days (tarmac at origin/transit/destination) use the real
@@ -23121,9 +23314,23 @@ async function runLookup(){
         containerMax.push(amMax!=null ? amMax+bonus : null);
         containerMin.push(amMin!=null ? amMin+offsetMinC : null);
         dayDates.push(new Date(depDate.getTime() + d*86400000));
+
+        /* Mức xấu nhất cho ô tổng kết: ngày nằm bãi thì lấy ngày nóng nhất của
+           tháng tại cảng đó, ngày đang chạy thì lấy chính nhiệt độ ngày hôm đó. */
+        const worstAmbient = (dwellPeakAmbient != null) ? Math.max(dwellPeakAmbient, amMax==null?-999:amMax) : amMax;
+        if(worstAmbient != null){
+          const worstBonus = inDwell ? dwellOffsetForWeather(worstAmbient) : offsetTransit;
+          if(peakAmbient == null || worstAmbient > peakAmbient) peakAmbient = worstAmbient;
+          const worstCont = worstAmbient + worstBonus;
+          if(peakContainer == null || worstCont > peakContainer) peakContainer = worstCont;
+          worstContainer.push(worstCont);
+        }else{
+          worstContainer.push(null);
+        }
       }
 
-      journey = { waypoints, dayDates, ambientMax, ambientMin, containerMax, containerMin, totalDays, isAir, isLand, preDays };
+      journey = { waypoints, dayDates, ambientMax, ambientMin, containerMax, containerMin,
+                  peakAmbient, peakContainer, worstContainer, totalDays, isAir, isLand, preDays };
     }else if(!og || !ds){
       climateError = geocodeErrorMessage();
     }
@@ -23152,11 +23359,15 @@ function renderLookupResults(ctx){
     const aMin = journey.ambientMin.filter(v=>v!=null);
     if(cMax.length && cMin.length){
       jStats = {
-        contMax: Math.max(...cMax), contMin: Math.min(...cMin),
-        ambMax: Math.max(...aMax), ambMin: Math.min(...aMin),
-        over30: journey.containerMax.filter(v=>v!=null&&v>30).length,
-        over35: journey.containerMax.filter(v=>v!=null&&v>35).length,
-        over40: journey.containerMax.filter(v=>v!=null&&v>40).length,
+        /* "Cao nhất" lấy mức xấu nhất (ngày nằm bãi dùng đỉnh tháng), nên có thể
+           cao hơn điểm cao nhất nhìn thấy trên biểu đồ — biểu đồ đi theo đúng ngày. */
+        contMax: (journey.peakContainer != null) ? journey.peakContainer : Math.max(...cMax),
+        contMin: Math.min(...cMin),
+        ambMax: (journey.peakAmbient != null) ? journey.peakAmbient : Math.max(...aMax),
+        ambMin: Math.min(...aMin),
+        over30: (journey.worstContainer || journey.containerMax).filter(v=>v!=null&&v>30).length,
+        over35: (journey.worstContainer || journey.containerMax).filter(v=>v!=null&&v>35).length,
+        over40: (journey.worstContainer || journey.containerMax).filter(v=>v!=null&&v>40).length,
         totalDays: journey.totalDays,
       };
     }
