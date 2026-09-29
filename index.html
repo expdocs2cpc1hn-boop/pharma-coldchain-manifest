@@ -124,6 +124,8 @@
   .lg-card{border:1px solid var(--border-soft);border-radius:var(--radius);background:var(--surface);margin-top:12px;padding:13px 15px;}
   .lg-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
   .lg-name{font-family:var(--font-mono);font-size:12.5px;word-break:break-all;}
+  .dup-warn{border:1px solid var(--danger);background:rgba(201,54,54,.07);color:var(--danger);
+            border-radius:var(--radius);padding:11px 13px;margin-bottom:12px;font-size:13px;line-height:1.5;}
   .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
   @media(max-width:760px){.grid-2,.grid-3{grid-template-columns:1fr;}}
 
@@ -779,7 +781,7 @@ const APPCHECK_MODE = 'off';
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v36 · 2026-09-28 · khí hậu trung bình 10 năm + dùng dự báo thật cho 2 tuần tới';
+const APP_VERSION = 'v38 · 2026-09-29 · mọi người đều ẩn được lô, chỉ admin bỏ ẩn';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 const HAS_FIREBASE = (typeof firebase !== 'undefined') && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
@@ -1171,6 +1173,12 @@ const META_COLLECTION = 'shipments_meta';
    Bỏ ẩn lại được ngay trong app. Muốn xoá thật (để dọn dung lượng) thì vào
    Firebase Console xoá tay — Console chạy bằng quyền quản trị nên không bị
    rules chặn.
+
+   v38 (2026-09-29, theo yêu cầu): MỌI NGƯỜI đăng nhập đều ẩn được lô, kể cả lô
+   của người khác. BỎ ẨN thì vẫn chỉ admin. Vì ẩn là việc lấy lại được nên bỏ
+   luôn bước nhập mã 2FA khi ẩn. Rules cho người thường ghi ĐÚNG ba trường
+   hidden / hiddenAt / hiddenBy và chỉ theo chiều ẩn — sửa nội dung lô của
+   người khác vẫn bị máy chủ chặn như trước.
    ========================================================================== */
 async function loadIndex(includeHidden){
   let all;
@@ -1197,7 +1205,7 @@ async function setShipmentHidden(id, hidden){
     hiddenAt: hidden ? Date.now() : null,
     /* Lưu MÃ TÀI KHOẢN (uid), không lưu email — trước đây lưu email nên mọi
        người đăng nhập đều đọc được email của nhau ở danh sách lô đã ẩn. */
-    hiddenBy: hidden ? ((fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.uid : '') : null
+    hiddenBy: hidden ? currentUid() : null
   });
   const ok = await saveIndexEntry(updated);
   return ok !== null;
@@ -1256,6 +1264,17 @@ function aggregateLoggers(loggers){
   const ids = loggers.map(l=>l.deviceId).filter(Boolean);
   out.deviceId = ids.length ? ids.join(', ') : null;
   return out;
+}
+
+/* ==========================================================================
+   DẤU VÂN TAY CỦA MỘT FILE DATA LOGGER
+   Mã máy (Device ID, ví dụ A208649) KHÔNG đủ để nhận ra file trùng: một máy
+   logger được dùng đi dùng lại cho nhiều chuyến khác nhau. Cái thật sự không
+   lặp lại là bộ ba: MÃ MÁY + GIỜ BẮT ĐẦU + GIỜ KẾT THÚC của lần ghi đó.
+   ========================================================================== */
+function loggerKey(lg){
+  if(!lg) return '';
+  return [String(lg.deviceId||'').trim(), lg.start||'', lg.stop||''].join('|');
 }
 
 /* Bản ghi kiểu cũ (v27 trở về trước) không có mảng loggers. Dựng tạm một logger
@@ -1361,6 +1380,9 @@ function shipmentMeta(record){
     loggerCount: (typeof record.loggerCount === 'number')
       ? record.loggerCount
       : (Array.isArray(record.loggers) ? record.loggers.length : 1),
+    /* Dấu vân tay từng file logger — để phát hiện có ai tải trùng file không.
+       Nằm ở mục lục để kiểm tra nhanh, khỏi phải tải cả kho về đối chiếu. */
+    loggerKeys: (record.loggers || []).map(loggerKey).filter(Boolean),
     /* Chỉ lưu MÃ người tạo lô, không lưu email — tên người phụ trách đã có ở
        cột "DOC phụ trách". firestore.rules dùng trường này để biết ai được sửa. */
     uploadedByUid: record.uploadedByUid || '',
@@ -22544,10 +22566,13 @@ async function addLoggerFile(file){
 
   try{
     const parsed = await parsePdf(file);
+    /* Kiểm tra trùng TRƯỚC khi thêm vào danh sách, để không tự so với chính nó. */
+    const dup = await findDuplicateLogger(parsed);
     pendingLoggers.push({ lid, file, parsed });
     const chip = document.getElementById('chip-'+lid);
     if(chip) chip.outerHTML = `<button type="button" class="btn btn-danger btn-sm" onclick="removePendingLogger('${lid}')">Bỏ file này</button>`;
     renderLoggerBody(lid, parsed);
+    if(dup) showDuplicateWarning(lid, parsed, dup);
     renderLotSummary();
   }catch(err){
     const chip = document.getElementById('chip-'+lid);
@@ -22555,6 +22580,75 @@ async function addLoggerFile(file){
     const body = document.getElementById('body-'+lid);
     if(body) body.innerHTML = `<p style="color:var(--danger);font-size:13.5px;">${escapeHtml(err.message || String(err))}</p>`;
   }
+}
+
+/* ==========================================================================
+   PHÁT HIỆN TẢI TRÙNG FILE
+   Tìm xem file vừa thả vào đã nằm ở đâu đó trong kho chưa — hoặc đã được thả
+   vào chính lô đang nhập dở chưa. Chỉ CẢNH BÁO, không chặn: có lúc người dùng
+   cố ý tải lại thật.
+   ========================================================================== */
+async function findDuplicateLogger(parsed){
+  const key = loggerKey(parsed);
+  if(!key || key === '||') return null;
+
+  /* 1. Trùng với file vừa thả vào cùng lô này (chưa lưu). */
+  const inPending = pendingLoggers.find(l => loggerKey(l.parsed) === key);
+  if(inPending) return { trongLoDangNhap: true, fileName: inPending.file.name };
+
+  /* 2. Trùng với lô đã lưu. Lấy cả lô đang ẩn — trùng với lô đã ẩn vẫn là trùng. */
+  let idx = [];
+  try{ idx = await loadIndex(true); }
+  catch(e){ console.error('duplicate check: không đọc được mục lục', e); return null; }
+
+  for(const r of idx){
+    if(Array.isArray(r.loggerKeys)){
+      if(r.loggerKeys.indexOf(key) >= 0) return r;
+      continue;
+    }
+    /* Lô lưu trước v37 chưa có dấu vân tay từng file — so ở mức cả lô.
+       Đúng với lô một logger; lô nhiều logger thì có thể bỏ sót, chấp nhận. */
+    if(r.deviceId && parsed.deviceId
+       && String(r.deviceId).trim() === String(parsed.deviceId).trim()
+       && r.start === parsed.start && r.stop === parsed.stop){
+      return r;
+    }
+  }
+  return null;
+}
+
+function showDuplicateWarning(lid, parsed, dup){
+  const body = document.getElementById('body-'+lid);
+  if(!body) return;
+  const khoang = (parsed.start && parsed.stop)
+    ? (new Date(parsed.start).toLocaleDateString('vi-VN') + ' – ' + new Date(parsed.stop).toLocaleDateString('vi-VN'))
+    : '';
+
+  let chiTiet;
+  if(dup.trongLoDangNhap){
+    chiTiet = 'Bạn vừa thả file này vào chính lô đang nhập: <b>' + escapeHtml(dup.fileName || '') + '</b>';
+  }else{
+    const ten = dup.subMail || dup.productName || dup.fileName || 'lô không có tên';
+    const them = [
+      dup.shipMonth ? 'ship ' + fmtMonth(dup.shipMonth) : '',
+      dup.destPort || dup.dest || '',
+      dup.docOwner ? 'DOC ' + dup.docOwner : '',
+      dup.uploadedAt ? 'tải lên ' + new Date(dup.uploadedAt).toLocaleDateString('vi-VN') : '',
+      dup.hidden ? 'lô này đang bị ẩn' : ''
+    ].filter(Boolean).map(escapeHtml).join(' · ');
+    chiTiet = 'Đã có trong kho, thuộc lô <b>' + escapeHtml(ten) + '</b>'
+            + (them ? '<div style="margin-top:3px;">' + them + '</div>' : '');
+  }
+
+  const box = document.createElement('div');
+  box.className = 'dup-warn';
+  box.innerHTML =
+    '<b>⚠ File data logger này đã được tải lên rồi</b>'
+    + '<div style="margin-top:5px;">Mã máy <b>' + escapeHtml(parsed.deviceId || '?') + '</b>'
+    + (khoang ? ' · ' + khoang : '') + '</div>'
+    + '<div style="margin-top:5px;">' + chiTiet + '</div>'
+    + '<div style="margin-top:7px;opacity:.8;">Vẫn lưu được nếu bạn cố ý. Nếu không, bấm "Bỏ file này" để tránh lưu trùng.</div>';
+  body.insertBefore(box, body.firstChild);
 }
 
 window.removePendingLogger = function(lid){
@@ -23708,7 +23802,7 @@ window.openCountryGroup = async function(groupKey){
       <div class="lib-foot" style="margin-top:8px;">
         <button class="btn btn-ghost btn-sm" onclick="openDetail('${r.id}')">Xem chi tiết &amp; biểu đồ</button>
         ${canEditLot(r) ? `<button class="btn btn-ghost btn-sm" onclick="openEditLot('${r.id}')">Sửa thông tin lô</button>` : ''}
-        ${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="removeShipmentFromGroup('${r.id}','${groupKey.replace(/'/g,"\\'")}')">Ẩn</button>` : ''}
+        <button class="btn btn-danger btn-sm" onclick="removeShipmentFromGroup('${r.id}','${groupKey.replace(/'/g,"\\'")}')">Ẩn</button>
       </div>
     </div>`;
   }
@@ -23770,9 +23864,7 @@ window.openCountryGroup = async function(groupKey){
   render();
 };
 window.removeShipmentFromGroup = async function(id, groupKey){
-  if(!isAdmin){ toast('Chỉ tài khoản admin mới ẩn được. Đăng nhập bằng tài khoản admin trước.'); return; }
-  if(!confirm('Ẩn lô này khỏi kho dữ liệu?\n\nDữ liệu KHÔNG bị xoá — vẫn nằm nguyên trên máy chủ và bỏ ẩn lại được bất cứ lúc nào.')) return;
-  if(!await requireAdminStepUp()) return;
+  if(!confirm('Ẩn lô này khỏi kho dữ liệu?\n\nDữ liệu KHÔNG bị xoá — vẫn nằm nguyên trên máy chủ. Chỉ admin bỏ ẩn lại được.')) return;
   if(!await setShipmentHidden(id, true)){
     toast('ẨN KHÔNG THÀNH CÔNG — máy chủ từ chối. Mở F12 > Console xem lỗi.');
     renderLibrary();
@@ -24336,9 +24428,7 @@ document.getElementById('gate-pass').addEventListener('keydown', e=>{
 });
 
 window.removeShipment = async function(id){
-  if(HAS_FIREBASE && !isAdmin){ toast('Chỉ tài khoản admin mới ẩn được.'); return; }
-  if(!confirm('Ẩn lô này khỏi kho dữ liệu?\n\nDữ liệu KHÔNG bị xoá — vẫn nằm nguyên trên máy chủ và bỏ ẩn lại được bất cứ lúc nào.')) return;
-  if(!await requireAdminStepUp()) return;
+  if(!confirm('Ẩn lô này khỏi kho dữ liệu?\n\nDữ liệu KHÔNG bị xoá — vẫn nằm nguyên trên máy chủ. Chỉ admin bỏ ẩn lại được.')) return;
   if(!await setShipmentHidden(id, true)){
     toast('ẨN KHÔNG THÀNH CÔNG — máy chủ từ chối. Mở F12 > Console xem lỗi.');
   }else{
