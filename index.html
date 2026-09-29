@@ -7,10 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     /* Giao diện NỀN SÁNG. Màu chữ và viền chọn theo độ tương phản đọc được trên
@@ -290,38 +287,6 @@
     padding:32px 28px;
   }
 
-  /* ---- 2FA overlay ---- */
-  #mfa-gate{z-index:900;}
-  #mfa-gate .login-gate-card{max-width:440px;}
-  .mfa-code-input{
-    width:100%;text-align:center;letter-spacing:.42em;
-    font-family:var(--font-mono, ui-monospace, monospace);
-    font-size:24px;padding:12px 10px;
-    background:rgba(22,32,46,.05);
-    color:var(--text, #16202E);
-    border:1px solid var(--border-soft);border-radius:10px;
-    outline:none;
-  }
-  .mfa-code-input:focus{border-color:var(--ice);}
-  .mfa-code-input::placeholder{color:rgba(22,32,46,.32);}
-  .mfa-secret{
-    font-family:var(--font-mono, ui-monospace, monospace);
-    font-size:14px;letter-spacing:.08em;word-break:break-all;
-    background:rgba(22,32,46,.04);border:1px solid var(--border-soft);
-    border-radius:8px;padding:10px 12px;margin:8px 0 4px;user-select:all;
-  }
-  .mfa-qr{
-    display:flex;justify-content:center;background:#fff;
-    padding:12px;border-radius:10px;margin:0 auto 14px;width:max-content;
-  }
-  .mfa-step{display:none;}
-  .mfa-step.active{display:block;}
-  .mfa-recovery{
-    font-family:var(--font-mono, ui-monospace, monospace);font-size:18px;
-    letter-spacing:.12em;text-align:center;color:var(--amber);
-    background:rgba(180,113,26,.10);border:1px dashed rgba(180,113,26,.5);
-    border-radius:10px;padding:14px;margin:10px 0;user-select:all;
-  }
 
   /* nút tròn nhỏ trên thanh đầu trang (tài khoản) */
   .icon-btn{
@@ -364,71 +329,6 @@
   </div>
 </div>
 
-<!-- ===== Lớp xác thực 2 bước cho tài khoản admin ===== -->
-<div class="login-gate" id="mfa-gate">
-  <div class="login-gate-card">
-
-    <!-- Bước 1: cài đặt lần đầu -->
-    <div class="mfa-step" id="mfa-step-setup">
-      <h2 style="font-family:var(--font-display);margin:0 0 6px;">🛡️ Bật xác thực 2 bước</h2>
-      <p class="hint" style="margin-bottom:16px;">
-        Tài khoản admin có quyền XOÁ dữ liệu nên bắt buộc phải có lớp khoá thứ hai.
-        Mở app <b>Google Authenticator</b> (hoặc Microsoft Authenticator / Authy) trên điện thoại,
-        bấm <b>+</b> → <b>Quét mã QR</b>.
-      </p>
-      <div class="mfa-qr" id="mfa-qr"></div>
-      <p class="hint">Không quét được? Chọn "Nhập khoá thủ công" rồi gõ chuỗi này:</p>
-      <div class="mfa-secret" id="mfa-secret-text"></div>
-      <p class="hint" style="margin:14px 0 6px;">Nhập 6 số app hiện ra để xác nhận:</p>
-      <input class="mfa-code-input" id="mfa-setup-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
-      <div id="mfa-setup-error" class="hint" style="color:var(--danger);display:none;margin:10px 0;"></div>
-      <button class="btn btn-primary btn-block" id="mfa-setup-confirm" style="margin-top:14px;">Xác nhận &amp; bật</button>
-      <button class="btn btn-ghost btn-block" id="mfa-setup-skip" style="margin-top:8px;">Để sau (dùng như tài khoản thường, không xoá được)</button>
-    </div>
-
-    <!-- Bước 2: hiện mã dự phòng -->
-    <div class="mfa-step" id="mfa-step-recovery">
-      <h2 style="font-family:var(--font-display);margin:0 0 6px;">🔑 Mã dự phòng</h2>
-      <p class="hint">
-        Chép mã này ra giấy / lưu vào trình quản lý mật khẩu <b>ngay bây giờ</b>.
-        Mã chỉ hiện <b>một lần duy nhất</b>. Mất điện thoại thì đây là cách duy nhất
-        lấy lại quyền admin.
-      </p>
-      <div class="mfa-recovery" id="mfa-recovery-code"></div>
-      <label class="hint" style="display:flex;gap:8px;align-items:flex-start;margin:12px 0;">
-        <input type="checkbox" id="mfa-recovery-ack" style="margin-top:3px;">
-        <span>Tôi đã lưu mã dự phòng này ở nơi an toàn.</span>
-      </label>
-      <div id="mfa-recovery-error" class="hint" style="color:var(--danger);display:none;margin-bottom:10px;"></div>
-      <button class="btn btn-primary btn-block" id="mfa-recovery-done" disabled>Xong</button>
-    </div>
-
-    <!-- Bước 3: nhập mã mỗi lần đăng nhập -->
-    <div class="mfa-step" id="mfa-step-verify">
-      <h2 style="font-family:var(--font-display);margin:0 0 6px;">🛡️ Xác thực 2 bước</h2>
-      <p class="hint" style="margin-bottom:16px;">Mở Google Authenticator và nhập 6 số đang hiện.</p>
-      <input class="mfa-code-input" id="mfa-verify-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
-      <div id="mfa-verify-error" class="hint" style="color:var(--danger);display:none;margin:10px 0;"></div>
-      <button class="btn btn-primary btn-block" id="mfa-verify-confirm" style="margin-top:14px;">Xác nhận</button>
-      <button class="btn btn-ghost btn-block" id="mfa-verify-recovery" style="margin-top:8px;">Mất điện thoại — dùng mã dự phòng</button>
-      <button class="btn btn-ghost btn-block" id="mfa-verify-skip" style="margin-top:6px;">Bỏ qua (không có quyền xoá)</button>
-    </div>
-
-    <!-- Bước 4: khôi phục bằng mã dự phòng -->
-    <div class="mfa-step" id="mfa-step-restore">
-      <h2 style="font-family:var(--font-display);margin:0 0 6px;">🔑 Dùng mã dự phòng</h2>
-      <p class="hint" style="margin-bottom:16px;">
-        Nhập mã dự phòng đã lưu. Sau khi đúng, app sẽ tạo khoá mới cho thiết bị này
-        và cấp một mã dự phòng mới (mã cũ hết hiệu lực).
-      </p>
-      <input class="mfa-code-input" id="mfa-restore-code" style="letter-spacing:.16em;font-size:18px;" placeholder="XXXX-XXXX-XXXX-XXXX">
-      <div id="mfa-restore-error" class="hint" style="color:var(--danger);display:none;margin:10px 0;"></div>
-      <button class="btn btn-primary btn-block" id="mfa-restore-confirm" style="margin-top:14px;">Khôi phục</button>
-      <button class="btn btn-ghost btn-block" id="mfa-restore-back" style="margin-top:8px;">Quay lại</button>
-    </div>
-
-  </div>
-</div>
 
 <div class="topbar" id="app-topbar">
   <div class="topbar-inner">
@@ -699,350 +599,323 @@ function parseDMY(str, swapped){
 }
 
 /* ==========================================================================
-   FIREBASE CONFIG — dán config Firebase của bạn vào đây để bật kho dữ liệu
-   DÙNG CHUNG cho mọi người truy cập trang web này.
-   Xem hướng dẫn lấy config tại: https://console.firebase.google.com
-   Nếu để nguyên placeholder (chưa dán config thật), app tự động dùng
-   IndexedDB cục bộ trên từng máy (không dùng chung được) như trước.
+   KẾT NỐI SUPABASE
+   --------------------------------------------------------------------------
+   Từ v39 app không dùng Firebase nữa. Dữ liệu nằm trên Supabase tự dựng của
+   công ty (phòng RD CPC1HN). Toàn bộ phần giao diện, biểu đồ, báo cáo bên dưới
+   KHÔNG đổi — chỉ tầng lưu trữ này thay ruột.
+
+   ANON_KEY để công khai trong file được, y như apiKey của Firebase trước đây:
+   thứ bảo vệ dữ liệu là RLS (Row Level Security) trên máy chủ, không phải việc
+   giấu chìa khoá. Xem 01-tao-bang.sql và 03-cho-moi-nguoi-an-lo.sql.
+
+   ⚠️ TUYỆT ĐỐI KHÔNG dán SERVICE_ROLE_KEY vào đây. Khoá đó bỏ qua mọi RLS.
    ========================================================================== */
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyA5HXFZ7jMC9z79fyD-G-YS4ZGur7FTz0g",
-  authDomain: "data-logger-8af48.firebaseapp.com",
-  projectId: "data-logger-8af48",
-  storageBucket: "data-logger-8af48.firebasestorage.app",
-  messagingSenderId: "240099162931",
-  appId: "1:240099162931:web:58e3baaf05722b51049c46"
-};
-/* ==========================================================================
-   TÀI KHOẢN QUẢN TRỊ
-   Nhận diện admin bằng MÃ TÀI KHOẢN (uid), KHÔNG bằng email — để trong file
-   này không còn địa chỉ email thật nào. Ai xem nguồn trang cũng không đọc
-   được email của người quản trị nữa.
-
-   uid là chuỗi ngẫu nhiên do Firebase tự cấp cho mỗi tài khoản. Từ uid không
-   suy ngược ra được email, và uid không dùng để đăng nhập, nên để công khai ở
-   đây là an toàn.
-
-   Lấy uid ở: Firebase Console > Authentication > tab Users > cột "User UID".
-
-   ⚠️ Sửa ở đây thì PHẢI sửa cả Firestore Rules cho khớp, nếu không rules vẫn
-   chặn — rules mới là thứ có hiệu lực thật, code này chỉ điều khiển giao diện.
-   ⚠️ Thêm admin dự phòng: tạo tài khoản thật ở Firebase Console >
-   Authentication > Users > Add user, rồi chép uid của tài khoản đó vào đây.
-   Mỗi admin có 2FA riêng của mình (khoá TOTP gắn theo uid), không dùng chung.
-   ========================================================================== */
-const ADMIN_UIDS = [
-  "JKoOlb5yN7cgVtZpP9OGUFkeWMr1",
-  /* Thêm uid quản trị dự phòng ở đây, VD:
-       "aB3dE7gHiJ2kLmN4oPqR5sTuV6w1", */
-];
-function isAdminUid(uid){
-  if(!uid) return false;
-  const u = String(uid).trim();
-  return ADMIN_UIDS.some(a => a.trim() === u);
-}
-function isAdminUser(user){
-  return !!user && isAdminUid(user.uid);
-}
-
-/* App Check — chặn bot/script tự động dội request vào Firebase (đăng nhập, Firestore).
-   Khác với đăng nhập (xác minh NGƯỜI), App Check xác minh yêu cầu đến từ ĐÚNG trang web
-   này chứ không phải script bên ngoài.
-
-   ⚠️ QUAN TRỌNG — có HAI loại site key reCAPTCHA và chúng KHÔNG dùng lẫn nhau được:
-     • reCAPTCHA v3 "cổ điển"  (tạo ở google.com/recaptcha/admin, hoặc tạo thẳng trong
-       Firebase > App Check)            → phải dùng ReCaptchaV3Provider
-     • reCAPTCHA Enterprise            (tạo ở Google Cloud Console > Security > reCAPTCHA)
-                                        → phải dùng ReCaptchaEnterpriseProvider
-   Dùng sai loại ⇒ lỗi "appCheck/recaptcha-error" lặp vô tận trong console (đúng cái lỗi
-   đang gặp). Code bên dưới TỰ DÒ xem key này thuộc loại nào rồi mới bật App Check,
-   nên không cần đoán nữa. Nếu muốn ép cứng thì đổi APPCHECK_MODE bên dưới.
-
-   Ngoài loại key, tên miền cũng phải được cho phép: trong danh sách "Domains" của key
-   phải có đúng tên miền đang chạy (VD pharma-coldchain-manifest-swh8.vercel.app).
-   Mỗi bản deploy preview của Vercel là một tên miền khác ⇒ chỉ nên dùng tên miền
-   Production cố định, và thêm nó vào danh sách Domains. */
-const RECAPTCHA_SITE_KEY = "6LcaYZstAAAAAPK0QSZ12xvRlqOBWP9lM7s4bh1p";
-
-/* 'auto' = tự dò · 'enterprise' · 'v3' · 'off' = tắt hẳn App Check
-   ┌──────────────────────────────────────────────────────────────────────────┐
-   │ ĐANG ĐỂ 'off'. Site key 6LcaYZst... đã chết (Google trả về "Invalid site  │
-   │ key" cho cả hai kiểu), nên App Check không thể chạy. Tắt hẳn để khỏi tốn  │
-   │ 7 giây dò mỗi lần mở trang và khỏi rác console.                           │
-   │                                                                          │
-   │ MUỐN BẬT LẠI SAU NÀY — đúng 2 việc:                                       │
-   │   1. Tạo site key reCAPTCHA mới, nhớ thêm tên miền production của Vercel  │
-   │      vào danh sách Domains của key. Dán key mới vào RECAPTCHA_SITE_KEY     │
-   │      ngay bên dưới.                                                       │
-   │   2. Đổi dòng này thành:  const APPCHECK_MODE = 'auto';                   │
-   │   3. Mở web, bấm 🛡️ Bảo mật. Xanh thì mới vào Firebase bật Enforce.       │
-   └──────────────────────────────────────────────────────────────────────────┘ */
-const APPCHECK_MODE = 'off';
+const SUPABASE_URL      = "https://datalogger.sb.qlcvdtp.io.vn";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkwMTUzODA2LCJleHAiOjE5NDc4MzM4MDZ9.dJNJZ-IbmGr3O48gwKGY0vgRN1VVr-JhKUIJMqO7pFM";
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v38 · 2026-09-29 · mọi người đều ẩn được lô, chỉ admin bỏ ẩn';
+const APP_VERSION = 'v39 · 2026-09-29 · chuyển kho dữ liệu sang Supabase';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
-const HAS_FIREBASE = (typeof firebase !== 'undefined') && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
-let fsDb = null;
-let fsAuth = null;
+/* Tên bảng và kho file — phải khớp với 01-tao-bang.sql */
+const TB_LO     = 'lo_hang';
+const TB_LOGGER = 'data_logger';
+const TB_CACHE  = 'cache_khi_hau';
+const TB_ADMIN  = 'quan_tri';
+const KHO_PDF   = 'data-logger-pdf';
+
+const HAS_SUPABASE = (typeof supabase !== 'undefined')
+  && supabase && typeof supabase.createClient === 'function'
+  && !!SUPABASE_URL && !!SUPABASE_ANON_KEY;
+
+/* Giữ nguyên tên cũ HAS_FIREBASE cho 20.000 dòng giao diện bên dưới khỏi phải
+   sửa. Nó chỉ mang nghĩa "đang chạy với kho dữ liệu dùng chung trên máy chủ"
+   (ngược lại là chế độ lưu cục bộ trong trình duyệt). */
+const HAS_FIREBASE = HAS_SUPABASE;
+
+let sb = null;            /* client Supabase */
+let fsDb = null;          /* bí danh cũ, vài chỗ dùng để kiểm tra "đã kết nối chưa" */
+let fsAuth = null;        /* lớp bọc mỏng cho phần code cũ gọi fsAuth.currentUser */
 let isLoggedIn = false;
 let isAdmin = false;
-/* Trạng thái App Check để hiện trong bảng "Bảo mật" và log ra console. */
-let appCheckState = { ok:false, provider:null, message:'Chưa khởi tạo' };
 
-function _loadScriptOnce(src){
-  return new Promise((resolve, reject)=>{
-    const existing = document.querySelector('script[data-appcheck-src="'+src+'"]');
-    if(existing){
-      if(existing.dataset.loaded === '1') return resolve();
-      /* Script đã hỏng lần trước: gỡ khỏi DOM rồi nạp lại. Bản cũ chỉ gắn thêm
-         listener vào thẻ đã chết ⇒ listener không bao giờ chạy, lời hứa treo mãi. */
-      if(existing.dataset.failed === '1'){ existing.remove(); }
-      else{
-        existing.addEventListener('load', ()=>resolve());
-        existing.addEventListener('error', ()=>reject(new Error('Không tải được '+src)));
-        return;
-      }
-    }
-    const s = document.createElement('script');
-    s.src = src; s.async = true; s.defer = true;
-    s.dataset.appcheckSrc = src;
-    s.onload = ()=>{ s.dataset.loaded = '1'; resolve(); };
-    s.onerror = ()=>{ s.dataset.failed = '1'; reject(new Error('Không tải được '+src+' (mạng chặn hoặc adblock?)')); };
-    document.head.appendChild(s);
-  });
-}
-function _withTimeout(p, ms, label){
-  return Promise.race([
-    Promise.resolve(p),
-    new Promise((_,rej)=>setTimeout(()=>rej(new Error('Hết giờ chờ: '+label)), ms))
-  ]);
-}
-/* ⚠️ enterprise.js và api.js KHÔNG sống chung được trong cùng một window: script nào
-   nạp trước sẽ đặt window.___grecaptcha_cfg, script sau thấy có rồi nên bỏ qua phần
-   khởi tạo ⇒ grecaptcha.execute không bao giờ xuất hiện và phép thử thứ hai luôn báo
-   sai. Vì vậy mỗi phép thử được chạy trong MỘT IFRAME RIÊNG (window sạch, nhưng vẫn
-   kế thừa nguyên origin của trang nên reCAPTCHA thấy đúng tên miền), và window chính
-   được giữ sạch hoàn toàn để Firebase tự nạp script của nó sau đó. */
-function _makeProbeFrame(){
-  const ifr = document.createElement('iframe');
-  ifr.setAttribute('aria-hidden', 'true');
-  ifr.setAttribute('tabindex', '-1');
-  ifr.style.cssText = 'position:absolute;left:-9999px;top:0;width:1px;height:1px;border:0;visibility:hidden;';
-  document.body.appendChild(ifr);
-  return ifr;
-}
-function _loadScriptIn(win, src){
-  return new Promise((resolve, reject)=>{
-    const d = win.document;
-    const s = d.createElement('script');
-    s.src = src; s.async = true;
-    s.onload  = ()=>resolve();
-    s.onerror = ()=>reject(new Error('không tải được script (mạng chặn hoặc adblock?)'));
-    (d.head || d.documentElement).appendChild(s);
-  });
-}
-/* api.js / enterprise.js chỉ là script mồi: nạp xong nó mới đi tải tiếp gói
-   recaptcha__<lang>.js, và grecaptcha.execute chỉ xuất hiện SAU khi gói đó chạy.
-   Kiểm tra ngay tại onload là quá sớm ⇒ luôn báo "không tạo grecaptcha.execute"
-   kể cả khi key hoàn toàn hợp lệ. Vì vậy phải chờ có thật rồi mới kết luận. */
-function _waitFor(fn, ms, label){
-  const deadline = Date.now() + ms;
-  return new Promise((resolve, reject)=>{
-    (function tick(){
-      let v = null;
-      try{ v = fn(); }catch(e){}
-      if(v) return resolve(v);
-      if(Date.now() > deadline) return reject(new Error('chờ mãi không thấy ' + label));
-      setTimeout(tick, 120);
-    })();
-  });
-}
-/* kind: 'enterprise' | 'v3'. Ném lỗi nếu key không thuộc loại đó, hoặc tên miền
-   hiện tại chưa nằm trong danh sách Domains của key. */
-async function _probeKind(kind, key){
-  const ifr = _makeProbeFrame();
-  try{
-    const win = ifr.contentWindow;
-    if(kind === 'enterprise'){
-      await _withTimeout(_loadScriptIn(win, 'https://www.google.com/recaptcha/enterprise.js?render='+encodeURIComponent(key)), 8000, 'tải enterprise.js');
-      const ent = await _waitFor(()=> (win.grecaptcha && win.grecaptcha.enterprise && typeof win.grecaptcha.enterprise.execute === 'function') ? win.grecaptcha.enterprise : null,
-                                 7000, 'grecaptcha.enterprise');
-      await _withTimeout(new Promise(res=>ent.ready(res)), 6000, 'enterprise.ready');
-      const t = await _withTimeout(ent.execute(key, {action:'appcheck_probe'}), 8000, 'enterprise.execute');
-      if(!t) throw new Error('trả về token rỗng');
-    }else{
-      await _withTimeout(_loadScriptIn(win, 'https://www.google.com/recaptcha/api.js?render='+encodeURIComponent(key)), 8000, 'tải api.js');
-      const g = await _waitFor(()=> (win.grecaptcha && typeof win.grecaptcha.execute === 'function') ? win.grecaptcha : null,
-                               7000, 'grecaptcha.execute');
-      await _withTimeout(new Promise(res=>g.ready(res)), 6000, 'v3.ready');
-      const t = await _withTimeout(g.execute(key, {action:'appcheck_probe'}), 8000, 'v3.execute');
-      if(!t) throw new Error('trả về token rỗng');
-    }
-    return true;
-  }finally{
-    setTimeout(()=>{ try{ ifr.remove(); }catch(e){} }, 0);
-  }
-}
-async function _detectRecaptchaKind(key){
-  if(APPCHECK_MODE === 'enterprise' || APPCHECK_MODE === 'v3') return APPCHECK_MODE;
-  /* Hai phép thử nằm ở hai iframe tách biệt nên chạy SONG SONG được. Chạy nối
-     tiếp thì trường hợp key chết phải chờ hết hạn hai lần (~1 phút) mới cho đăng
-     nhập được — chạy song song thì chỉ mất thời gian của một phép thử. */
-  const errs = {};
-  const [rv3, rent] = await Promise.allSettled([
-    _probeKind('v3', key),
-    _probeKind('enterprise', key)
-  ]);
-  if(rv3.status === 'fulfilled') return 'v3';
-  if(rent.status === 'fulfilled') return 'enterprise';
-  errs.v3 = rv3.reason ? rv3.reason.message : 'lỗi không rõ';
-  errs.enterprise = rent.reason ? rent.reason.message : 'lỗi không rõ';
+/* App Check là thứ của Firebase, không còn nữa. Giữ biến để bảng Bảo mật
+   không vỡ khi đọc tới. */
+let appCheckState = { ok:false, provider:null, message:'Không dùng nữa — đã chuyển sang Supabase' };
+const APPCHECK_MODE = 'off';
 
-  /* Diễn giải lỗi thành việc cần làm, thay vì ném nguyên văn tiếng Anh của Google. */
-  const all = ((errs.v3||'') + ' ' + (errs.enterprise||'')).toLowerCase();
-  let why;
-  if(all.indexOf('chờ mãi không thấy') >= 0 && all.indexOf('invalid') < 0){
-    why = 'Script reCAPTCHA nạp được nhưng không khởi tạo nổi với site key này — gần như chắc chắn key đã bị xoá hoặc không tồn tại. Tạo site key mới rồi thay vào code.';
-  }else if(all.indexOf('invalid domain') >= 0){
-    why = 'Google báo SAI TÊN MIỀN. Mở trang quản lý site key, thêm "' + location.hostname + '" vào danh sách Domains.';
-  }else if(all.indexOf('invalid site key') >= 0 || all.indexOf('invalid key') >= 0){
-    why = 'Google báo KHÔNG TÌM THẤY key này. Hoặc key đã bị xoá, hoặc site key trong code không khớp với key thật, hoặc tên miền "' + location.hostname + '" chưa có trong danh sách Domains của key.';
-  }else if(all.indexOf('không tải được') >= 0){
-    why = 'Không tải nổi script reCAPTCHA — mạng công ty chặn google.com, hoặc trình duyệt đang bật chặn quảng cáo.';
-  }else{
-    why = 'Không lấy được token reCAPTCHA. Kiểm tra key còn tồn tại và tên miền "' + location.hostname + '" đã có trong danh sách Domains.';
-  }
-  const err = new Error(why);
-  err.detail = 'v3: ' + (errs.v3 || 'ok') + ' | Enterprise: ' + (errs.enterprise || 'ok');
-  throw err;
+/* ==========================================================================
+   NHẬN DIỆN QUẢN TRỊ VIÊN
+   Trước đây danh sách uid admin nằm cứng trong file này. Giờ nó nằm ở BẢNG
+   quan_tri trên máy chủ — thêm bớt admin không phải sửa code, và quan trọng
+   hơn: máy chủ tự kiểm tra bằng hàm is_admin(), không tin lời app nói.
+   ========================================================================== */
+async function sbIsAdmin(){
+  const u = fsAuth && fsAuth.currentUser;
+  if(!u || !sb) return false;
+  const { data, error } = await sb.from(TB_ADMIN).select('user_id').eq('user_id', u.uid).maybeSingle();
+  if(error){ console.error('Không đọc được bảng quan_tri:', error); return false; }
+  return !!data;
 }
-async function setupAppCheck(){
-  if(APPCHECK_MODE === 'off'){
-    appCheckState = { ok:false, provider:null, message:'Đã tắt thủ công (APPCHECK_MODE = "off")' };
-    return;
-  }
-  if(!RECAPTCHA_SITE_KEY || RECAPTCHA_SITE_KEY === 'YOUR_RECAPTCHA_V3_SITE_KEY'){
-    appCheckState = { ok:false, provider:null, message:'Chưa dán site key reCAPTCHA' };
-    return;
-  }
-  /* Chạy trên máy cá nhân (localhost / mở file trực tiếp) thì reCAPTCHA không hoạt động
-     được — bật debug token để vẫn test được. Lần đầu chạy, console sẽ in ra 1 mã UUID,
-     copy mã đó dán vào Firebase > App Check > app > ⋮ > Manage debug tokens. */
-  const host = location.hostname;
-  if(host === 'localhost' || host === '127.0.0.1' || location.protocol === 'file:'){
-    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-  }
-  let kind;
-  try{
-    kind = await _detectRecaptchaKind(RECAPTCHA_SITE_KEY);
-  }catch(e){
-    appCheckState = { ok:false, provider:null, message:e.message, detail:e.detail || '' };
-    console.error('[App Check] ' + e.message);
-    if(e.detail) console.error('[App Check] chi tiết kỹ thuật — ' + e.detail);
-    console.error('[App Check] ⚠️ ĐỪNG bật Enforce trong Firebase console khi còn dòng lỗi này, nếu bật app sẽ ngừng đăng nhập/lưu được.');
-    return;
-  }
-  try{
-    const provider = (kind === 'enterprise')
-      ? new firebase.appCheck.ReCaptchaEnterpriseProvider(RECAPTCHA_SITE_KEY)
-      : new firebase.appCheck.ReCaptchaV3Provider(RECAPTCHA_SITE_KEY);
-    firebase.appCheck().activate(provider, true);
-    await _withTimeout(firebase.appCheck().getToken(), 15000, 'appCheck.getToken');
-    appCheckState = { ok:true, provider:kind,
-      message:'Đang chạy tốt với provider "'+(kind === 'enterprise' ? 'reCAPTCHA Enterprise' : 'reCAPTCHA v3')+'". Có thể bật Enforce trong Firebase console.' };
-    console.log('%c[App Check] ✅ ' + appCheckState.message, 'color:#22c55e');
-  }catch(e){
-    /* Lấy được token reCAPTCHA nhưng Firebase từ chối đổi sang App Check token ⇒
-       key chưa được đăng ký (hoặc đăng ký nhầm ô) trong Firebase > App Check > Apps. */
-    appCheckState = { ok:false, provider:kind,
-      message:'reCAPTCHA chạy được (loại '+kind+') nhưng Firebase từ chối đổi token. Vào Firebase > App Check > Apps > "Data logger", dán ĐÚNG site key này vào ô "'+(kind === 'enterprise' ? 'reCAPTCHA Enterprise' : 'reCAPTCHA')+'". Lỗi: '+(e.code || e.message) };
-    console.error('[App Check] ' + appCheckState.message);
+/* Hai hàm cũ — giữ tên để chỗ khác gọi vẫn chạy. Giờ chỉ trả lời được về
+   NGƯỜI ĐANG ĐĂNG NHẬP, vì quyền admin nằm trên máy chủ chứ không nằm trong file. */
+function isAdminUid(uid){
+  const u = fsAuth && fsAuth.currentUser;
+  return !!uid && !!u && u.uid === uid && isAdmin;
+}
+function isAdminUser(user){ return !!user && isAdminUid(user.uid); }
+
+function _sbWrapUser(u){ return u ? { uid: u.id, email: u.email || '' } : null; }
+
+let _sbAuthSeq = 0;
+async function _sbOnAuth(session){
+  const seq = ++_sbAuthSeq;
+  const u = session ? session.user : null;
+  fsAuth.currentUser = _sbWrapUser(u);
+  isLoggedIn = !!u;
+  isAdmin = false;
+  updateAdminUI();
+  updateGate();
+  if(isLoggedIn){
+    renderLibrary();
+    let admin = false;
+    try{ admin = await sbIsAdmin(); }
+    catch(e){ console.error('Kiểm tra quyền quản trị lỗi', e); }
+    /* Phiên đã đổi trong lúc chờ máy chủ trả lời (đăng xuất, tab khác đăng nhập
+       tài khoản khác) → bỏ kết quả cũ đi, không được cấp quyền nhầm. */
+    if(seq !== _sbAuthSeq) return;
+    isAdmin = admin;
+    updateAdminUI();
+    renderLibrary();
   }
   if(typeof updateSecurityPanel === 'function') updateSecurityPanel();
   if(typeof updateAccountPanel === 'function') updateAccountPanel();
 }
 
-if(HAS_FIREBASE){
+if(HAS_SUPABASE){
   try{
-    firebase.initializeApp(FIREBASE_CONFIG);
-    /* App Check phải được bật TRƯỚC khi Firestore/Auth gửi request đầu tiên, nên
-       toàn bộ phần khởi tạo nằm trong hàm async này. Nếu App Check hỏng thì vẫn
-       chạy tiếp (app không chết) — chỉ là chưa có lớp chặn bot. */
-    (async ()=>{
-      const gateErr = document.getElementById('gate-error');
-      if(gateErr){
-        gateErr.textContent = 'Đang kiểm tra lớp bảo mật, chờ vài giây…';
-        gateErr.style.color = 'var(--text-dim)';
-        gateErr.style.display = 'block';
-      }
-      /* Chặn trên cứng: dù phép dò có kẹt thế nào cũng không được giữ màn hình
-         đăng nhập quá 25 giây. Hỏng thì bỏ App Check, app vẫn chạy. */
-      try{ await _withTimeout(setupAppCheck(), 25000, 'setupAppCheck'); }
-      catch(e){
-        console.error('[App Check] bỏ qua vì quá lâu hoặc lỗi:', e.message);
-        if(!appCheckState.message || appCheckState.message === 'Chưa khởi tạo'){
-          appCheckState = { ok:false, provider:null, message:'Kiểm tra quá lâu nên đã bỏ qua App Check. App vẫn chạy bình thường (đừng bật Enforce).', detail:e.message };
-        }
-      }
-      if(gateErr){
-        gateErr.style.display = 'none';
-        gateErr.style.color = 'var(--danger)';
-      }
-      fsDb = firebase.firestore();
-      fsAuth = firebase.auth();
-      fsAuth.onAuthStateChanged(async user=>{
-        isLoggedIn = !!user;
-        /* Phiên vừa đổi (đăng xuất, hết hạn, hoặc tab khác đăng nhập tài khoản khác):
-           đóng ngay màn hình 2FA đang mở và huỷ luồng của tài khoản cũ, nếu không
-           lời hứa của nó treo mãi và có thể cấp quyền nhầm cho phiên mới. */
-        if(typeof mfaAbortFlow === 'function') mfaAbortFlow();
-        /* Đăng nhập đúng email admin là thấy được nút xoá ngay. Mã 6 số chỉ được
-           hỏi đúng lúc bấm xoá (step-up), xem requireAdminStepUp() bên dưới. */
-        isAdmin = isAdminUser(user);
-        mfaUnlockUntil = 0;
-        mfaEnrolled = null;
-        updateAdminUI();
-        updateGate();
-        if(isLoggedIn) renderLibrary();
-        if(isAdmin){
-          try{ await loadMfaStatus(user); }
-          catch(e){ console.error('2FA status error', e); }
-          updateAdminUI();
-        }
-        if(typeof updateSecurityPanel === 'function') updateSecurityPanel();
-  if(typeof updateAccountPanel === 'function') updateAccountPanel();
-      });
-      if(typeof updateSecurityPanel === 'function') updateSecurityPanel();
-  if(typeof updateAccountPanel === 'function') updateAccountPanel();
-    })();
-  }catch(e){ console.error('Firebase init failed', e); }
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+    });
+    fsDb = sb;
+    fsAuth = {
+      currentUser: null,
+      async signInWithEmailAndPassword(email, password){
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
+        if(error) throw error;
+        return data;
+      },
+      async signOut(){ await sb.auth.signOut(); }
+    };
+    sb.auth.getSession().then(r=>_sbOnAuth(r && r.data ? r.data.session : null))
+                        .catch(e=>console.error('getSession', e));
+    sb.auth.onAuthStateChange((_evt, session)=>{ _sbOnAuth(session); });
+  }catch(e){ console.error('Supabase init failed', e); }
 }
-const FS_COLLECTION = 'coldroute_shared';
-async function fsGet(key){
-  const doc = await fsDb.collection(FS_COLLECTION).doc(key).get();
-  return doc.exists ? doc.data().value : null;
+
+/* ==========================================================================
+   ĐỔI QUA LẠI base64 ⇄ Blob
+   File PDF trước đây nhét thẳng vào database dưới dạng base64 nên dính trần
+   750 KB mỗi file. Giờ file nằm trong kho Storage, nhưng phần đọc PDF của app
+   vẫn nhận base64 — nên đổi qua lại ở đây, chỗ khác không phải sửa.
+   ========================================================================== */
+function _b64ToBlob(b64, type){
+  const clean = String(b64).replace(/^data:[^,]*,/, '');
+  const bin = atob(clean);
+  const buf = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) buf[i] = bin.charCodeAt(i);
+  return new Blob([buf], { type: type || 'application/pdf' });
 }
-/* extra: các trường ghi thêm ở NGOÀI chuỗi value — hiện chỉ dùng cho "owner",
-   vì Firestore Rules không đọc được bên trong chuỗi JSON nên phải để chủ lô ở
-   ngoài thì rules mới kiểm tra được ai là chủ. */
-async function fsSet(key, value, extra){
-  await fsDb.collection(FS_COLLECTION).doc(key).set(
-    Object.assign({ value, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, extra || {})
-  );
-  return true;
+function _blobToB64(blob){
+  return new Promise((resolve, reject)=>{
+    const fr = new FileReader();
+    fr.onload = ()=>{ const s = String(fr.result); resolve(s.slice(s.indexOf(',')+1)); };
+    fr.onerror = ()=>reject(fr.error);
+    fr.readAsDataURL(blob);
+  });
 }
-async function fsDelete(key){
-  await fsDb.collection(FS_COLLECTION).doc(key).delete();
+
+/* ==========================================================================
+   MỘT KHOÁ ĐI VỀ ĐÂU
+   App vẫn gọi lưu/đọc theo "khoá" như thời Firebase. Ở đây phân luồng:
+     shipment:<mã lô>            → bảng lo_hang
+     pdf:<mã lô>:<mã logger>     → kho file data-logger-pdf
+     climate: geocode: normals:  → bảng cache_khi_hau
+   ========================================================================== */
+function _sbKind(key){
+  if(/^pdf:/.test(key)) return 'pdf';
+  if(/^shipment:/.test(key)) return 'lo';
+  return 'cache';
+}
+function _sbSafeName(s){ return String(s).replace(/[^\w.-]/g, '_'); }
+function _pdfPath(key){
+  const rest = String(key).slice(4);              /* bỏ 'pdf:' */
+  const i = rest.lastIndexOf(':');
+  if(i < 0) return _sbSafeName(rest) + '.pdf';
+  return _sbSafeName(rest.slice(0, i)) + '/' + _sbSafeName(rest.slice(i+1)) + '.pdf';
+}
+
+/* Máy chủ từ chối vì không đủ quyền → dựng đúng loại lỗi mà saveErrorMessage()
+   nhận ra, để giao diện báo "chỉ người tạo lô hoặc admin mới sửa được".
+   PostgREST không báo lỗi khi RLS chặn sửa — nó chỉ sửa 0 dòng. Vì vậy mọi
+   lệnh update bên dưới đều .select() lại để đếm xem có thật sự sửa được không. */
+function _denied(){
+  const e = new Error('Máy chủ từ chối: không đủ quyền.');
+  e.code = 'permission-denied';
+  return e;
+}
+
+/* ---------- các cột của bảng lo_hang ----------
+   Bản ghi đầy đủ nằm ở cột du_lieu (jsonb) — đó là thứ app đọc. Mấy cột riêng
+   bên cạnh chỉ để người vào Studio nhìn bảng cho dễ và để sau này viết SQL báo
+   cáo. App không bao giờ đọc chúng, nên sửa tay trong Studio KHÔNG đổi được dữ
+   liệu app hiển thị. */
+function _sbLoColumns(rec){
+  const num = v => (typeof v === 'number' && isFinite(v)) ? Math.round(v*10)/10 : null;
+  const iso = t => (typeof t === 'number' && isFinite(t)) ? new Date(t).toISOString() : null;
+  return {
+    muc_luc:            (typeof shipmentMeta === 'function') ? shipmentMeta(rec) : null,
+    sub_mail:           rec.subMail || '',
+    ten_hang:           rec.productName || null,
+    thang_ship:         rec.shipMonth || null,
+    eta:                rec.eta || null,
+    thang_den_thuc_te:  rec.actualArrivalMonth || null,
+    cang_den:           rec.destPort || null,
+    nuoc_den:           rec.dest || null,
+    loai_hinh:          rec.transportMode || null,
+    cang_di:            rec.origin || 'Việt Nam',
+    lat_di:             (typeof rec.originLat === 'number') ? rec.originLat : null,
+    lon_di:             (typeof rec.originLon === 'number') ? rec.originLon : null,
+    lat_den:            (typeof rec.destLat === 'number') ? rec.destLat : null,
+    lon_den:            (typeof rec.destLon === 'number') ? rec.destLon : null,
+    note:               rec.note || null,
+    doc_phu_trach:      rec.docOwner || null,
+    tinh_trang:         rec.status || null,
+    ghi_chu:            rec.remark || null,
+    thang_update:       rec.loggerUpdateMonth || null,
+    so_logger:          (typeof rec.loggerCount === 'number') ? rec.loggerCount : ((rec.loggers||[]).length),
+    nhiet_cao_nhat:     num(rec.max),
+    nhiet_thap_nhat:    num(rec.min),
+    nhiet_trung_binh:   num(rec.avg),
+    bat_dau:            iso(rec.start),
+    ket_thuc:           iso(rec.stop),
+    thang_trong_hanh_trinh: Array.isArray(rec.months) ? rec.months : null,
+    sua_luc:            new Date().toISOString()
+  };
+}
+
+async function _sbSaveLo(id, value){
+  const rec = (typeof value === 'string') ? JSON.parse(value) : value;
+  const row = _sbLoColumns(rec);
+  row.du_lieu = rec;
+  const { data: dangCo, error: e1 } = await sb.from(TB_LO).select('id').eq('id', id).maybeSingle();
+  if(e1) throw e1;
+  if(dangCo){
+    const { data, error } = await sb.from(TB_LO).update(row).eq('id', id).select('id');
+    if(error) throw error;
+    if(!data || !data.length) throw _denied();
+  }else{
+    row.id = id;
+    row.nguoi_tao = currentUid();
+    const { error } = await sb.from(TB_LO).insert(row);
+    if(error) throw error;
+  }
   return true;
 }
 
+/* ---------- đọc ---------- */
+async function fsGet(key){
+  const kind = _sbKind(key);
+  if(kind === 'cache'){
+    const { data, error } = await sb.from(TB_CACHE).select('gia_tri').eq('khoa', key).maybeSingle();
+    if(error) throw error;
+    return (data && data.gia_tri && typeof data.gia_tri.v !== 'undefined') ? data.gia_tri.v : null;
+  }
+  if(kind === 'pdf'){
+    const { data, error } = await sb.storage.from(KHO_PDF).download(_pdfPath(key));
+    if(error || !data) return null;           /* chưa có file thì coi như không có */
+    return await _blobToB64(data);
+  }
+  const id = key.slice('shipment:'.length);
+  const { data, error } = await sb.from(TB_LO).select('du_lieu').eq('id', id).maybeSingle();
+  if(error) throw error;
+  return (data && data.du_lieu) ? JSON.stringify(data.du_lieu) : null;
+}
+
+/* ---------- ghi ----------
+   extra: thời Firebase dùng để ghi "owner" ra ngoài chuỗi JSON cho rules đọc
+   được. Supabase có cột nguoi_tao riêng nên không cần nữa, giữ tham số cho
+   khỏi phải sửa chỗ gọi. */
+async function fsSet(key, value, extra){
+  const kind = _sbKind(key);
+  if(kind === 'cache'){
+    const { error } = await sb.from(TB_CACHE)
+      .upsert({ khoa:key, gia_tri:{ v:value }, cap_nhat:new Date().toISOString() }, { onConflict:'khoa' });
+    if(error) throw error;
+    return true;
+  }
+  if(kind === 'pdf'){
+    const { error } = await sb.storage.from(KHO_PDF)
+      .upload(_pdfPath(key), _b64ToBlob(value), { contentType:'application/pdf', upsert:false });
+    if(error){
+      /* Kho file khoá "ghi một lần, không ai sửa". File đã có sẵn ⇒ coi như xong. */
+      const msg = String(error.message || '');
+      if(/exist/i.test(msg) || String(error.statusCode) === '409') return true;
+      throw error;
+    }
+    return true;
+  }
+  return await _sbSaveLo(key.slice('shipment:'.length), value);
+}
+
+/* ---------- xoá ----------
+   Máy chủ KHÔNG có luật xoá cho bất kỳ bảng nào, kể cả admin. Hàm này giữ lại
+   để chỗ gọi cũ không vỡ, nhưng luôn báo không thành công. Muốn cho lô biến
+   khỏi kho thì dùng ẨN (an_lo), dữ liệu vẫn còn nguyên. */
+async function fsDelete(key){
+  console.warn('[TUYẾN LẠNH] Không xoá được "' + key + '": máy chủ khoá xoá vĩnh viễn. Dùng nút Ẩn.');
+  return null;
+}
+
+/* ---------- bảng data_logger ----------
+   Mỗi file data logger một dòng. Bảng này KHÔNG có luật sửa và KHÔNG có luật
+   xoá — đã ghi là khoá vĩnh viễn, vì đây là bằng chứng nhiệt độ của lô hàng
+   dược. Số liệu app hiển thị vẫn đọc từ lo_hang.du_lieu; bảng này là bản ghi
+   không ai sửa được, để đối chiếu khi cần. */
+async function sbSyncLoggers(rec){
+  if(!HAS_SUPABASE || !sb || !rec) return;
+  const list = (rec.loggers || []).filter(lg => lg && loggerKey(lg));
+  if(!list.length) return;
+  let daCo = [];
+  try{
+    const { data } = await sb.from(TB_LOGGER).select('van_tay').eq('lo_id', rec.id);
+    daCo = (data || []).map(r=>r.van_tay);
+  }catch(e){ console.error('đọc data_logger lỗi', e); }
+  const them = list.filter(lg => daCo.indexOf(loggerKey(lg)) < 0).map(lg=>({
+    lo_id:         rec.id,
+    ten_file:      lg.fileName || null,
+    ma_may:        lg.deviceId || null,
+    bat_dau:       (typeof lg.start === 'number') ? new Date(lg.start).toISOString() : null,
+    ket_thuc:      (typeof lg.stop  === 'number') ? new Date(lg.stop).toISOString()  : null,
+    nhiet_cao:     (typeof lg.max === 'number') ? Math.round(lg.max*10)/10 : null,
+    nhiet_thap:    (typeof lg.min === 'number') ? Math.round(lg.min*10)/10 : null,
+    nhiet_tb:      (typeof lg.avg === 'number') ? Math.round(lg.avg*10)/10 : null,
+    thang:         Array.isArray(lg.months) ? lg.months : null,
+    duong_dan_pdf: _pdfPath(pdfKey(rec.id, lg.lid)),
+    van_tay:       loggerKey(lg),
+    nguoi_tao:     currentUid()
+  }));
+  if(!them.length) return;
+  const { error } = await sb.from(TB_LOGGER).insert(them);
+  if(error) console.error('Không ghi được dòng data_logger:', error);
+}
+
 /* ---------------- storage helpers ---------------- */
-/* Priority: Firebase Firestore (real shared storage for everyone on this page)
-   > window.storage (when previewed inside Claude.ai)
-   > IndexedDB (local-only fallback, per browser/device). */
+/* Thứ tự ưu tiên: Supabase (kho dùng chung thật, mọi người cùng thấy)
+   > window.storage (khi xem thử bên trong Claude.ai)
+   > IndexedDB (lưu cục bộ trên một máy, không dùng chung được). */
 const HAS_CLAUDE_STORAGE = (typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function');
 
 const IDB_NAME = 'coldroute-db', IDB_VERSION = 1, IDB_STORE = 'kv';
@@ -1111,7 +984,7 @@ async function safeSet(key, value, shared=false){
     if(!_storageBroken){
       _storageBroken = true;
       toast(HAS_FIREBASE
-        ? 'Không lưu được dữ liệu lên Firebase (kiểm tra lại config/quyền Firestore Rules).'
+        ? 'Không lưu được dữ liệu lên Supabase (kiểm tra lại kết nối và quyền RLS).'
         : 'Không lưu được dữ liệu vào trình duyệt (có thể do chế độ ẩn danh / trình duyệt chặn lưu trữ). Thử mở bằng tab thường.');
     }
     return null;
@@ -1127,7 +1000,14 @@ async function strictSet(key, value, extra){
   return ok;
 }
 async function strictIndexEntry(meta){
-  if(HAS_FIREBASE){ await fsDb.collection(META_COLLECTION).doc(meta.id).set(meta); return true; }
+  if(HAS_SUPABASE){
+    const { data, error } = await sb.from(TB_LO)
+      .update({ muc_luc: meta, sua_luc: new Date().toISOString() })
+      .eq('id', meta.id).select('id');
+    if(error) throw error;
+    if(!data || !data.length) throw _denied();
+    return true;
+  }
   const ok = await saveIndexEntry(meta);
   if(ok === null) throw new Error('Không lưu được mục lục.');
   return ok;
@@ -1158,35 +1038,37 @@ async function safeDelete(key, shared=false){
   }catch(e){ console.error('storage delete failed', key, e); return null; }
 }
 
-/* Metadata listing: on Firebase, each shipment gets its OWN document inside a
-   dedicated collection (no shared array, no size ceiling, scales to any count).
-   Without Firebase (local/personal fallback), keep the old single-array-key
-   approach since that use case won't realistically reach thousands of entries. */
-const META_COLLECTION = 'shipments_meta';
+/* Mục lục kho: trên Supabase nằm ở cột muc_luc của chính dòng lô (bảng lo_hang).
+   Chế độ lưu cục bộ (không có máy chủ) vẫn dùng một mảng chung trong trình duyệt,
+   vì trường hợp đó không bao giờ lên tới hàng nghìn lô. */
 
 /* ==========================================================================
    ẨN THAY VÌ XOÁ — chống mất dữ liệu
-   Firestore Rules đặt allow delete: if false, nên KHÔNG AI xoá vĩnh viễn được
-   qua app hay qua API — kể cả tài khoản admin, kể cả người chiếm được tài khoản
-   đó. Nút "Xoá" trong app giờ chỉ gắn cờ hidden:true lên dòng mục lục: lô biến
-   khỏi mọi danh sách và khỏi phần tra cứu, nhưng dữ liệu vẫn nằm nguyên.
-   Bỏ ẩn lại được ngay trong app. Muốn xoá thật (để dọn dung lượng) thì vào
-   Firebase Console xoá tay — Console chạy bằng quyền quản trị nên không bị
-   rules chặn.
+   Trên Supabase, KHÔNG BẢNG NÀO có luật xoá (RLS), nên không ai xoá vĩnh viễn
+   được qua app hay qua API — kể cả admin, kể cả người chiếm được tài khoản đó.
+   Nút "Ẩn" chỉ bật cờ an = true trên dòng lô: lô biến khỏi mọi danh sách và
+   khỏi báo cáo tháng, nhưng bản ghi vẫn nằm nguyên.
 
-   v38 (2026-09-29, theo yêu cầu): MỌI NGƯỜI đăng nhập đều ẩn được lô, kể cả lô
-   của người khác. BỎ ẨN thì vẫn chỉ admin. Vì ẩn là việc lấy lại được nên bỏ
-   luôn bước nhập mã 2FA khi ẩn. Rules cho người thường ghi ĐÚNG ba trường
-   hidden / hiddenAt / hiddenBy và chỉ theo chiều ẩn — sửa nội dung lô của
-   người khác vẫn bị máy chủ chặn như trước.
+   MỌI NGƯỜI đăng nhập đều ẩn được lô, kể cả lô của người khác. BỎ ẨN thì chỉ
+   admin. Hai việc này đi qua hai hàm trên máy chủ — an_lo() và bo_an_lo() —
+   chứ không phải lệnh sửa bảng, nên người thường không nhân cơ hội đó sửa được
+   nhiệt độ hay Sub mail của lô người khác. Xem 03-cho-moi-nguoi-an-lo.sql.
    ========================================================================== */
 async function loadIndex(includeHidden){
   let all;
-  if(HAS_FIREBASE){
+  if(HAS_SUPABASE){
     try{
-      const snap = await fsDb.collection(META_COLLECTION).get();
-      all = snap.docs.map(d=>d.data());
-    }catch(e){ console.error('loadIndex (firestore) failed', e); return []; }
+      const { data, error } = await sb.from(TB_LO).select('id, muc_luc, an, an_luc, an_boi');
+      if(error) throw error;
+      /* Cờ ẩn lấy từ CỘT an chứ không lấy trong muc_luc: ẩn/bỏ ẩn đi qua hàm
+         an_lo()/bo_an_lo() nên chỉ cột đó mới là thứ đúng. */
+      all = (data || []).filter(r=>r.muc_luc).map(r=>Object.assign({}, r.muc_luc, {
+        id:       r.id,
+        hidden:   !!r.an,
+        hiddenAt: r.an_luc ? Date.parse(r.an_luc) : null,
+        hiddenBy: r.an_boi || ''
+      }));
+    }catch(e){ console.error('loadIndex (supabase) failed', e); return []; }
   }else{
     const raw = await safeGet('shipment-index', false);
     if(!raw) return [];
@@ -1194,26 +1076,36 @@ async function loadIndex(includeHidden){
   }
   return includeHidden ? all : all.filter(r=>!r.hidden);
 }
-/* Gắn/bỏ cờ ẩn. Đây là thao tác GHI ĐÈ (update), rules vẫn cho phép — chỉ có
-   xoá thật mới bị cấm. Trả về true nếu máy chủ nhận. */
+/* Bật/tắt cờ ẩn. Trên Supabase gọi hàm máy chủ, không sửa bảng trực tiếp:
+   an_lo    — ai đăng nhập cũng gọi được
+   bo_an_lo — hàm tự kiểm tra is_admin(), không phải admin thì máy chủ báo lỗi */
 async function setShipmentHidden(id, hidden){
+  if(HAS_SUPABASE){
+    const { error } = await sb.rpc(hidden ? 'an_lo' : 'bo_an_lo', { p_id: id });
+    if(error){ console.error('an_lo/bo_an_lo lỗi:', error); return false; }
+    return true;
+  }
   const all = await loadIndex(true);
   const meta = all.find(r=>r.id === id);
   if(!meta){ console.error('setShipmentHidden: không thấy lô', id); return false; }
   const updated = Object.assign({}, meta, {
     hidden: !!hidden,
     hiddenAt: hidden ? Date.now() : null,
-    /* Lưu MÃ TÀI KHOẢN (uid), không lưu email — trước đây lưu email nên mọi
-       người đăng nhập đều đọc được email của nhau ở danh sách lô đã ẩn. */
     hiddenBy: hidden ? currentUid() : null
   });
   const ok = await saveIndexEntry(updated);
   return ok !== null;
 }
 async function saveIndexEntry(meta){
-  if(HAS_FIREBASE){
-    try{ await fsDb.collection(META_COLLECTION).doc(meta.id).set(meta); return true; }
-    catch(e){ console.error('saveIndexEntry (firestore) failed', e); return null; }
+  if(HAS_SUPABASE){
+    try{
+      const { data, error } = await sb.from(TB_LO)
+        .update({ muc_luc: meta, sua_luc: new Date().toISOString() })
+        .eq('id', meta.id).select('id');
+      if(error) throw error;
+      if(!data || !data.length) return null;      /* RLS chặn: không sửa được dòng nào */
+      return true;
+    }catch(e){ console.error('saveIndexEntry (supabase) failed', e); return null; }
   }
   const idx = await loadIndex();
   idx.push(meta);
@@ -1221,9 +1113,9 @@ async function saveIndexEntry(meta){
   return true;
 }
 async function deleteIndexEntry(id){
-  if(HAS_FIREBASE){
-    try{ await fsDb.collection(META_COLLECTION).doc(id).delete(); return true; }
-    catch(e){ console.error('deleteIndexEntry (firestore) failed', e); return null; }
+  if(HAS_SUPABASE){
+    console.warn('[TUYẾN LẠNH] Không xoá được mục lục lô ' + id + ': máy chủ khoá xoá. Dùng nút Ẩn.');
+    return null;
   }
   const idx = (await loadIndex()).filter(x=>x.id!==id);
   await safeSet('shipment-index', JSON.stringify(idx), false);
@@ -1233,9 +1125,9 @@ async function deleteIndexEntry(id){
    MỘT LÔ HÀNG = MỘT "SUB MAIL TBXK", BÊN TRONG CÓ THỂ CÓ NHIỀU DATA LOGGER
    Trước v28: một file PDF = một lô. Từ v28: một lô chứa cả danh sách logger.
 
-   PDF của từng logger lưu thành BẢN GHI RIÊNG ('pdf:<id lô>:<id logger>'),
-   KHÔNG nhét chung vào bản ghi lô. Lý do: Firestore chỉ cho mỗi bản ghi tối đa
-   1 MiB — gộp 2-3 file PDF vào một chỗ là vượt ngay, lưu hỏng.
+   PDF của từng logger lưu RIÊNG dưới khoá 'pdf:<mã lô>:<mã logger>'. Từ v39
+   khoá đó trỏ vào KHO FILE của Supabase (bucket data-logger-pdf), không còn
+   nhét base64 vào database nữa — hết luôn trần 750 KB mỗi file thời Firestore.
    ========================================================================== */
 function pdfKey(shipmentId, lid){ return 'pdf:' + shipmentId + ':' + lid; }
 
@@ -1436,6 +1328,9 @@ async function saveShipment(record){
      TẠO lô — admin sửa lô của người khác thì chủ lô vẫn giữ nguyên. */
   await strictSet('shipment:'+record.id, JSON.stringify(toStore), { owner: record.uploadedByUid || '' });
   await strictIndexEntry(shipmentMeta(toStore));
+  /* Ghi thêm mỗi file logger một dòng vào bảng data_logger — bảng khoá vĩnh
+     viễn, không ai sửa hay xoá được. Lỗi ở đây KHÔNG làm hỏng việc lưu lô. */
+  if(HAS_SUPABASE){ try{ await sbSyncLoggers(toStore); }catch(e){ console.error('sbSyncLoggers', e); } }
 }
 async function getShipment(id){
   const raw = await safeGet('shipment:'+id, false);
@@ -23607,25 +23502,26 @@ function transportModeShort(m){
 
 /* ==========================================================================
    DỰNG LẠI MỤC LỤC KHO DỮ LIỆU
-   Lô hàng được lưu thành HAI phần: nội dung đầy đủ ở collection coldroute_shared
-   (doc "shipment:<id>") và một dòng mục lục ở collection shipments_meta. Tab
-   "Kho dữ liệu" đọc mục lục. Nếu Firestore Rules thiếu quyền cho shipments_meta
-   thì phần ghi mục lục bị từ chối lặng lẽ ⇒ dữ liệu vẫn còn nguyên nhưng kho
-   trông như trống rỗng. Nút này quét lại coldroute_shared và dựng lại mục lục.
+   Mỗi lô là một dòng trong bảng lo_hang, gồm hai phần: cột du_lieu giữ toàn bộ
+   nội dung lô, cột muc_luc giữ dòng tóm tắt mà tab "Kho dữ liệu" và "Báo cáo
+   tháng" đọc. Nếu vì lý do gì đó cột muc_luc bị thiếu hoặc cũ, kho trông như
+   trống rỗng trong khi dữ liệu vẫn còn nguyên. Nút này đọc lại du_lieu của mọi
+   lô và tính lại muc_luc.
    ========================================================================== */
 async function rebuildIndexFromShipments(){
-  if(!HAS_FIREBASE || !fsDb) throw new Error('Chỉ dùng được khi đang chạy với Firebase.');
-  const snap = await fsDb.collection(FS_COLLECTION).get();
+  if(!HAS_SUPABASE || !sb) throw new Error('Chỉ dùng được khi đang chạy với Supabase.');
+  const { data, error } = await sb.from(TB_LO).select('id, du_lieu');
+  if(error) throw error;
   let scanned = 0, restored = 0, failed = 0;
-  for(const doc of snap.docs){
-    if(!doc.id.startsWith('shipment:')) continue;   /* bỏ qua các key khác */
+  for(const row of (data || [])){
+    if(!row || !row.du_lieu) continue;
     scanned++;
     let rec = null;
     try{
-      const raw = doc.data().value;
-      rec = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      rec = (typeof row.du_lieu === 'string') ? JSON.parse(row.du_lieu) : row.du_lieu;
     }catch(e){ failed++; continue; }
-    if(!rec || !rec.id){ failed++; continue; }
+    if(!rec){ failed++; continue; }
+    rec.id = row.id;
     const ok = await saveIndexEntry(shipmentMeta(normalizeShipment(rec)));
     if(ok) restored++; else failed++;
   }
@@ -23641,7 +23537,7 @@ document.getElementById('btn-rebuild-index').addEventListener('click', async ()=
     const r = await rebuildIndexFromShipments();
     await renderLibrary();
     if(r.scanned === 0){
-      toast('Không tìm thấy lô nào trong kho gốc — có thể chưa lô nào lưu được lên Firebase.');
+      toast('Không tìm thấy lô nào trong kho gốc — có thể chưa lô nào lưu được lên Supabase.');
     }else if(r.failed){
       toast('Đã dựng lại ' + r.restored + '/' + r.scanned + ' lô. ' + r.failed + ' lô lỗi — mở F12 > Console xem chi tiết.');
     }else{
@@ -23649,7 +23545,7 @@ document.getElementById('btn-rebuild-index').addEventListener('click', async ()=
     }
   }catch(e){
     console.error('rebuild index failed', e);
-    toast('Dựng lại thất bại: ' + (e.code || e.message) + '. Nhiều khả năng Firestore Rules chưa cho ghi collection "shipments_meta".');
+    toast('Dựng lại thất bại: ' + (e.code || e.message) + '. Nhiều khả năng quyền RLS chưa cho sửa bảng lo_hang.');
   }finally{
     btn.disabled = false;
     btn.innerHTML = old;
@@ -23879,369 +23775,6 @@ window.removeShipmentFromGroup = async function(id, groupKey){
 };
 
 /* ==========================================================================
-   XÁC THỰC 2 BƯỚC (2FA / TOTP) CHO TÀI KHOẢN ADMIN
-   --------------------------------------------------------------------------
-   Cách hoạt động:
-     • Khoá bí mật (secret) chỉ nằm trong localStorage của MÁY admin — KHÔNG
-       bao giờ gửi lên Firestore. Kẻ có mật khẩu nhưng không có máy/điện thoại
-       của admin thì không sinh được mã 6 số.
-     • Firestore chỉ lưu { enabled:true, recoveryHash } — recoveryHash là bản
-       băm SHA-256 của mã dự phòng, không thể suy ngược ra mã.
-     • Máy mới ⇒ phải nhập mã dự phòng mới đăng ký lại được thiết bị.
-   Giới hạn cần biết: đây là lớp khoá ở phía app. Firestore Rules vẫn chỉ xét
-   được email, không xét được TOTP. Muốn 2FA được ép ở tầng máy chủ thì phải
-   nâng dự án lên Blaze + Identity Platform rồi bật Multi-factor (TOTP) —
-   xem phần hướng dẫn kèm theo.
-   ========================================================================== */
-const MFA_COLLECTION = 'admin_2fa';
-const mfaSecretKey = uid => 'coldroute_mfa_secret_' + uid;
-/* Sau khi nhập đúng mã, mở khoá quyền xoá trong 5 phút để xoá nhiều lô liên tiếp
-   không bị hỏi lại từng cái. Chỉ nằm trong bộ nhớ, tải lại trang là mất. */
-const MFA_UNLOCK_MS = 5 * 60 * 1000;
-let mfaUnlockUntil = 0;
-let mfaEnrolled = null;   /* null = chưa biết · true/false = đã đọc từ Firestore */
-
-const _B32A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-function b32encode(bytes){
-  let bits = 0, value = 0, out = '';
-  for(const b of bytes){
-    value = (value << 8) | b; bits += 8;
-    while(bits >= 5){ out += _B32A[(value >>> (bits - 5)) & 31]; bits -= 5; }
-  }
-  if(bits > 0) out += _B32A[(value << (5 - bits)) & 31];
-  return out;
-}
-function b32decode(str){
-  const clean = String(str).toUpperCase().replace(/[^A-Z2-7]/g, '');
-  let bits = 0, value = 0; const out = [];
-  for(const c of clean){
-    const idx = _B32A.indexOf(c); if(idx < 0) continue;
-    value = (value << 5) | idx; bits += 5;
-    if(bits >= 8){ out.push((value >>> (bits - 8)) & 255); bits -= 8; }
-  }
-  return new Uint8Array(out);
-}
-function _randBytes(n){ const a = new Uint8Array(n); crypto.getRandomValues(a); return a; }
-function newTotpSecret(){ return b32encode(_randBytes(20)); }   /* 160-bit, chuẩn RFC 4226 */
-const _RECA = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';               /* bỏ I,L,O,0,1 cho dễ chép tay */
-function newRecoveryCode(){
-  const r = _randBytes(16); let s = '';
-  for(let i = 0; i < 16; i++){
-    s += _RECA[r[i] % _RECA.length];
-    if(i % 4 === 3 && i < 15) s += '-';
-  }
-  return s;
-}
-function normRecovery(s){ return String(s).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
-async function sha256hex(str){
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-/* TOTP theo RFC 6238: HMAC-SHA1, bước 30 giây, 6 chữ số. */
-async function totpAt(secretB32, counter){
-  const key = await crypto.subtle.importKey('raw', b32decode(secretB32), {name:'HMAC', hash:'SHA-1'}, false, ['sign']);
-  const buf = new ArrayBuffer(8), dv = new DataView(buf);
-  dv.setUint32(0, Math.floor(counter / 4294967296));
-  dv.setUint32(4, counter >>> 0);
-  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, buf));
-  const off = sig[sig.length - 1] & 0x0f;
-  const bin = ((sig[off] & 0x7f) << 24) | (sig[off+1] << 16) | (sig[off+2] << 8) | sig[off+3];
-  return String(bin % 1000000).padStart(6, '0');
-}
-async function verifyTotp(secretB32, code, drift){
-  const c = String(code||'').replace(/\D/g, '');
-  if(c.length !== 6) return false;
-  const step = Math.floor(Date.now() / 30000);
-  const d = (drift == null) ? 1 : drift;          /* cho lệch ±30s phòng đồng hồ máy lệch */
-  for(let i = -d; i <= d; i++){
-    if(await totpAt(secretB32, step + i) === c) return true;
-  }
-  return false;
-}
-
-function mfaShow(step){
-  document.getElementById('mfa-gate').classList.add('active');
-  ['setup','recovery','verify','restore'].forEach(s=>{
-    document.getElementById('mfa-step-'+s).classList.toggle('active', s === step);
-  });
-}
-function mfaHide(){ document.getElementById('mfa-gate').classList.remove('active'); }
-
-/* Mọi luồng 2FA đang mở đều đăng ký hàm huỷ ở đây, để khi người dùng đăng xuất
-   (hoặc phiên bị thu hồi ở tab khác) thì đóng luôn màn hình và trả về false,
-   thay vì để lời hứa treo vĩnh viễn và cấp quyền cho tài khoản đã đổi. */
-let mfaCancelCurrent = null;
-function mfaAbortFlow(){
-  const c = mfaCancelCurrent;
-  mfaCancelCurrent = null;
-  if(c) c();
-  mfaHide();
-}
-/* Chặn bấm hai lần: khoá nút trong lúc chờ mạng rồi mở lại. */
-async function _withButtonBusy(btn, label, fn){
-  const old = btn.textContent;
-  btn.disabled = true; btn.textContent = label;
-  try{ return await fn(); }
-  finally{ btn.disabled = false; btn.textContent = old; }
-}
-function mfaGrant(uid){
-  const u = fsAuth && fsAuth.currentUser;
-  /* Phiên có thể đã đổi trong lúc màn hình 2FA đang mở — không cấp quyền cho
-     tài khoản khác với tài khoản đã bắt đầu luồng này. */
-  if(!u || u.uid !== uid || !isAdminUid(u.uid)){
-    mfaHide();
-    toast('Phiên đăng nhập đã thay đổi — hãy đăng nhập lại rồi thử lại.');
-    return false;
-  }
-  isAdmin = true;
-  mfaEnrolled = true;
-  mfaUnlockUntil = Date.now() + MFA_UNLOCK_MS;
-  mfaHide();
-  updateAdminUI();
-  if(typeof updateSecurityPanel === 'function') updateSecurityPanel();
-  if(typeof updateAccountPanel === 'function') updateAccountPanel();
-  toast('Đã xác thực — mở khoá quyền xoá trong 5 phút.');
-  return true;
-}
-async function renderMfaQr(uri){
-  const box = document.getElementById('mfa-qr');
-  box.innerHTML = ''; box.style.display = '';
-  try{
-    if(typeof QRCode === 'undefined'){
-      await _loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js');
-    }
-    new QRCode(box, { text: uri, width: 190, height: 190, correctLevel: QRCode.CorrectLevel.M });
-  }catch(e){
-    box.style.display = 'none';   /* không tải được thư viện QR ⇒ nhập khoá thủ công */
-  }
-}
-
-/* THỨ TỰ QUAN TRỌNG khi đăng ký:
-     1. kiểm mã 6 số đúng chưa
-     2. LƯU KHOÁ vào localStorage trước  ← nếu trình duyệt chặn thì dừng ngay,
-        chưa ghi gì lên Firestore, người dùng thử lại được bình thường
-     3. HIỆN mã dự phòng, bắt tích xác nhận đã chép
-     4. bấm "Xong" mới GHI enabled:true + recoveryHash lên Firestore
-   Bản trước ghi Firestore ở bước 2. Nếu localStorage bị chặn (ẩn danh, Safari,
-   trình duyệt chặn lưu trữ) thì Firestore đã ghi enabled:true trong khi mã dự
-   phòng chưa từng hiện ra ⇒ lần sau app đòi mã dự phòng mà người dùng không hề
-   có ⇒ MẤT QUYỀN XOÁ VĨNH VIỄN, chỉ cứu được bằng cách vào Firebase console xoá
-   tay doc admin_2fa. Đây là lỗi nặng nhất trong bản cũ. */
-function mfaRunEnroll(uid, email, ref){
-  return new Promise(resolve=>{
-    let done = false;
-    const finish = v=>{ if(done) return; done = true; mfaCancelCurrent = null; resolve(v); };
-    mfaCancelCurrent = ()=>finish(false);
-
-    const secret = newTotpSecret();
-    const label  = 'TUYEN LANH:' + (email || 'admin');
-    const uri = 'otpauth://totp/' + encodeURIComponent(label) +
-                '?secret=' + secret + '&issuer=' + encodeURIComponent('TUYEN LANH') +
-                '&algorithm=SHA1&digits=6&period=30';
-    document.getElementById('mfa-secret-text').textContent = secret.replace(/(.{4})/g, '$1 ').trim();
-    renderMfaQr(uri);
-    const codeEl = document.getElementById('mfa-setup-code');
-    const errEl  = document.getElementById('mfa-setup-error');
-    const confirmBtn = document.getElementById('mfa-setup-confirm');
-    codeEl.value = ''; errEl.style.display = 'none';
-    mfaShow('setup');
-    setTimeout(()=>codeEl.focus(), 80);
-
-    document.getElementById('mfa-setup-skip').onclick = ()=>{ mfaHide(); finish(false); };
-    confirmBtn.onclick = ()=>_withButtonBusy(confirmBtn, 'Đang kiểm tra…', async ()=>{
-      errEl.style.display = 'none';
-      if(!await verifyTotp(secret, codeEl.value)){
-        errEl.textContent = 'Mã không đúng. Kiểm tra đồng hồ điện thoại có đang để "tự động theo mạng" không, rồi thử lại.';
-        errEl.style.display = 'block'; codeEl.select(); return;
-      }
-      /* (2) lưu khoá lên máy TRƯỚC — chưa đụng gì tới Firestore */
-      try{ localStorage.setItem(mfaSecretKey(uid), secret); }
-      catch(e){
-        errEl.textContent = 'Trình duyệt chặn localStorage nên không lưu được khoá. Tắt chế độ ẩn danh (hoặc bỏ chặn dữ liệu trang) rồi thử lại. Chưa có gì bị thay đổi.';
-        errEl.style.display = 'block'; return;
-      }
-      /* (3) hiện mã dự phòng, (4) ghi Firestore khi bấm Xong */
-      const rec   = newRecoveryCode();
-      const recEl = document.getElementById('mfa-recovery-code');
-      const ack   = document.getElementById('mfa-recovery-ack');
-      const doneBtn = document.getElementById('mfa-recovery-done');
-      const recErr  = document.getElementById('mfa-recovery-error');
-      recEl.textContent = rec;
-      ack.checked = false; doneBtn.disabled = true;
-      if(recErr) recErr.style.display = 'none';
-      ack.onchange = ()=>{ doneBtn.disabled = !ack.checked; };
-      doneBtn.onclick = ()=>_withButtonBusy(doneBtn, 'Đang lưu…', async ()=>{
-        try{
-          await ref.set({
-            enabled: true,
-            recoveryHash: await sha256hex(normRecovery(rec)),
-            email: email || '',
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
-        }catch(e){
-          if(recErr){
-            recErr.textContent = 'Không lưu được lên Firestore: ' + (e.code || e.message) + '. Kiểm tra Firestore Rules cho collection admin_2fa, rồi bấm Xong lại.';
-            recErr.style.display = 'block';
-          }else{
-            toast('Không lưu được lên Firestore: ' + (e.code || e.message));
-          }
-          return;   /* giữ nguyên màn hình, mã dự phòng vẫn còn trên màn */
-        }
-        if(mfaGrant(uid)) finish(true); else finish(false);
-      });
-      mfaShow('recovery');
-    });
-    codeEl.onkeydown = e=>{ if(e.key === 'Enter') confirmBtn.click(); };
-  });
-}
-
-function mfaRunVerify(uid, ref){
-  return new Promise(resolve=>{
-    let done = false;
-    const finish = v=>{ if(done) return; done = true; mfaCancelCurrent = null; resolve(v); };
-    mfaCancelCurrent = ()=>finish(false);
-
-    const secret = (()=>{ try{ return localStorage.getItem(mfaSecretKey(uid)); }catch(e){ return null; } })();
-    const codeEl = document.getElementById('mfa-verify-code');
-    const errEl  = document.getElementById('mfa-verify-error');
-    const confirmBtn = document.getElementById('mfa-verify-confirm');
-    const recoverBtn = document.getElementById('mfa-verify-recovery');
-    codeEl.value = ''; errEl.style.display = 'none';
-    mfaShow('verify');
-    setTimeout(()=>codeEl.focus(), 80);
-
-    document.getElementById('mfa-verify-skip').onclick = ()=>{ mfaHide(); finish(false); };
-    recoverBtn.onclick = ()=>_withButtonBusy(recoverBtn, 'Đang tải…', async ()=>{
-      let hash = null;
-      try{ const s = await ref.get(); hash = s.exists ? s.data().recoveryHash : null; }catch(e){}
-      if(!hash){
-        errEl.textContent = 'Không đọc được mã dự phòng từ máy chủ. Kiểm tra kết nối mạng rồi thử lại.';
-        errEl.style.display = 'block'; return;
-      }
-      done = true;                       /* nhường quyền kết thúc cho luồng khôi phục */
-      mfaCancelCurrent = null;
-      resolve(await mfaRunRestore(uid, hash, ref));
-    });
-    confirmBtn.onclick = ()=>_withButtonBusy(confirmBtn, 'Đang kiểm tra…', async ()=>{
-      errEl.style.display = 'none';
-      if(!secret){
-        errEl.textContent = 'Máy này không có khoá 2FA (trình duyệt có thể đang chặn lưu trữ). Dùng nút "Mất điện thoại" bên dưới.';
-        errEl.style.display = 'block'; return;
-      }
-      if(await verifyTotp(secret, codeEl.value)){
-        if(mfaGrant(uid)) finish(true); else finish(false);
-      }else{
-        errEl.textContent = 'Mã không đúng hoặc đã hết hạn (mã đổi mỗi 30 giây).';
-        errEl.style.display = 'block'; codeEl.select();
-      }
-    });
-    codeEl.onkeydown = e=>{ if(e.key === 'Enter') confirmBtn.click(); };
-  });
-}
-
-function mfaRunRestore(uid, recoveryHash, ref){
-  return new Promise(resolve=>{
-    let done = false;
-    const finish = v=>{ if(done) return; done = true; mfaCancelCurrent = null; resolve(v); };
-    mfaCancelCurrent = ()=>finish(false);
-
-    const codeEl = document.getElementById('mfa-restore-code');
-    const errEl  = document.getElementById('mfa-restore-error');
-    const confirmBtn = document.getElementById('mfa-restore-confirm');
-    codeEl.value = ''; errEl.style.display = 'none';
-    mfaShow('restore');
-    setTimeout(()=>codeEl.focus(), 80);
-
-    document.getElementById('mfa-restore-back').onclick = ()=>{ mfaHide(); finish(false); };
-    confirmBtn.onclick = ()=>_withButtonBusy(confirmBtn, 'Đang kiểm tra…', async ()=>{
-      errEl.style.display = 'none';
-      const h = await sha256hex(normRecovery(codeEl.value));
-      if(h !== recoveryHash){
-        errEl.textContent = 'Mã dự phòng không đúng.';
-        errEl.style.display = 'block'; codeEl.select(); return;
-      }
-      /* KHÔNG xoá khoá cũ ở đây. Bản trước xoá ngay tại chỗ này, nên nếu người dùng
-         bấm "Để sau" ở màn đăng ký tiếp theo thì mất luôn thiết bị đang chạy tốt.
-         Đăng ký thành công sẽ tự ghi đè khoá mới. */
-      const email = (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.email : '';
-      done = true;
-      mfaCancelCurrent = null;
-      resolve(await mfaRunEnroll(uid, email, ref));   /* đăng ký lại thiết bị + cấp mã dự phòng mới */
-    });
-    codeEl.onkeydown = e=>{ if(e.key === 'Enter') confirmBtn.click(); };
-  });
-}
-
-/* Đọc xem tài khoản này đã bật 2FA chưa (1 lượt đọc nhẹ, chỉ để hiện trạng thái). */
-async function loadMfaStatus(user){
-  if(!fsDb) return null;
-  try{
-    const snap = await fsDb.collection(MFA_COLLECTION).doc(user.uid).get();
-    const d = snap.exists ? snap.data() : null;
-    mfaEnrolled = !!(d && d.enabled && d.recoveryHash);
-  }catch(e){
-    console.error('[2FA] không đọc được ' + MFA_COLLECTION + ':', e);
-    mfaEnrolled = null;
-    toast('Chưa có Firestore Rules cho "' + MFA_COLLECTION + '" — xem hướng dẫn.');
-  }
-  if(typeof updateSecurityPanel === 'function') updateSecurityPanel();
-  if(typeof updateAccountPanel === 'function') updateAccountPanel();
-  return mfaEnrolled;
-}
-
-/* ĐIỂM VÀO CHÍNH — gọi ngay trước mọi hành động XOÁ.
-   Trả về true nếu được phép xoá. Đăng nhập/tra cứu/tải lên không đụng tới hàm này,
-   nên người dùng chỉ bị hỏi mã đúng lúc sắp xoá thật.
-   Lần đầu tiên sẽ là màn hình cài đặt (quét QR), các lần sau chỉ nhập 6 số. */
-/* Chỉ cho phép MỘT luồng 2FA chạy tại một thời điểm. Trước đây bấm Xoá ở hai lô
-   liên tiếp (trong lúc còn đang chờ Firestore trả lời) sẽ mở hai luồng chồng nhau;
-   luồng sau gán đè onclick của luồng trước ⇒ lời hứa của luồng trước treo vĩnh viễn,
-   lô đó không bao giờ được xoá mà cũng không báo lỗi gì. Giờ luồng thứ hai chờ
-   luồng thứ nhất xong rồi dùng chung kết quả. */
-let mfaPending = null;
-async function requireAdminStepUp(){
-  if(!HAS_FIREBASE) return true;                       /* chế độ lưu cục bộ, không có Firebase */
-  const user = fsAuth && fsAuth.currentUser;
-  if(!isAdminUser(user)){
-    toast('Chỉ tài khoản admin mới xoá được.');
-    return false;
-  }
-  if(Date.now() < mfaUnlockUntil) return true;         /* còn trong cửa sổ 5 phút */
-  if(!fsDb){
-    toast('Đang khởi tạo kết nối bảo mật, chờ vài giây rồi bấm lại.');
-    return false;
-  }
-  if(mfaPending) return await mfaPending;              /* đã có luồng đang chạy */
-
-  mfaPending = (async ()=>{
-    const uid = user.uid;
-    const ref = fsDb.collection(MFA_COLLECTION).doc(uid);
-    let data = null;
-    try{
-      const snap = await ref.get();
-      data = snap.exists ? snap.data() : null;
-    }catch(e){
-      console.error('[2FA] không đọc được ' + MFA_COLLECTION + ':', e);
-      toast('Không đọc được cấu hình 2FA — kiểm tra Firestore Rules cho "' + MFA_COLLECTION + '".');
-      return false;
-    }
-    mfaEnrolled = !!(data && data.enabled && data.recoveryHash);
-
-    let hasDevice = false;
-    try{ hasDevice = !!localStorage.getItem(mfaSecretKey(uid)); }catch(e){}
-
-    if(mfaEnrolled){
-      return hasDevice ? await mfaRunVerify(uid, ref)
-                       : await mfaRunRestore(uid, data.recoveryHash, ref);
-    }
-    return await mfaRunEnroll(uid, user.email, ref);
-  })();
-
-  try{ return await mfaPending; }
-  finally{ mfaPending = null; }
-}
-
-/* ==========================================================================
    BẢNG TRẠNG THÁI BẢO MẬT
    ========================================================================== */
 function _secRow(dot, title, body){
@@ -24249,58 +23782,39 @@ function _secRow(dot, title, body){
          escapeHtml(title) + '</b><div class="hint" style="margin-top:3px;">' + body + '</div></div></div>';
 }
 function securityPanelHtml(embedded){
-  const ac = appCheckState;
-  const acDot  = ac.ok ? 'sec-ok' : (APPCHECK_MODE === 'off' ? 'sec-warn' : 'sec-bad');
-  const acHtml = _secRow(acDot, 'App Check (chặn bot dội request)',
-    escapeHtml(ac.message) +
-    (ac.detail ? '<div style="opacity:.55;font-size:11px;margin-top:5px;">' + escapeHtml(ac.detail) + '</div>' : ''));
+  /* Kho dữ liệu */
+  const kho = _secRow(HAS_SUPABASE ? 'sec-ok' : 'sec-warn',
+    'Kho dữ liệu',
+    HAS_SUPABASE
+      ? 'Supabase của công ty — <b>' + escapeHtml((SUPABASE_URL||'').replace(/^https?:\/\//,'')) + '</b>. ' +
+        'File data logger gốc nằm trong kho <b>' + escapeHtml(KHO_PDF) + '</b>, không công khai.'
+      : 'Chưa kết nối được máy chủ. App đang lưu tạm trong trình duyệt máy này, người khác KHÔNG thấy.');
 
-  let mfaDot = 'sec-warn', mfaMsg = 'Chưa đăng nhập bằng tài khoản admin.';
+  /* Tài khoản */
+  let taiKhoanDot = 'sec-warn', taiKhoan = 'Chưa đăng nhập.';
   if(isLoggedIn && fsAuth && fsAuth.currentUser){
-    const u = fsAuth.currentUser;
-    if(!isAdminUid(u.uid)){
-      mfaDot = 'sec-ok';
-      mfaMsg = 'Tài khoản thường — không có quyền xoá nên không cần 2FA.';
-    }else if(mfaEnrolled === true){
-      const left = Math.max(0, Math.ceil((mfaUnlockUntil - Date.now()) / 60000));
-      mfaDot = 'sec-ok';
-      mfaMsg = 'Đã bật. Khoá TOTP nằm trên máy này, mã dự phòng đã băm SHA-256 trên Firestore. ' +
-               (left > 0 ? 'Quyền xoá đang mở khoá, còn ~' + left + ' phút.'
-                         : 'App sẽ hỏi mã 6 số đúng lúc bấm xoá.');
-    }else if(mfaEnrolled === false){
-      mfaDot = 'sec-bad';
-      mfaMsg = 'CHƯA bật. Ai lấy được mật khẩu là xoá sạch kho dữ liệu được. ' +
-               '<button class="btn btn-primary btn-sm" style="margin-top:8px;" ' +
-               'onclick="document.getElementById(\'modal-bg\').classList.remove(\'active\'); requireAdminStepUp();">Bật ngay (quét QR)</button>';
-    }else{
-      mfaDot = 'sec-bad';
-      mfaMsg = 'Firestore TỪ CHỐI cho đọc collection "' + MFA_COLLECTION + '" ⇒ chưa bật 2FA được. ' +
-               'Vào Firebase Console > Firestore Database > Rules, kiểm tra có đúng khối này chưa rồi bấm Publish:' +
-               '<div style="font-family:var(--font-mono,monospace);font-size:11px;background:rgba(22,32,46,.04);' +
-               'border:1px solid var(--border-soft);border-radius:8px;padding:8px 10px;margin-top:8px;white-space:pre;overflow-x:auto;">' +
-               'match /' + escapeHtml(MFA_COLLECTION) + '/{uid} {\n' +
-               '  allow read, write: if request.auth != null\n' +
-               '    &amp;&amp; request.auth.uid == uid;\n' +
-               '}</div>';
-    }
+    taiKhoanDot = 'sec-ok';
+    taiKhoan = escapeHtml(fsAuth.currentUser.email || '') +
+      (isAdmin ? ' — <b style="color:var(--ice);">quản trị viên</b>. Sửa được lô của mọi người và bỏ ẩn được lô.'
+               : ' — tài khoản thường. Sửa được lô của chính mình, ẩn được lô bất kỳ.');
   }
-  const mfaHtml = _secRow(mfaDot, '2FA cho tài khoản admin', mfaMsg);
+  const tk = _secRow(taiKhoanDot, 'Đang đăng nhập', taiKhoan);
 
-  /* Ba trạng thái, không phải hai: chạy tốt · đang tắt có chủ ý · đang lỗi. */
-  let enforceDot, enforceMsg;
-  if(ac.ok){
-    enforceDot = 'sec-ok';
-    enforceMsg = 'ĐƯỢC. Vào Firebase console > App Check > APIs, bấm Enforce cho Cloud Firestore và Firebase Authentication.';
-  }else if(APPCHECK_MODE === 'off'){
-    enforceDot = 'sec-warn';
-    enforceMsg = 'KHÔNG. App Check đang tắt có chủ ý, nên Enforce sẽ chặn luôn chính app này — bật vào là ngừng đăng nhập/lưu được ngay. ' +
-                 'Muốn bật Enforce thì phải dựng lại App Check trước (tạo site key reCAPTCHA mới, đổi APPCHECK_MODE thành "auto"). ' +
-                 'Không bật Enforce cũng không sao: dữ liệu vẫn được Firestore Rules và 2FA bảo vệ.';
-  }else{
-    enforceDot = 'sec-bad';
-    enforceMsg = 'CHƯA. App Check đang lỗi (xem dòng trên), bật Enforce vào là app ngừng đăng nhập/lưu được.';
-  }
-  const enforceHtml = _secRow(enforceDot, 'Có thể bật Enforce chưa?', enforceMsg);
+  /* Luật trên máy chủ — mô tả đúng những gì RLS đang đặt.
+     Không tự kiểm tra được từ trình duyệt, nên đây là bản tóm tắt để đối chiếu,
+     không phải kết quả đo. */
+  const luat = _secRow('sec-ok', 'Luật trên máy chủ (RLS)',
+    'Chưa đăng nhập thì không đọc được gì.<br>' +
+    'Không ai xoá được bất cứ thứ gì — <b>kể cả quản trị viên</b>.<br>' +
+    'Chỉ người tạo lô và quản trị viên mới sửa được nội dung lô đó.<br>' +
+    'File data logger gốc ghi một lần rồi khoá — không ai sửa được.<br>' +
+    'Ẩn lô: mọi người. Bỏ ẩn: chỉ quản trị viên.');
+
+  /* Việc còn phải làm bằng tay trên trang Supabase. */
+  const tuDangKy = _secRow('sec-warn', 'Tự đăng ký tài khoản',
+    'App không có nút đăng ký, nhưng chặn thật sự là ở máy chủ. Phải tắt tự đăng ký ' +
+    'trong phần Authentication của Supabase (biến <b>GOTRUE_DISABLE_SIGNUP</b>). ' +
+    'Chưa tắt thì ai biết địa chỉ cũng tự tạo được tài khoản và đọc hết dữ liệu.');
 
   return (embedded
            ? '<div class="section-label"><span class="dot" style="background:var(--ice)"></span><h3>🛡️ Trạng thái bảo mật</h3></div>'
@@ -24308,7 +23822,7 @@ function securityPanelHtml(embedded){
              + '<h2 style="font-family:var(--font-display);margin:0 0 4px;">🛡️ Trạng thái bảo mật</h2>') +
          '<div class="hint" style="margin-bottom:4px;">Tên miền đang chạy: <b>' + escapeHtml(location.hostname || '(file cục bộ)') + '</b></div>' +
          '<div class="hint" style="margin-bottom:14px;">Phiên bản file đang chạy: <b style="color:var(--ice);">' + escapeHtml(APP_VERSION) + '</b></div>' +
-         acHtml + mfaHtml + enforceHtml;
+         kho + tk + luat + tuDangKy;
 }
 function updateSecurityPanel(){
   const bg = document.getElementById('modal-bg');
@@ -24330,7 +23844,7 @@ function updateAdminUI(){
     const curUser = (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser : null;
     const email = curUser ? (curUser.email || '') : '';
     const isAdminAccount = isAdminUser(curUser);
-    const needsAttention = isAdminAccount && mfaEnrolled === false;
+    const needsAttention = false;
     btn.textContent = isAdminAccount ? (needsAttention ? '⚠️' : '🛡️') : '👤';
     btn.title = (isAdminAccount ? 'Admin' : 'Tài khoản') + ': ' + email;
     btn.classList.toggle('warn', needsAttention);
@@ -24353,7 +23867,6 @@ function openAccountPanel(){
   const out = document.getElementById('acc-signout');
   if(out) out.onclick = async ()=>{
     bg.classList.remove('active');
-    mfaUnlockUntil = 0;
     await fsAuth.signOut();
     toast('Đã đăng xuất.');
   };
@@ -24389,13 +23902,21 @@ function updateGate(){
     gate.classList.add('active');
     topbar.style.display = 'none';
     wrap.style.display = 'none';
-    /* mfa-gate có z-index cao hơn login-gate, nếu không đóng nó sẽ lơ lửng
-       đè lên màn hình đăng nhập sau khi đăng xuất giữa chừng. */
-    const mfaGate = document.getElementById('mfa-gate');
-    if(mfaGate) mfaGate.classList.remove('active');
   }
 }
 
+/* Supabase trả lỗi bằng tiếng Anh, dịch sang câu người dùng hiểu được. */
+function loginErrorMessage(e){
+  const msg = String((e && e.message) || e || '');
+  if(/invalid login credentials/i.test(msg))  return 'Sai email hoặc mật khẩu.';
+  if(/email not confirmed/i.test(msg))        return 'Tài khoản chưa được xác nhận. Nhờ quản trị viên vào Authentication > Users bật "Auto Confirm" cho tài khoản này.';
+  if(/user not found/i.test(msg))             return 'Không tìm thấy tài khoản với email này. Kiểm tra lại đúng chữ, không có dấu cách thừa.';
+  if(/invalid.*email/i.test(msg))             return 'Email không đúng định dạng.';
+  if(/banned|disabled/i.test(msg))            return 'Tài khoản này đang bị khoá.';
+  if(/rate limit|too many/i.test(msg))        return 'Đăng nhập sai quá nhiều lần, chờ vài phút rồi thử lại.';
+  if(/failed to fetch|network/i.test(msg))    return 'Không kết nối được máy chủ. Kiểm tra mạng, hoặc máy chủ công ty đang tạm ngưng.';
+  return 'Đăng nhập không thành công: ' + msg;
+}
 document.getElementById('gate-submit').addEventListener('click', async ()=>{
   const email = document.getElementById('gate-email').value.trim();
   const pass = document.getElementById('gate-pass').value;
@@ -24409,17 +23930,8 @@ document.getElementById('gate-submit').addEventListener('click', async ()=>{
   try{
     await fsAuth.signInWithEmailAndPassword(email, pass);
   }catch(e){
-    console.error('login error', e.code, e.message);
-    const FRIENDLY = {
-      'auth/wrong-password': 'Sai mật khẩu.',
-      'auth/invalid-credential': 'Sai email hoặc mật khẩu.',
-      'auth/user-not-found': 'Không tìm thấy tài khoản với email này. Kiểm tra lại đúng chữ (không dấu cách thừa).',
-      'auth/invalid-email': 'Email không đúng định dạng.',
-      'auth/user-disabled': 'Tài khoản này đã bị vô hiệu hoá (Disable) trong Firebase.',
-      'auth/too-many-requests': 'Đăng nhập sai quá nhiều lần, Firebase tạm khoá thử lại sau vài phút.',
-      'auth/network-request-failed': 'Lỗi mạng, kiểm tra lại kết nối internet.',
-    };
-    errEl.textContent = (FRIENDLY[e.code] || (e.code + ': ' + e.message)) + ' [' + (e.code||'no-code') + ']';
+    console.error('login error', e);
+    errEl.textContent = loginErrorMessage(e);
     errEl.style.display = 'block';
   }
 });
