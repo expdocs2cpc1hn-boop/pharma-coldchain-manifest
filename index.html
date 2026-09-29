@@ -486,6 +486,11 @@
         <label class="field-label">Ghi chú</label>
         <input type="text" id="lot-remark" placeholder="04/09: Hàng đã tới, khách chưa gửi lại">
       </div>
+      <div class="field">
+        <label class="field-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="lot-reported" style="width:auto;margin:0;">Đã báo cáo rồi
+        </label>
+      </div>
     </div>
 
     <div class="dropzone" id="dropzone">
@@ -508,7 +513,7 @@
   <!-- ================= REPORT TAB ================= -->
   <div class="panel" id="panel-report">
     <h1 class="page-title">Báo cáo tháng</h1>
-    <p class="page-sub">Tổng hợp các lô đã lưu, gom theo tháng ship hàng.</p>
+    <p class="page-sub">Tổng hợp các lô đã lưu, gom theo tháng ship hàng. Lọc theo tháng lấy cả lô ship trong tháng lẫn lô mới xin được data logger trong tháng.</p>
     <div id="pending-lots-box"></div>
     <div class="grid-2">
       <div class="field">
@@ -520,10 +525,16 @@
         <input type="month" id="rp-to">
       </div>
     </div>
+    <div class="field">
+      <label class="field-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="rp-show-reported" style="width:auto;margin:0;">Hiện cả lô đã báo cáo
+      </label>
+    </div>
     <button class="btn btn-primary" id="btn-export-xlsx">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
       Tải báo cáo Excel
     </button>
+    <button class="btn btn-ghost" id="btn-mark-reported" style="margin-left:8px;">Đánh dấu đã báo cáo</button>
     <div id="report-body"></div>
   </div>
 
@@ -616,7 +627,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5v
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v39 · 2026-09-29 · chuyển kho dữ liệu sang Supabase';
+const APP_VERSION = 'v42 · 2026-09-29 · ai cũng đánh dấu được lô đã báo cáo';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 /* Tên bảng và kho file — phải khớp với 01-tao-bang.sql */
@@ -819,6 +830,9 @@ async function _sbSaveLo(id, value){
   }else{
     row.id = id;
     row.nguoi_tao = currentUid();
+    /* Chỉ ghi cột này lúc TẠO. Lúc sửa thì không đụng tới, vì đánh dấu đã báo
+       cáo đi đường riêng qua hàm danh_dau_bao_cao(). */
+    row.da_bao_cao = !!rec.reported;
     const { error } = await sb.from(TB_LO).insert(row);
     if(error) throw error;
   }
@@ -1058,15 +1072,17 @@ async function loadIndex(includeHidden){
   let all;
   if(HAS_SUPABASE){
     try{
-      const { data, error } = await sb.from(TB_LO).select('id, muc_luc, an, an_luc, an_boi');
+      const { data, error } = await sb.from(TB_LO).select('id, muc_luc, an, an_luc, an_boi, da_bao_cao');
       if(error) throw error;
-      /* Cờ ẩn lấy từ CỘT an chứ không lấy trong muc_luc: ẩn/bỏ ẩn đi qua hàm
-         an_lo()/bo_an_lo() nên chỉ cột đó mới là thứ đúng. */
+      /* Cờ ẩn và cờ đã-báo-cáo lấy từ CỘT chứ không lấy trong muc_luc: hai việc
+         đó đi qua hàm trên máy chủ (an_lo / bo_an_lo / danh_dau_bao_cao) nên chỉ
+         cột mới là thứ đúng. */
       all = (data || []).filter(r=>r.muc_luc).map(r=>Object.assign({}, r.muc_luc, {
         id:       r.id,
         hidden:   !!r.an,
         hiddenAt: r.an_luc ? Date.parse(r.an_luc) : null,
-        hiddenBy: r.an_boi || ''
+        hiddenBy: r.an_boi || '',
+        reported: !!r.da_bao_cao
       }));
     }catch(e){ console.error('loadIndex (supabase) failed', e); return []; }
   }else{
@@ -1096,6 +1112,31 @@ async function setShipmentHidden(id, hidden){
   const ok = await saveIndexEntry(updated);
   return ok !== null;
 }
+/* ==========================================================================
+   DẤU "ĐÃ BÁO CÁO"
+   Chị chủ không nhớ nổi lô cũ đã báo cáo tháng nào, nên thay vì bắt điền tháng
+   thì đánh dấu một cái. Lô đã đánh dấu không hiện ở Báo cáo tháng nữa (vẫn xem
+   lại được bằng ô tích "Hiện cả lô đã báo cáo").
+
+   Cờ nằm ở CỘT da_bao_cao (là thứ đúng), và được chép thêm vào du_lieu với
+   muc_luc cho khớp. Hàm trên máy chủ ghi cả ba trong một lệnh.
+
+   Ai đánh dấu được: MỌI NGƯỜI đăng nhập, kể cả lô của người khác — vì người làm
+   báo cáo tháng gom lô của cả team. Nhưng phải đi qua hàm máy chủ
+   danh_dau_bao_cao() chứ không phải lệnh sửa bảng, nên không ai nhân đó sửa
+   được nhiệt độ hay Sub mail của lô người khác. Xem 05-danh-dau-da-bao-cao.sql. */
+async function setShipmentReported(id, value){
+  const co = !!value;
+  if(HAS_SUPABASE){
+    const { error } = await sb.rpc('danh_dau_bao_cao', { p_id: id, p_gia_tri: co });
+    if(error){ console.error('danh_dau_bao_cao lỗi:', error); return false; }
+    return true;
+  }
+  const rec = await getShipment(id);
+  if(rec){ rec.reported = co; try{ await saveShipment(rec); }catch(e){ return false; } return true; }
+  return false;
+}
+
 async function saveIndexEntry(meta){
   if(HAS_SUPABASE){
     try{
@@ -1269,6 +1310,8 @@ function shipmentMeta(record){
     actualArrivalMonth: record.actualArrivalMonth || '', note: record.note || '',
     docOwner: record.docOwner || '', status: record.status || '',
     remark: record.remark || '', loggerUpdateMonth: record.loggerUpdateMonth || '',
+    /* Lô đã đưa vào báo cáo tháng chưa. Mặc định chưa. */
+    reported: !!record.reported,
     loggerCount: (typeof record.loggerCount === 'number')
       ? record.loggerCount
       : (Array.isArray(record.loggers) ? record.loggers.length : 1),
@@ -22605,6 +22648,7 @@ function lotFormValues(){
     status: v('lot-status'),
     remark: (v('lot-remark')||'').trim(),
     loggerUpdateMonth: v('lot-updatemonth'),
+    reported: !!(document.getElementById('lot-reported') || {}).checked,
   };
 }
 
@@ -22619,6 +22663,8 @@ function resetLotForm(){
     const el = document.getElementById(id);
     if(el) el.value = '';
   });
+  const rp = document.getElementById('lot-reported');
+  if(rp) rp.checked = false;
   const mode = document.getElementById('lot-mode');
   if(mode) mode.value = '';
   const st = document.getElementById('lot-status');
@@ -22679,6 +22725,7 @@ async function saveLotFromForm(){
       note: f.note,
       docOwner: f.docOwner, status: f.status, remark: f.remark,
       loggerUpdateMonth: f.loggerUpdateMonth,
+      reported: !!f.reported,
       fileName: loggers.map(l=>l.fileName).join(' · '),
       loggers, loggerCount: loggers.length,
       deviceId: agg.deviceId,
@@ -24026,6 +24073,9 @@ window.openEditLot = async function(id){
       <div class="field"><label class="field-label">Tháng update thông tin data logger</label><input type="month" id="ed-updatemonth" value="${v(rec.loggerUpdateMonth)}"></div>
     </div>
     <div class="field"><label class="field-label">Ghi chú</label><input type="text" id="ed-remark" value="${v(rec.remark)}"></div>
+    <div class="field"><label class="field-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+      <input type="checkbox" id="ed-reported" style="width:auto;margin:0;"${rec.reported ? ' checked' : ''}>Đã báo cáo rồi
+    </label></div>
     <button class="btn btn-primary" id="ed-save">Lưu thay đổi</button>
   `;
   fillStatusSelect(document.getElementById('ed-status'), rec.status || LOT_STATUSES[0]);
@@ -24046,8 +24096,15 @@ window.openEditLot = async function(id){
     rec.status = document.getElementById('ed-status').value;
     rec.remark = document.getElementById('ed-remark').value.trim();
     rec.loggerUpdateMonth = document.getElementById('ed-updatemonth').value;
+    const coBaoCao = !!document.getElementById('ed-reported').checked;
     try{
       await saveShipment(rec);
+      /* Dấu "đã báo cáo" đi đường riêng qua hàm máy chủ, không nằm trong lệnh
+         lưu lô — để người làm báo cáo đánh dấu được cả lô của người khác. */
+      if(coBaoCao !== !!rec.reported){
+        if(await setShipmentReported(rec.id, coBaoCao)) rec.reported = coBaoCao;
+        else toast('Lưu được, nhưng không đổi được dấu "đã báo cáo" — mở F12 > Console xem lỗi.');
+      }
       toast('Đã lưu thay đổi.');
       bg.classList.remove('active');
       await renderLibrary();
@@ -24111,14 +24168,23 @@ async function reportGroups(){
   const to = toEl ? toEl.value : '';
   let items = idx.slice();
   if(from || to){
-    items = items.filter(r=>{
-      const m = r.shipMonth || '';
-      if(!m) return false;                 /* chưa điền tháng ship thì không lọc theo tháng được */
+    /* Một lô lọt vào khoảng tháng nếu THOẢ MỘT TRONG HAI:
+         • ship trong khoảng đó, HOẶC
+         • mới xin được data logger trong khoảng đó ("Tháng update")
+       Lý do: lô ship tháng 5 mà tháng 10 mới xin được logger thì phải nằm
+       trong báo cáo tháng 10 — lọc theo mỗi tháng ship sẽ bỏ sót nó.
+       Nó vẫn đứng dưới tiêu đề nhóm "Tháng 5/2026" cho đúng tháng hàng đi. */
+    const trongKhoang = m=>{
+      if(!m) return false;
       if(from && m < from) return false;
       if(to && m > to) return false;
       return true;
-    });
+    };
+    items = items.filter(r=>trongKhoang(r.shipMonth || '') || trongKhoang(r.loggerUpdateMonth || ''));
   }
+  /* Lô đã đánh dấu "đã báo cáo" thì không hiện nữa, trừ khi tích ô xem lại. */
+  const hienCaDaBaoCao = !!(document.getElementById('rp-show-reported') || {}).checked;
+  if(!hienCaDaBaoCao) items = items.filter(r=>!r.reported);
   const map = new Map();
   items.forEach(r=>{
     const k = r.shipMonth || '';
@@ -24383,10 +24449,37 @@ async function exportReportXlsx(){
   }
 }
 
+/* Đánh dấu "đã báo cáo" cho TẤT CẢ lô đang hiện trong bảng — làm một lần sau
+   khi đã xuất Excel gửi đi. Lô nào máy chủ từ chối (không phải lô của mình,
+   mà mình không phải admin) thì đếm riêng và nói rõ, không báo xong lấy lệ. */
+async function markShownAsReported(){
+  const btn = document.getElementById('btn-mark-reported');
+  const groups = await reportGroups();
+  const items = groups.reduce((a,g)=>a.concat(g.items), []).filter(r=>!r.reported);
+  if(!items.length){ toast('Không có lô nào để đánh dấu.'); return; }
+  if(!confirm('Đánh dấu ' + items.length + ' lô đang hiện là ĐÃ BÁO CÁO?\n\nChúng sẽ không hiện ở Báo cáo tháng nữa. Muốn xem lại thì tích ô "Hiện cả lô đã báo cáo".')) return;
+  const cu = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Đang đánh dấu…'; }
+  let xong = 0, hong = 0;
+  try{
+    for(const r of items){
+      if(await setShipmentReported(r.id, true)) xong++; else hong++;
+    }
+  }finally{
+    if(btn){ btn.disabled = false; btn.innerHTML = cu; }
+  }
+  await renderReport();
+  await renderLibrary();
+  if(hong) toast('Đã đánh dấu ' + xong + '/' + items.length + ' lô. ' + hong + ' lô máy chủ từ chối — chỉ người tạo lô hoặc admin mới đánh dấu được.');
+  else toast('Đã đánh dấu ' + xong + ' lô là đã báo cáo.');
+}
+
 (function wireReportTab(){
   const btnX = document.getElementById('btn-export-xlsx');
   if(btnX) btnX.addEventListener('click', exportReportXlsx);
-  ['rp-from','rp-to'].forEach(id=>{
+  const btnM = document.getElementById('btn-mark-reported');
+  if(btnM) btnM.addEventListener('click', markShownAsReported);
+  ['rp-from','rp-to','rp-show-reported'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.addEventListener('change', renderReport);
   });
