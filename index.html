@@ -550,7 +550,7 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6M3 22v-6h6"/><path d="M3.5 9a9 9 0 0114.9-3.4L21 8M20.5 15a9 9 0 01-14.9 3.4L3 16"/></svg>
       Dựng lại danh sách
     </button>
-    <div class="hint" style="margin:-8px 0 18px;">Dùng "Dựng lại danh sách" nếu bạn đã tải lô lên nhưng kho hiển thị trống — nó quét lại toàn bộ dữ liệu gốc và dựng lại mục lục. Không làm mất dữ liệu.</div>
+    <div class="hint" style="margin:-8px 0 18px;">Dùng "Dựng lại danh sách" nếu bạn đã tải lô lên nhưng kho hiển thị trống — nó quét lại dữ liệu gốc và dựng lại mục lục. Không làm mất dữ liệu. Chỉ dựng lại được lô do chính bạn tải lên; lô của người khác phải nhờ admin.</div>
     <div id="library-list"></div>
   </div>
 
@@ -627,7 +627,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5v
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v42 · 2026-09-29 · ai cũng đánh dấu được lô đã báo cáo';
+const APP_VERSION = 'v44 · 2026-10-01 · sửa được cảng đến và loại hình trong hộp Sửa lô';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 /* Tên bảng và kho file — phải khớp với 01-tao-bang.sql */
@@ -23557,22 +23557,32 @@ function transportModeShort(m){
    ========================================================================== */
 async function rebuildIndexFromShipments(){
   if(!HAS_SUPABASE || !sb) throw new Error('Chỉ dùng được khi đang chạy với Supabase.');
-  const { data, error } = await sb.from(TB_LO).select('id, du_lieu');
+  const { data, error } = await sb.from(TB_LO).select('id, du_lieu, nguoi_tao, sub_mail');
   if(error) throw error;
-  let scanned = 0, restored = 0, failed = 0;
+  const toi = currentUid();
+  let scanned = 0, restored = 0, failed = 0, skipped = 0;
   for(const row of (data || [])){
     if(!row || !row.du_lieu) continue;
     scanned++;
+    /* Dựng lại mục lục là một lần GHI vào dòng lô, nên chỉ người tạo lô và
+       admin làm được — đúng luật phân quyền. Lô của người khác thì BỎ QUA chứ
+       không phải lỗi: trước đây đếm chung vào "lỗi" làm đồng nghiệp tưởng
+       dữ liệu hỏng. */
+    if(!isAdmin && !(row.nguoi_tao && row.nguoi_tao === toi)){
+      skipped++;
+      continue;
+    }
     let rec = null;
     try{
       rec = (typeof row.du_lieu === 'string') ? JSON.parse(row.du_lieu) : row.du_lieu;
-    }catch(e){ failed++; continue; }
-    if(!rec){ failed++; continue; }
+    }catch(e){ console.error('dựng lại: đọc không được lô', row.id, row.sub_mail, e); failed++; continue; }
+    if(!rec){ console.error('dựng lại: lô rỗng', row.id, row.sub_mail); failed++; continue; }
     rec.id = row.id;
     const ok = await saveIndexEntry(shipmentMeta(normalizeShipment(rec)));
-    if(ok) restored++; else failed++;
+    if(ok) restored++;
+    else { console.error('dựng lại: máy chủ từ chối ghi lô', row.id, row.sub_mail); failed++; }
   }
-  return { scanned, restored, failed };
+  return { scanned, restored, failed, skipped };
 }
 
 document.getElementById('btn-rebuild-index').addEventListener('click', async ()=>{
@@ -23586,7 +23596,9 @@ document.getElementById('btn-rebuild-index').addEventListener('click', async ()=
     if(r.scanned === 0){
       toast('Không tìm thấy lô nào trong kho gốc — có thể chưa lô nào lưu được lên Supabase.');
     }else if(r.failed){
-      toast('Đã dựng lại ' + r.restored + '/' + r.scanned + ' lô. ' + r.failed + ' lô lỗi — mở F12 > Console xem chi tiết.');
+      toast('Đã dựng lại ' + r.restored + ' lô. ' + r.failed + ' lô lỗi thật — mở F12 > Console xem chi tiết.');
+    }else if(r.skipped){
+      toast('Đã dựng lại ' + r.restored + ' lô của bạn. ' + r.skipped + ' lô do người khác tải lên nên bỏ qua — nhờ admin bấm nút này nếu cần dựng lại cả kho. Không có lô nào hỏng.');
     }else{
       toast('Đã dựng lại danh sách: ' + r.restored + ' lô.');
     }
@@ -24061,6 +24073,22 @@ window.openEditLot = async function(id){
     <h2 style="font-family:var(--font-display);margin:0 0 14px;">Sửa thông tin lô</h2>
     <div class="field"><label class="field-label">Lô hàng (Sub mail TBXK)</label><input type="text" id="ed-submail" value="${v(rec.subMail)}"></div>
     <div class="field"><label class="field-label">Tên hàng xuất khẩu</label><input type="text" id="ed-product" value="${v(rec.productName || rec.drug)}"></div>
+    <div class="grid-2">
+      <div class="field"><label class="field-label">Loại hình vận chuyển</label>
+        <select id="ed-mode">
+          <option value="">— Chọn loại hình —</option>
+          <option value="AIR">AIR</option>
+          <option value="LAND">LAND (đường bộ)</option>
+          <option value="LCL">LCL</option>
+          <option value="FCL_COLD">FCL Lạnh</option>
+          <option value="FCL_STD">FCL Thường</option>
+        </select>
+      </div>
+      <div class="field"><label class="field-label">Cảng / nước đến</label>
+        <input type="text" id="ed-dest" list="ed-port-datalist" value="${v(rec.destPort || rec.dest)}" placeholder="Gõ tên cảng, sân bay hoặc quốc gia...">
+        <datalist id="ed-port-datalist"></datalist>
+      </div>
+    </div>
     <div class="grid-3">
       <div class="field"><label class="field-label">Tháng ship hàng</label><input type="month" id="ed-shipmonth" value="${v(rec.shipMonth)}"></div>
       <div class="field"><label class="field-label">ETA</label><input type="month" id="ed-eta" value="${v(rec.eta)}"></div>
@@ -24079,6 +24107,16 @@ window.openEditLot = async function(id){
     <button class="btn btn-primary" id="ed-save">Lưu thay đổi</button>
   `;
   fillStatusSelect(document.getElementById('ed-status'), rec.status || LOT_STATUSES[0]);
+  /* Gợi ý cảng lọc theo loại hình vận chuyển, y như khung tải lên. */
+  const edMode = document.getElementById('ed-mode');
+  const edList = document.getElementById('ed-port-datalist');
+  edMode.value = rec.transportMode || '';
+  function lamMoiGoiYCang(){
+    const m = edMode.value;
+    populatePortDatalist(edList, m ? (MODE_TO_PORT_TYPE[m] || 'sea') : null);
+  }
+  edMode.addEventListener('change', lamMoiGoiYCang);
+  lamMoiGoiYCang();
   const bg = document.getElementById('modal-bg');
   bg.dataset.panel = '';
   bg.classList.add('active');
@@ -24097,6 +24135,27 @@ window.openEditLot = async function(id){
     rec.remark = document.getElementById('ed-remark').value.trim();
     rec.loggerUpdateMonth = document.getElementById('ed-updatemonth').value;
     const coBaoCao = !!document.getElementById('ed-reported').checked;
+
+    /* Cảng đến: chỉ tra lại toạ độ khi chữ thật sự đổi, để khỏi gọi geocoder
+       vô ích mỗi lần bấm Lưu. Gõ sai tên thì DỪNG, không lưu nửa vời — cảng
+       sai kéo theo toạ độ sai, mà toạ độ là thứ phần tra cứu nhiệt độ dựa vào. */
+    const edDest = document.getElementById('ed-dest');
+    const cangMoi = edDest.value.trim();
+    const cangCu  = String(rec.destPort || rec.dest || '').trim();
+    if(cangMoi !== cangCu){
+      const giai = await resolvePortInput(edDest);
+      if(!giai){
+        toast('Không nhận ra "' + cangMoi + '". Gõ rồi chọn đúng tên trong danh sách gợi ý nhé.');
+        btn.disabled = false; btn.textContent = 'Lưu thay đổi';
+        return;
+      }
+      rec.dest     = giai.country;
+      rec.destPort = giai.type ? giai.label : null;
+      rec.destLat  = giai.lat;
+      rec.destLon  = giai.lon;
+    }
+    rec.transportMode = edMode.value || rec.transportMode;
+
     try{
       await saveShipment(rec);
       /* Dấu "đã báo cáo" đi đường riêng qua hàm máy chủ, không nằm trong lệnh
