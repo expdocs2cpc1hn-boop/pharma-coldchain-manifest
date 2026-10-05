@@ -670,7 +670,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5v
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v56 · 2026-10-05 · báo cáo 16 cột, bỏ Tình trạng khỏi bảng';
+const APP_VERSION = 'v57 · 2026-10-05 · lô chưa có logger thì không hiện tháng update';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 /* Tên bảng và kho file — phải khớp với 01-tao-bang.sql */
@@ -1419,6 +1419,8 @@ async function saveShipment(record){
     return copy;
   });
   const toStore = Object.assign({}, record, { loggers, loggerCount: loggers.length });
+  /* Dọn dữ liệu: không có file logger thì không giữ "tháng update data logger". */
+  if(!loggers.length) toStore.loggerUpdateMonth = '';
   delete toStore.pdfBase64;
   delete toStore.uploadedByEmail;   /* không bao giờ lưu email người dùng vào dữ liệu lô */
   /* points ở cấp lô là số liệu dựng lại được từ loggers — không lưu bản sao thứ hai. */
@@ -24562,7 +24564,10 @@ function reportRowsFor(items){
     r.docOwner || '',
     r.updatePrev || '',
     r.updateNow || '',
-    fmtMonth(r.loggerUpdateMonth)
+    /* Lô chưa có file logger nào thì cột này phải TRỐNG — "tháng update thông
+       tin data logger" của một lô không có data logger là vô nghĩa. Dữ liệu cũ
+       nhập từ bản trước có thể còn sót tháng ở đây, chặn luôn ở chỗ hiển thị. */
+    hasRealLogger(r) ? fmtMonth(r.loggerUpdateMonth) : ''
   ]);
 }
 
