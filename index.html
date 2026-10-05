@@ -670,7 +670,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5v
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v55 · 2026-10-05 · báo cáo 17 cột, gõ update thẳng trong bảng';
+const APP_VERSION = 'v56 · 2026-10-05 · báo cáo 16 cột, bỏ Tình trạng khỏi bảng';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 /* Tên bảng và kho file — phải khớp với 01-tao-bang.sql */
@@ -24524,10 +24524,15 @@ window.openEditLot = async function(id){
    ========================================================================== */
 const REPORT_COLUMNS = ['TT','Lô hàng (Sub mail TBXK)','Tên hàng xuất khẩu','Tháng ship hàng','ETA',
   'Tháng hàng đến thực tế','Cảng đến','Số lượng data logger','Nhiệt độ cao nhất','Nhiệt độ thấp nhất',
-  'Nhiệt độ trung bình','Note','DOC phụ trách','Tình trạng','Update tháng trước','Update tháng này',
+  'Nhiệt độ trung bình','Note','DOC phụ trách','Update tháng trước','Update tháng này',
   'Tháng update thông tin data logger'];
+/* Cột "Tình trạng" KHÔNG đưa vào báo cáo: nội dung nó nói đúng cái mà "Update
+   tháng này" đã nói rồi ("Hàng chưa tới" vs "24/09: khách chưa gửi"). Trường
+   này vẫn còn trong app — khung "Đang chờ data logger" dựa vào nó để biết lô
+   nào còn phải theo. */
+
 /* Hai cột này gõ thẳng trong bảng báo cáo, không phải mở hộp Sửa lô. */
-const REPORT_EDIT_COLS = { 14: 'updatePrev', 15: 'updateNow' };
+const REPORT_EDIT_COLS = { 13: 'updatePrev', 14: 'updateNow' };
 /* Các cột căn giữa / là số: TT, số lượng logger, 3 cột nhiệt độ. */
 const REPORT_NUM_COLS = [0, 7, 8, 9, 10];
 /* Ba cột nhiệt độ — làm tròn 1 chữ số thập phân khi hiện và khi xuất Excel. */
@@ -24555,7 +24560,6 @@ function reportRowsFor(items){
     (typeof r.avg === 'number') ? r.avg : null,
     r.note || '',
     r.docOwner || '',
-    r.status || '',
     r.updatePrev || '',
     r.updateNow || '',
     fmtMonth(r.loggerUpdateMonth)
