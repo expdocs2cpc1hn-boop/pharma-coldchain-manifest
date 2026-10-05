@@ -301,6 +301,25 @@
   .icon-btn.warn{border-color:var(--amber,#fbbf24);}
 
   /* ---- bảng trạng thái bảo mật ---- */
+  /* ---- ô gõ thẳng trong bảng báo cáo ---- */
+  td.rp-edit{cursor:text;min-width:160px;outline:none;}
+  td.rp-edit:hover{background:rgba(91,217,232,.07);}
+  td.rp-edit:focus{background:rgba(91,217,232,.14);box-shadow:inset 0 0 0 2px var(--ice);}
+  td.rp-saving{opacity:.5;}
+  td.rp-saved{background:rgba(34,197,94,.18)!important;transition:background .4s;}
+
+  /* ---- hai cột update trong khung "Đang chờ data logger" ---- */
+  .pending-updates{
+    display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;margin-top:8px;
+  }
+  .pending-updates .pu-label{
+    display:block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--text-dim);margin-bottom:2px;
+  }
+  .pending-updates .pu-text{font-size:13px;line-height:1.45;white-space:pre-wrap;}
+  .pending-updates .pu-empty{color:var(--amber);font-style:italic;}
+  @media (max-width:640px){ .pending-updates{grid-template-columns:1fr;} }
+
   .sec-row{
     display:flex;align-items:flex-start;gap:10px;
     padding:10px 0;border-bottom:1px solid var(--border-soft);
@@ -481,13 +500,27 @@
           <select id="lot-status"></select>
         </div>
         <div class="field">
-          <label class="field-label">Tháng update thông tin data logger</label>
-          <input type="month" id="lot-updatemonth">
+          <label class="field-label">Ghi chú</label>
+          <input type="text" id="lot-remark" placeholder="Kiện lẻ, hàng ghép…">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label class="field-label">Update tháng trước</label>
+          <input type="text" id="lot-update-prev" placeholder="24/09: đang dự trù NPL">
+        </div>
+        <div class="field">
+          <label class="field-label">Update tháng này</label>
+          <input type="text" id="lot-update-now" placeholder="01/10: dự kiến cuối tháng 10">
         </div>
       </div>
       <div class="field">
-        <label class="field-label">Ghi chú</label>
-        <input type="text" id="lot-remark" placeholder="04/09: Hàng đã tới, khách chưa gửi lại">
+        <label class="field-label">Tháng update thông tin data logger</label>
+        <div style="display:flex;gap:6px;align-items:stretch;">
+          <input type="month" id="lot-updatemonth" disabled style="flex:1;">
+          <button type="button" class="btn btn-ghost btn-sm" id="lot-updatemonth-edit"
+                  title="Mở khoá để sửa tay" style="padding:0 12px;display:none;">Sửa</button>
+        </div>
       </div>
       <div class="field">
         <label class="field-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -516,8 +549,15 @@
   <!-- ================= REPORT TAB ================= -->
   <div class="panel" id="panel-report">
     <h1 class="page-title">Báo cáo tháng</h1>
-    <p class="page-sub">Tổng hợp các lô đã lưu, gom theo tháng ship hàng. Lọc theo tháng lấy cả lô ship trong tháng lẫn lô mới xin được data logger trong tháng.</p>
+    <p class="page-sub">Tổng hợp các lô đã lưu, gom theo tháng ship hàng. Bỏ trống hai ô tháng để thấy mọi lô chưa đánh dấu đã báo cáo.</p>
     <div id="pending-lots-box"></div>
+    <div class="field">
+      <label class="field-label">Lọc theo</label>
+      <select id="rp-mode" style="max-width:320px;">
+        <option value="ship" selected>Tháng ship hàng</option>
+        <option value="update">Tháng update thông tin data logger</option>
+      </select>
+    </div>
     <div class="grid-2">
       <div class="field">
         <label class="field-label">Từ tháng</label>
@@ -630,7 +670,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5v
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v49 · 2026-10-05 · DOC phụ trách chọn từ danh sách dùng chung';
+const APP_VERSION = 'v55 · 2026-10-05 · báo cáo 17 cột, gõ update thẳng trong bảng';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 /* Tên bảng và kho file — phải khớp với 01-tao-bang.sql */
@@ -706,6 +746,7 @@ async function _sbOnAuth(session){
     if(typeof refreshDocSelects === 'function'){
       try{ await refreshDocSelects(); }catch(e){ console.error('nạp danh sách DOC lỗi', e); }
     }
+    if(typeof capNhatNutSuaThangUpdate === 'function') capNhatNutSuaThangUpdate();
   }
   if(typeof updateSecurityPanel === 'function') updateSecurityPanel();
   if(typeof updateAccountPanel === 'function') updateAccountPanel();
@@ -1319,7 +1360,12 @@ function shipmentMeta(record){
     shipMonth: record.shipMonth || '', eta: record.eta || '',
     actualArrivalMonth: record.actualArrivalMonth || '', note: record.note || '',
     docOwner: record.docOwner || '', status: record.status || '',
-    remark: record.remark || '', loggerUpdateMonth: record.loggerUpdateMonth || '',
+    remark: record.remark || '',
+    /* Hai ô "Update tháng trước / tháng này" — người phụ trách tự gõ kèm ngày,
+       app không điền hộ. Nhìn hai ô cạnh nhau là biết lô nào đứng im. */
+    updatePrev: record.updatePrev || '',
+    updateNow: record.updateNow || '',
+    loggerUpdateMonth: record.loggerUpdateMonth || '',
     /* Lô đã đưa vào báo cáo tháng chưa. Mặc định chưa. */
     reported: !!record.reported,
     loggerCount: (typeof record.loggerCount === 'number')
@@ -22557,6 +22603,8 @@ async function addLoggerFile(file){
     if(chip) chip.outerHTML = `<button type="button" class="btn btn-danger btn-sm" onclick="removePendingLogger('${lid}')">Bỏ file này</button>`;
     renderLoggerBody(lid, parsed);
     if(dup) showDuplicateWarning(lid, parsed, dup);
+    const oTU = document.getElementById('lot-updatemonth');
+    if(oTU && !oTU.value) oTU.value = thangHienTai();
     renderLotSummary();
   }catch(err){
     const chip = document.getElementById('chip-'+lid);
@@ -22693,6 +22741,8 @@ function lotFormValues(){
     docOwner: (v('lot-docowner')||'').trim(),
     status: v('lot-status'),
     remark: (v('lot-remark')||'').trim(),
+    updatePrev: (v('lot-update-prev')||'').trim(),
+    updateNow: (v('lot-update-now')||'').trim(),
     loggerUpdateMonth: v('lot-updatemonth'),
     reported: !!(document.getElementById('lot-reported') || {}).checked,
   };
@@ -22705,7 +22755,7 @@ function resetLotForm(){
   const sum = document.getElementById('lot-summary');
   if(sum) sum.innerHTML = '';
   ['lot-submail','lot-product','lot-dest','lot-note','lot-shipmonth','lot-eta','lot-arrival',
-   'lot-docowner','lot-remark','lot-updatemonth'].forEach(id=>{
+   'lot-docowner','lot-remark','lot-update-prev','lot-update-now','lot-updatemonth'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.value = '';
   });
@@ -22713,6 +22763,10 @@ function resetLotForm(){
   if(rp) rp.checked = false;
   const doc = document.getElementById('lot-docowner');
   if(doc) doc.value = '';
+  const tu = document.getElementById('lot-updatemonth');
+  if(tu){ tu.value = ''; tu.disabled = true; }
+  capNhatNutSuaThangUpdate();
+
   const mode = document.getElementById('lot-mode');
   if(mode) mode.value = '';
   const st = document.getElementById('lot-status');
@@ -22778,6 +22832,7 @@ async function saveLotFromForm(){
       shipMonth: f.shipMonth, eta: f.eta, actualArrivalMonth: f.actualArrivalMonth,
       note: f.note,
       docOwner: f.docOwner, status: f.status, remark: f.remark,
+      updatePrev: f.updatePrev, updateNow: f.updateNow,
       loggerUpdateMonth: f.loggerUpdateMonth,
       reported: !!f.reported,
       fileName: loggers.map(l=>l.fileName).join(' · '),
@@ -24268,9 +24323,20 @@ window.openEditLot = async function(id){
         </div>
       </div>
       <div class="field"><label class="field-label">Tình trạng</label><select id="ed-status"></select></div>
-      <div class="field"><label class="field-label">Tháng update thông tin data logger</label><input type="month" id="ed-updatemonth" value="${v(rec.loggerUpdateMonth)}"></div>
+      <div class="field"><label class="field-label">Ghi chú</label><input type="text" id="ed-remark" value="${v(rec.remark)}"></div>
     </div>
-    <div class="field"><label class="field-label">Ghi chú</label><input type="text" id="ed-remark" value="${v(rec.remark)}"></div>
+    <div class="grid-2">
+      <div class="field"><label class="field-label">Update tháng trước</label>
+        <input type="text" id="ed-update-prev" value="${v(rec.updatePrev)}" placeholder="24/09: đang dự trù NPL"></div>
+      <div class="field"><label class="field-label">Update tháng này</label>
+        <input type="text" id="ed-update-now" value="${v(rec.updateNow)}" placeholder="01/10: dự kiến cuối tháng 10"></div>
+    </div>
+    <div class="field"><label class="field-label">Tháng update thông tin data logger</label>
+      <div style="display:flex;gap:6px;align-items:stretch;">
+        <input type="month" id="ed-updatemonth" value="${v(rec.loggerUpdateMonth)}" disabled style="flex:1;">
+        <button type="button" class="btn btn-ghost btn-sm" id="ed-updatemonth-edit"
+                title="Mở khoá để sửa tay" style="padding:0 12px;display:none;">Sửa</button>
+      </div></div>
     <div class="field">
       <label class="field-label">Data logger</label>
       <div class="hint" id="ed-logger-info"></div>
@@ -24285,6 +24351,7 @@ window.openEditLot = async function(id){
   `;
   fillStatusSelect(document.getElementById('ed-status'), rec.status || LOT_STATUSES[0]);
   fillDocSelect(document.getElementById('ed-docowner'), rec.docOwner);
+  moKhoaThangUpdate('ed-updatemonth', 'ed-updatemonth-edit');
   document.getElementById('ed-docowner-add').addEventListener('click', ()=>
     themDocMoi(document.getElementById('ed-docowner')));
   /* Gợi ý cảng lọc theo loại hình vận chuyển, y như khung tải lên. */
@@ -24343,11 +24410,8 @@ window.openEditLot = async function(id){
            để người dùng NHÌN THẤY, muốn giữ nguyên thì chọn lại được. */
         const oTinhTrang = document.getElementById('ed-status');
         if(LOT_STATUS_NO_LOGGER.indexOf(oTinhTrang.value) >= 0) oTinhTrang.value = 'Đã có data logger';
-        const oThangUpdate = document.getElementById('ed-updatemonth');
-        if(!oThangUpdate.value){
-          const h = new Date();
-          oThangUpdate.value = h.getFullYear() + '-' + String(h.getMonth() + 1).padStart(2, '0');
-        }
+        const oTU2 = document.getElementById('ed-updatemonth');
+        if(oTU2 && !oTU2.value) oTU2.value = thangHienTai();
         capNhatInfo();
       }catch(err){
         dong.innerHTML = '<span class="sec-dot sec-bad"></span><div style="flex:1;"><b>' +
@@ -24373,6 +24437,8 @@ window.openEditLot = async function(id){
     rec.docOwner = document.getElementById('ed-docowner').value.trim();
     rec.status = document.getElementById('ed-status').value;
     rec.remark = document.getElementById('ed-remark').value.trim();
+    rec.updatePrev = document.getElementById('ed-update-prev').value.trim();
+    rec.updateNow  = document.getElementById('ed-update-now').value.trim();
     rec.loggerUpdateMonth = document.getElementById('ed-updatemonth').value;
     const coBaoCao = !!document.getElementById('ed-reported').checked;
 
@@ -24458,7 +24524,10 @@ window.openEditLot = async function(id){
    ========================================================================== */
 const REPORT_COLUMNS = ['TT','Lô hàng (Sub mail TBXK)','Tên hàng xuất khẩu','Tháng ship hàng','ETA',
   'Tháng hàng đến thực tế','Cảng đến','Số lượng data logger','Nhiệt độ cao nhất','Nhiệt độ thấp nhất',
-  'Nhiệt độ trung bình','Note','DOC phụ trách','Tình trạng','Ghi chú','Tháng update thông tin data logger'];
+  'Nhiệt độ trung bình','Note','DOC phụ trách','Tình trạng','Update tháng trước','Update tháng này',
+  'Tháng update thông tin data logger'];
+/* Hai cột này gõ thẳng trong bảng báo cáo, không phải mở hộp Sửa lô. */
+const REPORT_EDIT_COLS = { 14: 'updatePrev', 15: 'updateNow' };
 /* Các cột căn giữa / là số: TT, số lượng logger, 3 cột nhiệt độ. */
 const REPORT_NUM_COLS = [0, 7, 8, 9, 10];
 /* Ba cột nhiệt độ — làm tròn 1 chữ số thập phân khi hiện và khi xuất Excel. */
@@ -24487,7 +24556,8 @@ function reportRowsFor(items){
     r.note || '',
     r.docOwner || '',
     r.status || '',
-    r.remark || '',
+    r.updatePrev || '',
+    r.updateNow || '',
     fmtMonth(r.loggerUpdateMonth)
   ]);
 }
@@ -24500,19 +24570,22 @@ async function reportGroups(){
   const to = toEl ? toEl.value : '';
   let items = idx.slice();
   if(from || to){
-    /* Một lô lọt vào khoảng tháng nếu THOẢ MỘT TRONG HAI:
-         • ship trong khoảng đó, HOẶC
-         • mới xin được data logger trong khoảng đó ("Tháng update")
-       Lý do: lô ship tháng 5 mà tháng 10 mới xin được logger thì phải nằm
-       trong báo cáo tháng 10 — lọc theo mỗi tháng ship sẽ bỏ sót nó.
-       Nó vẫn đứng dưới tiêu đề nhóm "Tháng 5/2026" cho đúng tháng hàng đi. */
+    /* Lọc theo cột nào là do ô "Lọc theo" quyết định:
+         ship   → Tháng ship hàng. Xem tháng đó đi những lô nào.
+         update → Tháng update thông tin data logger. Bắt được cả lô ship từ
+                  mấy tháng trước mà tháng này mới xin được file.
+       Phần gom nhóm KHÔNG đổi — vẫn theo tháng ship, đúng mẫu Excel. Nên lọc
+       kiểu update có thể ra nhiều nhóm tháng khác nhau, đó là đúng. */
+    const cot = (document.getElementById('rp-mode') || {}).value === 'update'
+      ? (r => r.loggerUpdateMonth || '')
+      : (r => r.shipMonth || '');
     const trongKhoang = m=>{
       if(!m) return false;
       if(from && m < from) return false;
       if(to && m > to) return false;
       return true;
     };
-    items = items.filter(r=>trongKhoang(r.shipMonth || '') || trongKhoang(r.loggerUpdateMonth || ''));
+    items = items.filter(r=>trongKhoang(cot(r)));
   }
   /* Lô đã đánh dấu "đã báo cáo" thì không hiện nữa, trừ khi tích ô xem lại. */
   const hienCaDaBaoCao = !!(document.getElementById('rp-show-reported') || {}).checked;
@@ -24544,34 +24617,140 @@ function reportCellText(value, colIndex){
    đập vào mắt khi đang làm báo cáo tháng mới. Ship tháng cũ nhất xếp lên trên.
    Không có lô nào đang chờ thì khung tự ẩn đi cho gọn.
    ========================================================================== */
+/* ==========================================================================
+   KHUNG "ĐANG CHỜ DATA LOGGER"
+   --------------------------------------------------------------------------
+   Lô khai "Hàng chưa tới" nằm ở đây cho tới khi xin được file. Mỗi tháng người
+   phụ trách hỏi lại khách rồi viết một dòng vào ô Ghi chú ("05/10: khách chưa
+   gửi"). Dòng đó chính là dấu "tháng này đã có người ngó tới lô này".
+
+   Vì vậy khung này cho LỌC THEO NGƯỜI (ai lo lô nấy) và đánh dấu rõ lô nào
+   tháng này chưa ai đụng tới, để còn nhắc nhau.
+   ========================================================================== */
+/* Tháng hiện tại, dạng 'YYYY-MM'. Ô "Tháng update thông tin data logger" điền
+   đúng tháng TẢI FILE LÊN — tải tháng nào ghi tháng đó. */
+function thangHienTai(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+/* Ô "Tháng update" khoá sẵn cho khỏi gõ nhầm — nó tự điền khi thêm file data
+   logger. Admin cần chữa thì bấm "Sửa". */
+function moKhoaThangUpdate(idInput, idNut){
+  const o = document.getElementById(idInput), n = document.getElementById(idNut);
+  if(!o || !n) return;
+  n.style.display = isAdmin ? '' : 'none';
+  n.onclick = ()=>{ o.disabled = false; o.focus(); n.style.display = 'none'; };
+}
+function capNhatNutSuaThangUpdate(){ moKhoaThangUpdate('lot-updatemonth', 'lot-updatemonth-edit'); }
+
+const PENDING_FILTER_KEY = 'coldroute_pending_doc';
+
+/* Lô đã chờ bao nhiêu tháng, tính từ tháng ship hàng. */
+function soThangDaCho(r){
+  const m = String((r && r.shipMonth) || '');
+  if(!/^\d{4}-\d{2}$/.test(m)) return null;
+  const nay = new Date();
+  const [y, mo] = m.split('-').map(Number);
+  return (nay.getFullYear() - y) * 12 + (nay.getMonth() + 1 - mo);
+}
+function _docPending(r){ return String((r && r.docOwner) || '').trim() || '(chưa ghi tên)'; }
+
+function _layLocPending(){
+  try{ return localStorage.getItem(PENDING_FILTER_KEY) || ''; }catch(e){ return ''; }
+}
+function _luuLocPending(v){
+  try{ localStorage.setItem(PENDING_FILTER_KEY, v || ''); }catch(e){}
+}
+window.doiLocPending = async function(v){
+  _luuLocPending(v);
+  await renderPendingLotsBox();
+};
+
+/* ==========================================================================
+   KHUNG "ĐANG CHỜ DATA LOGGER"
+   --------------------------------------------------------------------------
+   Lô khai "Hàng chưa tới" nằm ở đây cho tới khi xin được file.
+
+   Hai cột "Update tháng trước / Update tháng này" là chữ người phụ trách tự gõ,
+   kèm ngày ("24/09: đang dự trù NPL"). App KHÔNG tự điền gì — nhìn hai cột cạnh
+   nhau là biết lô nào đứng im, lô nào có tiến triển.
+
+   Lọc theo người để ai lo lô nấy; app nhớ lựa chọn đó cho từng máy.
+   ========================================================================== */
 async function renderPendingLotsBox(){
   const el = document.getElementById('pending-lots-box');
   if(!el) return;
   const idx = await loadIndex();
   const waiting = idx.filter(r => r.status === 'Hàng chưa tới');
   if(!waiting.length){ el.innerHTML = ''; return; }
-  waiting.sort((a, b)=> String(a.shipMonth || '').localeCompare(String(b.shipMonth || '')));
-  const rows = waiting.map(r=>{
-    const meta = [
+
+  const dem = new Map();
+  waiting.forEach(r=>{ const t = _docPending(r); dem.set(t, (dem.get(t) || 0) + 1); });
+  const nguoi = Array.from(dem.keys()).sort((a,b)=>a.localeCompare(b,'vi'));
+
+  let loc = _layLocPending();
+  if(loc && !dem.has(loc)) loc = '';          /* người đó hết lô chờ thì về "tất cả" */
+
+  const hien = loc ? waiting.filter(r=>_docPending(r) === loc) : waiting;
+  const chuaGhi = hien.filter(r=>!String(r.updateNow || '').trim()).length;
+
+  /* Lô chưa ghi gì cho tháng này lên trước, rồi tới lô chờ lâu nhất. */
+  hien.sort((a, b)=>{
+    const ca = String(a.updateNow || '').trim() ? 1 : 0;
+    const cb = String(b.updateNow || '').trim() ? 1 : 0;
+    if(ca !== cb) return ca - cb;
+    const sa = soThangDaCho(a), sb = soThangDaCho(b);
+    if(sa === null) return 1;
+    if(sb === null) return -1;
+    return sb - sa;
+  });
+
+  const o = t => escapeHtml(String(t || '').trim());
+  const rows = hien.map(r=>{
+    const thang = soThangDaCho(r);
+    const dong2 = [
+      _docPending(r),
       r.shipMonth ? 'ship ' + fmtMonth(r.shipMonth) : '',
       r.eta ? 'ETA ' + fmtMonth(r.eta) : '',
       r.destPort || r.dest || '',
-      r.docOwner || ''
+      (thang !== null && thang > 0) ? 'chờ ' + thang + ' tháng' : ''
     ].filter(Boolean).map(escapeHtml).join(' · ');
-    return `<div class="sec-row">
-      <span class="sec-dot sec-warn"></span>
-      <div style="flex:1;">
+    const truoc = o(r.updatePrev);
+    const nay   = o(r.updateNow);
+    return `<div class="sec-row" style="align-items:flex-start;">
+      <span class="sec-dot ${nay ? 'sec-ok' : 'sec-warn'}" style="margin-top:5px;"></span>
+      <div style="flex:1;min-width:0;">
         <b>${escapeHtml(r.subMail || r.productName || 'Lô chưa đặt tên')}</b>
-        <div class="hint" style="margin-top:3px;">${meta}</div>
+        <div class="hint" style="margin-top:3px;">${dong2}</div>
+        <div class="pending-updates">
+          <div><span class="pu-label">Update tháng trước</span>
+               <span class="pu-text${truoc ? '' : ' pu-empty'}">${truoc || '—'}</span></div>
+          <div><span class="pu-label">Update tháng này</span>
+               <span class="pu-text${nay ? '' : ' pu-empty'}">${nay || 'chưa ghi'}</span></div>
+        </div>
       </div>
-      ${canEditLot(r) ? `<button class="btn btn-ghost btn-sm" onclick="openEditLot('${r.id}')">Cập nhật</button>` : ''}
+      ${canEditLot(r) ? `<button class="btn btn-ghost btn-sm" style="flex-shrink:0;" onclick="openEditLot('${r.id}')">Cập nhật</button>` : ''}
     </div>`;
   }).join('');
+
+  const chonNguoi = '<select id="pending-filter" onchange="doiLocPending(this.value)" style="max-width:220px;">' +
+    '<option value=""' + (loc ? '' : ' selected') + '>Tất cả (' + waiting.length + ')</option>' +
+    nguoi.map(n=>'<option value="' + escapeHtml(n) + '"' + (loc === n ? ' selected' : '') + '>' +
+      escapeHtml(n) + ' (' + dem.get(n) + ')</option>').join('') +
+    '</select>';
+
   el.innerHTML = `<div class="lg-card" style="margin:4px 0 18px;border-color:var(--amber);">
-    <div class="section-label" style="margin:0 0 6px;">
+    <div class="section-label" style="margin:0 0 10px;">
       <span class="dot" style="background:var(--amber);box-shadow:0 0 8px var(--amber);"></span>
       <h3>Đang chờ data logger</h3>
-      <small>${waiting.length} lô</small>
+      <small>${hien.length} lô${loc ? ' của ' + escapeHtml(loc) : ''}</small>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+      ${chonNguoi}
+      <span class="hint">${chuaGhi
+        ? '<b style="color:var(--amber);">' + chuaGhi + ' lô chưa ghi update tháng này</b>'
+        : 'Đã ghi update cho tất cả.'}</span>
     </div>
     ${rows}
   </div>`;
@@ -24587,11 +24766,21 @@ async function renderReport(){
     return;
   }
   el.innerHTML = groups.map(g=>{
-    const rows = reportRowsFor(g.items).map(row=>
-      `<tr>${row.map((c, i)=>
-        `<td class="${REPORT_NUM_COLS.indexOf(i) >= 0 ? 'num' : ''}">${escapeHtml(reportCellText(c, i))}</td>`
-      ).join('')}</tr>`
-    ).join('');
+    const rows = reportRowsFor(g.items).map((row, ri)=>{
+      const lo = g.items[ri];
+      const suaDuoc = canEditLot(lo);
+      return `<tr>${row.map((c, i)=>{
+        const truong = REPORT_EDIT_COLS[i];
+        const lop = REPORT_NUM_COLS.indexOf(i) >= 0 ? 'num' : '';
+        if(truong && suaDuoc){
+          return `<td class="${lop} rp-edit" contenteditable="true" spellcheck="false"` +
+                 ` data-lo="${escapeHtml(lo.id)}" data-truong="${truong}"` +
+                 ` data-cu="${escapeHtml(reportCellText(c, i))}"` +
+                 ` title="Gõ thẳng vào đây rồi bấm ra ngoài là lưu">${escapeHtml(reportCellText(c, i))}</td>`;
+        }
+        return `<td class="${lop}">${escapeHtml(reportCellText(c, i))}</td>`;
+      }).join('')}</tr>`;
+    }).join('');
     return `<div class="rp-month">
       <h3>${escapeHtml(g.title)}:</h3>
       <div class="rp-wrap"><table class="rp-table">
@@ -24600,6 +24789,47 @@ async function renderReport(){
       </table></div>
     </div>`;
   }).join('');
+  ganSuaTrongBang(el);
+}
+
+/* ==========================================================================
+   GÕ THẲNG VÀO BẢNG BÁO CÁO
+   Hai cột "Update tháng trước / tháng này" sửa được ngay tại bảng, bấm ra
+   ngoài ô là lưu. Đỡ phải mở hộp Sửa lô cho từng lô.
+
+   Lưu bằng cách đọc lại lô rồi ghi lại cả lô (saveShipment) — chậm hơn một
+   chút nhưng chắc: số liệu trong du_lieu và muc_luc luôn khớp nhau.
+   ========================================================================== */
+function ganSuaTrongBang(goc){
+  goc.querySelectorAll('td.rp-edit').forEach(td=>{
+    td.addEventListener('blur', async ()=>{
+      const moi = td.textContent.replace(/\s+/g, ' ').trim();
+      const cu  = String(td.dataset.cu || '');
+      if(moi === cu) return;
+      td.classList.add('rp-saving');
+      try{
+        const rec = await getShipment(td.dataset.lo);
+        if(!rec) throw new Error('Không tìm thấy lô này nữa — tải lại trang.');
+        rec[td.dataset.truong] = moi;
+        await saveShipment(rec);
+        td.dataset.cu = moi;
+        td.classList.remove('rp-saving');
+        td.classList.add('rp-saved');
+        setTimeout(()=>td.classList.remove('rp-saved'), 1200);
+        await renderPendingLotsBox();
+      }catch(e){
+        console.error('lưu ô báo cáo lỗi', e);
+        td.textContent = cu;                 /* trả lại chữ cũ, đừng để hiểu nhầm là đã lưu */
+        td.classList.remove('rp-saving');
+        toast(saveErrorMessage(e));
+      }
+    });
+    /* Enter = xong, không xuống dòng trong ô. */
+    td.addEventListener('keydown', e=>{
+      if(e.key === 'Enter'){ e.preventDefault(); td.blur(); }
+      if(e.key === 'Escape'){ td.textContent = String(td.dataset.cu || ''); td.blur(); }
+    });
+  });
 }
 
 /* ==========================================================================
@@ -24811,7 +25041,7 @@ async function markShownAsReported(){
   if(btnX) btnX.addEventListener('click', exportReportXlsx);
   const btnM = document.getElementById('btn-mark-reported');
   if(btnM) btnM.addEventListener('click', markShownAsReported);
-  ['rp-from','rp-to','rp-show-reported'].forEach(id=>{
+  ['rp-from','rp-to','rp-show-reported','rp-mode'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.addEventListener('change', renderReport);
   });
