@@ -471,7 +471,10 @@
       <div class="grid-3">
         <div class="field">
           <label class="field-label">DOC phụ trách</label>
-          <input type="text" id="lot-docowner" placeholder="Tuyến">
+          <div style="display:flex;gap:6px;align-items:stretch;">
+            <select id="lot-docowner" style="flex:1;"></select>
+            <button type="button" class="btn btn-ghost btn-sm" id="lot-docowner-add" title="Thêm tên người mới" style="padding:0 14px;">+</button>
+          </div>
         </div>
         <div class="field">
           <label class="field-label">Tình trạng</label>
@@ -550,7 +553,7 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6M3 22v-6h6"/><path d="M3.5 9a9 9 0 0114.9-3.4L21 8M20.5 15a9 9 0 01-14.9 3.4L3 16"/></svg>
       Dựng lại danh sách
     </button>
-    <div class="hint" style="margin:-8px 0 18px;">Dùng "Dựng lại danh sách" nếu bạn đã tải lô lên nhưng kho hiển thị trống — nó quét lại dữ liệu gốc và dựng lại mục lục. Không làm mất dữ liệu. Chỉ dựng lại được lô do chính bạn tải lên; lô của người khác phải nhờ admin.</div>
+    <div class="hint" style="margin:-8px 0 18px;">Dùng "Dựng lại danh sách" nếu bạn đã tải lô lên nhưng kho hiển thị trống — nó quét lại dữ liệu gốc và dựng lại mục lục. Không làm mất dữ liệu.</div>
     <div id="library-list"></div>
   </div>
 
@@ -627,7 +630,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5v
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v45 · 2026-10-01 · gõ thiếu tên cảng vẫn nhận ra';
+const APP_VERSION = 'v49 · 2026-10-05 · DOC phụ trách chọn từ danh sách dùng chung';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 /* Tên bảng và kho file — phải khớp với 01-tao-bang.sql */
@@ -700,6 +703,9 @@ async function _sbOnAuth(session){
     isAdmin = admin;
     updateAdminUI();
     renderLibrary();
+    if(typeof refreshDocSelects === 'function'){
+      try{ await refreshDocSelects(); }catch(e){ console.error('nạp danh sách DOC lỗi', e); }
+    }
   }
   if(typeof updateSecurityPanel === 'function') updateSecurityPanel();
   if(typeof updateAccountPanel === 'function') updateAccountPanel();
@@ -1029,17 +1035,21 @@ async function strictIndexEntry(meta){
 function currentUid(){
   return (fsAuth && fsAuth.currentUser) ? fsAuth.currentUser.uid : '';
 }
-/* Ai được sửa lô: chính người tạo lô, hoặc admin. Phải khớp với firestore.rules. */
+/* Ai được sửa lô: MỌI NGƯỜI đăng nhập (chốt 2026-10-05).
+   Trước đây chỉ người tạo lô và admin. Đổi vì lô khai "Hàng chưa tới" tháng
+   trước thì tháng sau người KHÁC mới xin được data logger của khách — luật cũ
+   làm họ không bổ sung file vào lô được.
+   Phải khớp với policy update trên bảng lo_hang (xem 06-ca-team-sua-duoc-lo.sql).
+   Người TẠO lô vẫn được giữ cứng bằng trigger trên máy chủ, sửa không mất. */
 function canEditLot(r){
-  if(isAdmin) return true;
-  const me = currentUid();
-  return !!(r && r.uploadedByUid && me && r.uploadedByUid === me);
+  if(!HAS_SUPABASE) return true;        /* chế độ lưu cục bộ, không có tài khoản */
+  return isLoggedIn;
 }
 /* Lỗi bị máy chủ từ chối vì không đủ quyền → câu báo dễ hiểu. */
 function saveErrorMessage(e){
   const code = e && (e.code || '');
   if(code === 'permission-denied' || /permission/i.test(String(e && e.message))){
-    return 'Máy chủ không cho lưu — chỉ người tạo lô hoặc admin mới sửa được lô này.';
+    return 'Máy chủ không cho lưu. Thử tải lại trang (Ctrl+F5) rồi đăng nhập lại; nếu vẫn vậy thì báo quản trị.';
   }
   return 'Lưu không thành công: ' + (code || (e && e.message) || e);
 }
@@ -22701,6 +22711,8 @@ function resetLotForm(){
   });
   const rp = document.getElementById('lot-reported');
   if(rp) rp.checked = false;
+  const doc = document.getElementById('lot-docowner');
+  if(doc) doc.value = '';
   const mode = document.getElementById('lot-mode');
   if(mode) mode.value = '';
   const st = document.getElementById('lot-status');
@@ -22811,6 +22823,96 @@ refreshLotPortDatalist();
 
 const btnAddLogger = document.getElementById('btn-add-logger');
 if(btnAddLogger) btnAddLogger.addEventListener('click', ()=>fileInput.click());
+
+/* ==========================================================================
+   DANH SÁCH "DOC PHỤ TRÁCH" — DÙNG CHUNG CẢ TEAM
+   Trước đây là ô gõ tay nên mỗi người viết một kiểu ("Tuyến", "tuyen", "T.Tuyến")
+   làm cột DOC phụ trách trong báo cáo loạn. Giờ là ô chọn.
+
+   Danh sách lưu trên máy chủ (bảng cache_khi_hau, khoá 'danhsach-doc') nên ai
+   thêm tên thì cả team thấy. Chưa lưu được gì thì dùng danh sách mặc định.
+   ========================================================================== */
+const DOC_MAC_DINH = ['Mina', 'Leo', 'Selena', 'Norah', 'Grace', 'Kiara'];
+const DOC_KEY = 'danhsach-doc';
+let _docList = null;
+
+async function loadDocList(){
+  if(_docList) return _docList;
+  let arr = null;
+  /* Chưa đăng nhập thì máy chủ từ chối đọc — đó là đúng luật, không phải lỗi.
+     Hỏi lúc đó chỉ làm Console đỏ lè doạ người dùng, nên để sau khi đăng nhập
+     xong (refreshDocSelects) mới đọc. */
+  if(!HAS_SUPABASE || isLoggedIn){
+    try{
+      const raw = await safeGet(DOC_KEY, false);
+      if(raw) arr = JSON.parse(raw);
+    }catch(e){ console.error('đọc danh sách DOC lỗi', e); }
+  }
+  _docList = (Array.isArray(arr) && arr.length) ? arr.slice() : DOC_MAC_DINH.slice();
+  return _docList;
+}
+
+/* Thêm một tên vào danh sách dùng chung. Trả về tên đã chuẩn hoá, hoặc null nếu
+   không lưu được. Tên trùng (không phân biệt hoa thường, không phân biệt dấu)
+   thì trả về đúng tên đang có, không tạo bản sao. */
+async function addDocName(ten){
+  const t = String(ten || '').trim();
+  if(!t) return null;
+  const ds = await loadDocList();
+  const daCo = ds.find(x => norm(x) === norm(t));
+  if(daCo) return daCo;
+  const moi = ds.concat([t]).sort((a, b) => a.localeCompare(b, 'vi'));
+  const ok = await safeSet(DOC_KEY, JSON.stringify(moi), false);
+  if(ok === null){ toast('Không lưu được tên mới lên máy chủ.'); return null; }
+  _docList = moi;
+  return t;
+}
+
+function fillDocSelect(sel, current){
+  if(!sel) return;
+  const ds = (_docList || DOC_MAC_DINH).slice();
+  const cur = String(current || '').trim();
+  /* Lô cũ có thể ghi tên không nằm trong danh sách — vẫn phải hiện ra, không
+     được âm thầm đổi dữ liệu người ta đã nhập. */
+  if(cur && !ds.some(x => norm(x) === norm(cur))) ds.unshift(cur);
+  sel.innerHTML = '<option value="">— Chọn người —</option>' + ds.map(n =>
+    `<option value="${escapeHtml(n)}"${norm(n) === norm(cur) ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('');
+  sel.value = cur && ds.some(x => norm(x) === norm(cur))
+    ? ds.find(x => norm(x) === norm(cur)) : '';
+}
+
+/* Nút "+": hỏi tên, lưu lên máy chủ, rồi chọn luôn tên vừa thêm. */
+async function themDocMoi(sel){
+  const ten = prompt('Tên người phụ trách mới:');
+  if(ten === null) return;
+  const btnSel = sel;
+  const daThem = await addDocName(ten);
+  if(!daThem) return;
+  fillDocSelect(btnSel, daThem);
+  /* Ô bên tab kia cũng phải có tên mới, không thì mỗi chỗ một danh sách. */
+  const kia = btnSel.id === 'lot-docowner'
+    ? document.getElementById('ed-docowner')
+    : document.getElementById('lot-docowner');
+  if(kia) fillDocSelect(kia, kia.value);
+  toast('Đã thêm "' + daThem + '" vào danh sách. Cả team đều thấy.');
+}
+
+(async function wireDocSelect(){
+  await loadDocList();
+  fillDocSelect(document.getElementById('lot-docowner'), '');
+  const nut = document.getElementById('lot-docowner-add');
+  if(nut) nut.addEventListener('click', ()=>themDocMoi(document.getElementById('lot-docowner')));
+})();
+
+/* Đăng nhập xong mới đọc được máy chủ, nên nạp lại danh sách lúc đó. */
+async function refreshDocSelects(){
+  _docList = null;
+  await loadDocList();
+  const a = document.getElementById('lot-docowner');
+  if(a) fillDocSelect(a, a.value);
+  const b = document.getElementById('ed-docowner');
+  if(b) fillDocSelect(b, b.value);
+}
 
 /* Đổ danh sách Tình trạng vào ô chọn, cả ở khung tải lên lẫn bảng sửa lô. */
 function fillStatusSelect(sel, current){
@@ -23599,21 +23701,12 @@ function transportModeShort(m){
    ========================================================================== */
 async function rebuildIndexFromShipments(){
   if(!HAS_SUPABASE || !sb) throw new Error('Chỉ dùng được khi đang chạy với Supabase.');
-  const { data, error } = await sb.from(TB_LO).select('id, du_lieu, nguoi_tao, sub_mail');
+  const { data, error } = await sb.from(TB_LO).select('id, du_lieu, sub_mail');
   if(error) throw error;
-  const toi = currentUid();
   let scanned = 0, restored = 0, failed = 0, skipped = 0;
   for(const row of (data || [])){
     if(!row || !row.du_lieu) continue;
     scanned++;
-    /* Dựng lại mục lục là một lần GHI vào dòng lô, nên chỉ người tạo lô và
-       admin làm được — đúng luật phân quyền. Lô của người khác thì BỎ QUA chứ
-       không phải lỗi: trước đây đếm chung vào "lỗi" làm đồng nghiệp tưởng
-       dữ liệu hỏng. */
-    if(!isAdmin && !(row.nguoi_tao && row.nguoi_tao === toi)){
-      skipped++;
-      continue;
-    }
     let rec = null;
     try{
       rec = (typeof row.du_lieu === 'string') ? JSON.parse(row.du_lieu) : row.du_lieu;
@@ -23714,7 +23807,8 @@ async function hiddenSectionHtml(){
         <b>${escapeHtml(r.dest || 'Không rõ')}</b>
         <div class="hint" style="margin-top:3px;">${escapeHtml(r.fileName || '')}${when ? ' · ẩn ngày ' + when : ''}</div>
       </div>
-      ${isAdmin ? `<button class="btn btn-ghost btn-sm" onclick="unhideShipment('${r.id}')">Bỏ ẩn</button>` : ''}
+      ${isAdmin ? `<button class="btn btn-ghost btn-sm" onclick="unhideShipment('${r.id}')">Bỏ ẩn</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteShipmentForever('${r.id}')">Xoá vĩnh viễn</button>` : ''}
     </div>`;
   }).join('');
   return `<details style="margin-top:26px;">
@@ -24062,6 +24156,35 @@ window.unhideShipment = async function(id){
   renderLibrary();
 };
 
+/* ==========================================================================
+   XOÁ VĨNH VIỄN — chỉ quản trị viên, và chỉ lô ĐANG ẨN
+   --------------------------------------------------------------------------
+   Hai điều kiện đó do MÁY CHỦ kiểm trong hàm xoa_lo_vinh_vien(), không phải do
+   đoạn mã này. Giấu nút đi hay sửa mã trong trình duyệt cũng không lách được.
+   Buộc ẩn trước là để không ai xoá nhầm trong một cú bấm — ẩn thì lấy lại được,
+   xoá thì không. Xem 07-admin-xoa-lo.sql.
+
+   Máy chủ công ty KHÔNG sao lưu tự động nên xoá là mất thật. Vì vậy ở đây hỏi
+   hai lần: xác nhận, rồi gõ tay chữ XOA.
+   ========================================================================== */
+window.deleteShipmentForever = async function(id){
+  if(!isAdmin){ toast('Chỉ quản trị viên mới xoá được.'); return; }
+  const r = (await loadIndex(true)).find(x=>x.id === id);
+  const ten = r ? (r.subMail || r.dest || id) : id;
+  if(!confirm('XOÁ VĨNH VIỄN lô này?\n\n' + ten + '\n\nMất cả file data logger gốc, số liệu nhiệt độ và dòng báo cáo. Máy chủ KHÔNG sao lưu — không ai lấy lại được, kể cả quản trị viên.')) return;
+  const go = prompt('Chắc chắn thì gõ đúng ba chữ in hoa:  XOA');
+  if(String(go || '').trim().toUpperCase() !== 'XOA'){ toast('Đã huỷ, không xoá gì.'); return; }
+  if(!HAS_SUPABASE){ toast('Chỉ xoá được khi đang chạy với máy chủ.'); return; }
+  const { data, error } = await sb.rpc('xoa_lo_vinh_vien', { p_id: id });
+  if(error){
+    console.error('xoa_lo_vinh_vien lỗi:', error);
+    toast('Máy chủ từ chối: ' + (error.message || 'không rõ lý do'));
+    return;
+  }
+  toast(String(data || 'Đã xoá.'));
+  renderLibrary();
+};
+
 window.openDetail = async function(id){
   const r = await getShipment(id);
   if(!r){ toast('Không tìm thấy dữ liệu.'); return; }
@@ -24138,17 +24261,32 @@ window.openEditLot = async function(id){
     </div>
     <div class="field"><label class="field-label">Note</label><input type="text" id="ed-note" value="${v(rec.note)}"></div>
     <div class="grid-3">
-      <div class="field"><label class="field-label">DOC phụ trách</label><input type="text" id="ed-docowner" value="${v(rec.docOwner)}"></div>
+      <div class="field"><label class="field-label">DOC phụ trách</label>
+        <div style="display:flex;gap:6px;align-items:stretch;">
+          <select id="ed-docowner" style="flex:1;"></select>
+          <button type="button" class="btn btn-ghost btn-sm" id="ed-docowner-add" title="Thêm tên người mới" style="padding:0 14px;">+</button>
+        </div>
+      </div>
       <div class="field"><label class="field-label">Tình trạng</label><select id="ed-status"></select></div>
       <div class="field"><label class="field-label">Tháng update thông tin data logger</label><input type="month" id="ed-updatemonth" value="${v(rec.loggerUpdateMonth)}"></div>
     </div>
     <div class="field"><label class="field-label">Ghi chú</label><input type="text" id="ed-remark" value="${v(rec.remark)}"></div>
+    <div class="field">
+      <label class="field-label">Data logger</label>
+      <div class="hint" id="ed-logger-info"></div>
+      <div id="ed-logger-list" style="margin-top:6px;"></div>
+      <input type="file" id="ed-logger-input" accept="application/pdf" multiple style="display:none">
+      <button type="button" class="btn btn-ghost btn-sm" id="ed-add-logger" style="margin-top:8px;">+ Thêm file data logger</button>
+    </div>
     <div class="field"><label class="field-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
       <input type="checkbox" id="ed-reported" style="width:auto;margin:0;"${rec.reported ? ' checked' : ''}>Đã báo cáo rồi
     </label></div>
     <button class="btn btn-primary" id="ed-save">Lưu thay đổi</button>
   `;
   fillStatusSelect(document.getElementById('ed-status'), rec.status || LOT_STATUSES[0]);
+  fillDocSelect(document.getElementById('ed-docowner'), rec.docOwner);
+  document.getElementById('ed-docowner-add').addEventListener('click', ()=>
+    themDocMoi(document.getElementById('ed-docowner')));
   /* Gợi ý cảng lọc theo loại hình vận chuyển, y như khung tải lên. */
   const edMode = document.getElementById('ed-mode');
   const edList = document.getElementById('ed-port-datalist');
@@ -24159,6 +24297,66 @@ window.openEditLot = async function(id){
   }
   edMode.addEventListener('change', lamMoiGoiYCang);
   lamMoiGoiYCang();
+
+  /* ---- Thêm file data logger vào lô đã lưu ----
+     Dùng cho đúng luồng: lô khai "Hàng chưa tới" từ tháng trước, tháng này xin
+     được file của khách thì mở lô đó ra bổ sung, KHÔNG tạo lô mới trùng tên. */
+  const loggerMoi = [];                       /* [{lid, file, parsed}] chờ lưu */
+  const soFileCu = (rec.loggers || []).filter(lg=>lg && (lg.fileName || lg.deviceId)).length;
+  const oInfo = document.getElementById('ed-logger-info');
+  const oList = document.getElementById('ed-logger-list');
+  function capNhatInfo(){
+    oInfo.textContent = soFileCu
+      ? 'Lô đang có ' + soFileCu + ' file' + (loggerMoi.length ? ', thêm ' + loggerMoi.length + ' file mới' : '')
+      : (loggerMoi.length ? 'Chưa có file nào, đang thêm ' + loggerMoi.length + ' file' : 'Lô này chưa có file data logger nào.');
+  }
+  capNhatInfo();
+  document.getElementById('ed-add-logger').addEventListener('click', ()=>
+    document.getElementById('ed-logger-input').click());
+  document.getElementById('ed-logger-input').addEventListener('change', async e=>{
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    for(const f of files){
+      const lid = uid();
+      const dong = document.createElement('div');
+      dong.className = 'sec-row';
+      dong.innerHTML = '<span class="sec-dot sec-warn"></span><div style="flex:1;"><b>' +
+        escapeHtml(f.name) + '</b><div class="hint" style="margin-top:3px;">Đang đọc PDF…</div></div>';
+      oList.appendChild(dong);
+      try{
+        const parsed = await parsePdf(f);
+        const trung = await findDuplicateLogger(parsed);
+        loggerMoi.push({ lid, file: f, parsed });
+        dong.innerHTML = '<span class="sec-dot sec-ok"></span><div style="flex:1;"><b>' +
+          escapeHtml(f.name) + '</b><div class="hint" style="margin-top:3px;">Mã máy ' +
+          escapeHtml(parsed.deviceId || '?') + ' · cao nhất ' + fmt1(parsed.max) + '° · thấp nhất ' + fmt1(parsed.min) + '°' +
+          (trung ? ' · <b style="color:var(--amber);">file này đã có trong kho</b>' : '') + '</div></div>';
+        const bo = document.createElement('button');
+        bo.type = 'button'; bo.className = 'btn btn-danger btn-sm'; bo.textContent = 'Bỏ';
+        bo.addEventListener('click', ()=>{
+          const i = loggerMoi.findIndex(x=>x.lid === lid);
+          if(i >= 0) loggerMoi.splice(i, 1);
+          dong.remove(); capNhatInfo();
+        });
+        dong.appendChild(bo);
+        /* Lô vừa có file thì không còn là "chưa tới" nữa — đổi sẵn trên màn hình
+           để người dùng NHÌN THẤY, muốn giữ nguyên thì chọn lại được. */
+        const oTinhTrang = document.getElementById('ed-status');
+        if(LOT_STATUS_NO_LOGGER.indexOf(oTinhTrang.value) >= 0) oTinhTrang.value = 'Đã có data logger';
+        const oThangUpdate = document.getElementById('ed-updatemonth');
+        if(!oThangUpdate.value){
+          const h = new Date();
+          oThangUpdate.value = h.getFullYear() + '-' + String(h.getMonth() + 1).padStart(2, '0');
+        }
+        capNhatInfo();
+      }catch(err){
+        dong.innerHTML = '<span class="sec-dot sec-bad"></span><div style="flex:1;"><b>' +
+          escapeHtml(f.name) + '</b><div class="hint" style="margin-top:3px;color:var(--danger);">' +
+          escapeHtml(err.message || String(err)) + '</div></div>';
+      }
+    }
+  });
+
   const bg = document.getElementById('modal-bg');
   bg.dataset.panel = '';
   bg.classList.add('active');
@@ -24201,6 +24399,34 @@ window.openEditLot = async function(id){
     }
     rec.transportMode = edMode.value || rec.transportMode;
 
+    /* Gộp file mới vào lô rồi tính lại số liệu tổng của lô. saveShipment sẽ tự
+       đẩy file PDF lên kho và ghi thêm dòng vào bảng data_logger. */
+    if(loggerMoi.length){
+      const them = [];
+      for(const item of loggerMoi){
+        let pdfBase64 = null;
+        try{ pdfBase64 = await fileToBase64(item.file); }
+        catch(e){ console.error('pdf to base64 failed', e); }
+        them.push({
+          lid: item.lid,
+          fileName: item.file.name,
+          deviceId: item.parsed.deviceId,
+          min: item.parsed.min, max: item.parsed.max, avg: item.parsed.avg,
+          start: item.parsed.start, stop: item.parsed.stop,
+          months: item.parsed.months,
+          points: item.parsed.points,
+          pdfBase64,
+        });
+      }
+      rec.loggers = (rec.loggers || []).filter(lg=>lg && (lg.fileName || lg.deviceId)).concat(them);
+      rec.loggerCount = rec.loggers.length;
+      const agg = aggregateLoggers(rec.loggers);
+      rec.min = agg.min; rec.max = agg.max; rec.avg = agg.avg;
+      rec.start = agg.start; rec.stop = agg.stop;
+      rec.months = agg.months; rec.deviceId = agg.deviceId;
+      rec.fileName = rec.loggers.map(l=>l.fileName).filter(Boolean).join(' · ');
+    }
+
     try{
       await saveShipment(rec);
       /* Dấu "đã báo cáo" đi đường riêng qua hàm máy chủ, không nằm trong lệnh
@@ -24209,7 +24435,9 @@ window.openEditLot = async function(id){
         if(await setShipmentReported(rec.id, coBaoCao)) rec.reported = coBaoCao;
         else toast('Lưu được, nhưng không đổi được dấu "đã báo cáo" — mở F12 > Console xem lỗi.');
       }
-      toast('Đã lưu thay đổi.');
+      toast(loggerMoi.length
+        ? 'Đã lưu và thêm ' + loggerMoi.length + ' file data logger vào lô.'
+        : 'Đã lưu thay đổi.');
       bg.classList.remove('active');
       await renderLibrary();
       const rp = document.getElementById('panel-report');
