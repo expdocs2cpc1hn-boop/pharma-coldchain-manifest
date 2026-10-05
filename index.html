@@ -670,7 +670,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5v
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v57 · 2026-10-05 · lô chưa có logger thì không hiện tháng update';
+const APP_VERSION = 'v61 · 2026-10-05 · lô còn chờ data logger thì tháng nào cũng vào báo cáo';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 /* Tên bảng và kho file — phải khớp với 01-tao-bang.sql */
@@ -24414,6 +24414,14 @@ window.openEditLot = async function(id){
         if(LOT_STATUS_NO_LOGGER.indexOf(oTinhTrang.value) >= 0) oTinhTrang.value = 'Đã có data logger';
         const oTU2 = document.getElementById('ed-updatemonth');
         if(oTU2 && !oTU2.value) oTU2.value = thangHienTai();
+        /* Lô này từng được báo cáo khi CHƯA có số liệu. Giờ có file rồi ⇒ phải
+           báo cáo lại kèm nhiệt độ, nên bỏ dấu "đã báo cáo" để nó quay lại bảng
+           báo cáo tháng. Bỏ bước này là lô có số liệu mà không ai nộp. */
+        const oBaoCao = document.getElementById('ed-reported');
+        if(oBaoCao && oBaoCao.checked){
+          oBaoCao.checked = false;
+          toast('Lô đã có số liệu nên bỏ dấu "đã báo cáo" — nó sẽ quay lại bảng báo cáo tháng.');
+        }
         capNhatInfo();
       }catch(err){
         dong.innerHTML = '<span class="sec-dot sec-bad"></span><div style="flex:1;"><b>' +
@@ -24596,9 +24604,22 @@ async function reportGroups(){
     };
     items = items.filter(r=>trongKhoang(cot(r)));
   }
-  /* Lô đã đánh dấu "đã báo cáo" thì không hiện nữa, trừ khi tích ô xem lại. */
+  /* ==========================================================================
+     LÔ NÀO CÒN PHẢI BÁO CÁO
+     Lô CÒN ĐANG CHỜ data logger thì tháng nào cũng phải có trong báo cáo —
+     tháng 9 hàng chưa tới, tháng 10 vẫn chưa tới, tháng 11 mới tới thì cả ba
+     tháng đều phải xuất hiện. Dấu "đã báo cáo" KHÔNG giấu được loại lô này.
+
+     Chỉ hai trường hợp lô rời bảng báo cáo (sau khi đã đánh dấu):
+       • Tình trạng "Lỗi / Không xin được" — chốt là không xin được nữa
+       • Đã có đủ file data logger — đã báo cáo kèm số liệu rồi
+     ========================================================================== */
+  const conPhaiBaoCao = r=>{
+    if(!hasRealLogger(r) && r.status !== 'Lỗi / Không xin được') return true;
+    return !r.reported;
+  };
   const hienCaDaBaoCao = !!(document.getElementById('rp-show-reported') || {}).checked;
-  if(!hienCaDaBaoCao) items = items.filter(r=>!r.reported);
+  if(!hienCaDaBaoCao) items = items.filter(conPhaiBaoCao);
   const map = new Map();
   items.forEach(r=>{
     const k = r.shipMonth || '';
@@ -24691,20 +24712,30 @@ async function renderPendingLotsBox(){
   const el = document.getElementById('pending-lots-box');
   if(!el) return;
   const idx = await loadIndex();
-  const waiting = idx.filter(r => r.status === 'Hàng chưa tới');
-  if(!waiting.length){ el.innerHTML = ''; return; }
+
+  /* Căn cứ là SỐ FILE LOGGER, không phải ô Tình trạng.
+     Bản trước chỉ nhận lô ghi đúng chữ "Hàng chưa tới", nên lô nào ghi nhầm
+     Tình trạng là rơi vào vùng chết: không có file mà cũng không ai nhắc. */
+  const chuaCoFile = idx.filter(r => !hasRealLogger(r));
+  if(!chuaCoFile.length){ el.innerHTML = ''; return; }
+
+  /* Bỏ hẳn lô "Lỗi / Không xin được" ra khỏi khung: đã chốt là không xin được
+     nữa thì không còn gì để chờ, để lại chỉ tổ rối.
+     Mọi lô 0 file CÒN LẠI đều lên đây, kể cả lô ghi nhầm Tình trạng — đó là chỗ
+     bản cũ làm rơi mất lô. */
+  const conTheo = chuaCoFile.filter(r => r.status !== 'Lỗi / Không xin được');
+  if(!conTheo.length){ el.innerHTML = ''; return; }
 
   const dem = new Map();
-  waiting.forEach(r=>{ const t = _docPending(r); dem.set(t, (dem.get(t) || 0) + 1); });
+  conTheo.forEach(r=>{ const t = _docPending(r); dem.set(t, (dem.get(t) || 0) + 1); });
   const nguoi = Array.from(dem.keys()).sort((a,b)=>a.localeCompare(b,'vi'));
 
   let loc = _layLocPending();
   if(loc && !dem.has(loc)) loc = '';          /* người đó hết lô chờ thì về "tất cả" */
 
-  const hien = loc ? waiting.filter(r=>_docPending(r) === loc) : waiting;
+  const hien = loc ? conTheo.filter(r=>_docPending(r) === loc) : conTheo;
   const chuaGhi = hien.filter(r=>!String(r.updateNow || '').trim()).length;
 
-  /* Lô chưa ghi gì cho tháng này lên trước, rồi tới lô chờ lâu nhất. */
   hien.sort((a, b)=>{
     const ca = String(a.updateNow || '').trim() ? 1 : 0;
     const cb = String(b.updateNow || '').trim() ? 1 : 0;
@@ -24716,7 +24747,7 @@ async function renderPendingLotsBox(){
   });
 
   const o = t => escapeHtml(String(t || '').trim());
-  const rows = hien.map(r=>{
+  const dongLo = r=>{
     const thang = soThangDaCho(r);
     const dong2 = [
       _docPending(r),
@@ -24725,13 +24756,23 @@ async function renderPendingLotsBox(){
       r.destPort || r.dest || '',
       (thang !== null && thang > 0) ? 'chờ ' + thang + ' tháng' : ''
     ].filter(Boolean).map(escapeHtml).join(' · ');
-    const truoc = o(r.updatePrev);
-    const nay   = o(r.updateNow);
+    /* Ghi "Đã có data logger" mà không có file nào — gần như chắc là nhập sót.
+       Nói thẳng ra, đừng để lô đó lặng lẽ nằm chờ. */
+    const sai = (r.status === 'Đã có data logger')
+      ? '<div class="hint" style="margin-top:3px;color:var(--danger);">Tình trạng ghi "Đã có data logger" nhưng chưa có file nào — kiểm tra lại.</div>'
+      : '';
+    /* Nhãn tình trạng, chỉ hiện khi KHÁC "Hàng chưa tới" để khỏi lặp chữ thừa. */
+    const nhan = (r.status && r.status !== 'Hàng chưa tới')
+      ? '<span class="status-chip" style="background:rgba(180,113,26,.14);color:var(--amber);white-space:nowrap;margin-left:8px;font-size:11px;">' +
+        escapeHtml(r.status) + '</span>'
+      : '';
+    const truoc = o(r.updatePrev), nay = o(r.updateNow);
     return `<div class="sec-row" style="align-items:flex-start;">
       <span class="sec-dot ${nay ? 'sec-ok' : 'sec-warn'}" style="margin-top:5px;"></span>
       <div style="flex:1;min-width:0;">
-        <b>${escapeHtml(r.subMail || r.productName || 'Lô chưa đặt tên')}</b>
+        <b>${escapeHtml(r.subMail || r.productName || 'Lô chưa đặt tên')}</b>${nhan}
         <div class="hint" style="margin-top:3px;">${dong2}</div>
+        ${sai}
         <div class="pending-updates">
           <div><span class="pu-label">Update tháng trước</span>
                <span class="pu-text${truoc ? '' : ' pu-empty'}">${truoc || '—'}</span></div>
@@ -24741,10 +24782,12 @@ async function renderPendingLotsBox(){
       </div>
       ${canEditLot(r) ? `<button class="btn btn-ghost btn-sm" style="flex-shrink:0;" onclick="openEditLot('${r.id}')">Cập nhật</button>` : ''}
     </div>`;
-  }).join('');
+  };
+
+  const rows = hien.map(dongLo).join('');
 
   const chonNguoi = '<select id="pending-filter" onchange="doiLocPending(this.value)" style="max-width:220px;">' +
-    '<option value=""' + (loc ? '' : ' selected') + '>Tất cả (' + waiting.length + ')</option>' +
+    '<option value=""' + (loc ? '' : ' selected') + '>Tất cả (' + conTheo.length + ')</option>' +
     nguoi.map(n=>'<option value="' + escapeHtml(n) + '"' + (loc === n ? ' selected' : '') + '>' +
       escapeHtml(n) + ' (' + dem.get(n) + ')</option>').join('') +
     '</select>';
@@ -25026,8 +25069,18 @@ async function exportReportXlsx(){
 async function markShownAsReported(){
   const btn = document.getElementById('btn-mark-reported');
   const groups = await reportGroups();
-  const items = groups.reduce((a,g)=>a.concat(g.items), []).filter(r=>!r.reported);
-  if(!items.length){ toast('Không có lô nào để đánh dấu.'); return; }
+  const tatCa = groups.reduce((a,g)=>a.concat(g.items), []);
+  /* Lô còn chờ data logger thì đánh dấu cũng vô ích — tháng sau nó vẫn hiện lại.
+     Bỏ qua luôn cho khỏi hiểu nhầm là đã xong. */
+  const conCho = tatCa.filter(r=>!hasRealLogger(r) && r.status !== 'Lỗi / Không xin được');
+  const items = tatCa.filter(r=>!r.reported && !(
+    !hasRealLogger(r) && r.status !== 'Lỗi / Không xin được'));
+  if(!items.length){
+    toast(conCho.length
+      ? 'Không có lô nào để đánh dấu. ' + conCho.length + ' lô còn chờ data logger nên tháng sau vẫn hiện lại.'
+      : 'Không có lô nào để đánh dấu.');
+    return;
+  }
   if(!confirm('Đánh dấu ' + items.length + ' lô đang hiện là ĐÃ BÁO CÁO?\n\nChúng sẽ không hiện ở Báo cáo tháng nữa. Muốn xem lại thì tích ô "Hiện cả lô đã báo cáo".')) return;
   const cu = btn ? btn.innerHTML : '';
   if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Đang đánh dấu…'; }
@@ -25041,8 +25094,9 @@ async function markShownAsReported(){
   }
   await renderReport();
   await renderLibrary();
-  if(hong) toast('Đã đánh dấu ' + xong + '/' + items.length + ' lô. ' + hong + ' lô máy chủ từ chối — chỉ người tạo lô hoặc admin mới đánh dấu được.');
-  else toast('Đã đánh dấu ' + xong + ' lô là đã báo cáo.');
+  const themCho = conCho.length ? ' ' + conCho.length + ' lô còn chờ data logger vẫn giữ lại, tháng sau hiện tiếp.' : '';
+  if(hong) toast('Đã đánh dấu ' + xong + '/' + items.length + ' lô. ' + hong + ' lô máy chủ từ chối — chỉ người tạo lô hoặc admin mới đánh dấu được.' + themCho);
+  else toast('Đã đánh dấu ' + xong + ' lô là đã báo cáo.' + themCho);
 }
 
 (function wireReportTab(){
