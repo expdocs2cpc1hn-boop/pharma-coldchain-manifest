@@ -380,6 +380,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 9h16M4 14h16M10 4v16"/></svg>
         Báo cáo tháng
       </button>
+      <button class="tab-btn" data-tab="archive">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 4h18v4H3z"/><path d="M5 8v11a1 1 0 001 1h12a1 1 0 001-1V8"/><path d="M10 12h4"/></svg>
+        Lưu trữ
+      </button>
     </div>
   </div>
 </div>
@@ -501,17 +505,7 @@
         </div>
         <div class="field">
           <label class="field-label">Ghi chú</label>
-          <input type="text" id="lot-remark" placeholder="Kiện lẻ, hàng ghép…">
-        </div>
-      </div>
-      <div class="grid-2">
-        <div class="field">
-          <label class="field-label">Update tháng trước</label>
-          <input type="text" id="lot-update-prev" placeholder="24/09: đang dự trù NPL">
-        </div>
-        <div class="field">
-          <label class="field-label">Update tháng này</label>
-          <input type="text" id="lot-update-now" placeholder="01/10: dự kiến cuối tháng 10">
+          <input type="text" id="lot-remark" placeholder="01/10: khách hẹn cuối tháng 10">
         </div>
       </div>
       <div class="field">
@@ -579,6 +573,38 @@
     </button>
     <button class="btn btn-ghost" id="btn-mark-reported" style="margin-left:8px;">Đánh dấu đã báo cáo</button>
     <div id="report-body"></div>
+  </div>
+
+  <!-- ================= ARCHIVE TAB ================= -->
+  <div class="panel" id="panel-archive">
+    <h1 class="page-title">Lưu trữ</h1>
+    <p class="page-sub">Những lô đã rời bảng Báo cáo tháng vẫn nằm nguyên ở đây. Lô rời báo cáo khi đã đánh dấu đã báo cáo và thuộc một trong hai trường hợp: Tình trạng "Lỗi / Không xin được", hoặc đã có đủ file data logger.</p>
+    <div class="field">
+      <label class="field-label">Lọc theo</label>
+      <select id="ar-mode" style="max-width:320px;">
+        <option value="ship" selected>Tháng ship hàng</option>
+        <option value="update">Tháng update thông tin data logger</option>
+      </select>
+    </div>
+    <div class="grid-2">
+      <div class="field">
+        <label class="field-label">Từ tháng</label>
+        <input type="month" id="ar-from">
+      </div>
+      <div class="field">
+        <label class="field-label">Đến tháng</label>
+        <input type="month" id="ar-to">
+      </div>
+    </div>
+    <div class="field">
+      <label class="field-label">DOC phụ trách</label>
+      <select id="ar-doc" style="max-width:320px;"><option value="">— Tất cả —</option></select>
+    </div>
+    <button class="btn btn-primary" id="btn-export-archive">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+      Tải Excel lưu trữ
+    </button>
+    <div id="archive-body"></div>
   </div>
 
   <!-- ================= LIBRARY TAB ================= -->
@@ -670,7 +696,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5v
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v61 · 2026-10-05 · lô còn chờ data logger thì tháng nào cũng vào báo cáo';
+const APP_VERSION = 'v63 · 2026-10-06 · thêm tab Lưu trữ cho lô đã chốt báo cáo';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 /* Tên bảng và kho file — phải khớp với 01-tao-bang.sql */
@@ -1265,6 +1291,13 @@ function loggerKey(lg){
    từ chính nó, để phần hiển thị mới dùng chung một kiểu dữ liệu duy nhất. */
 function normalizeShipment(rec){
   if(!rec) return rec;
+  /* Lô nhập hồi còn hai ô "Update tháng trước / tháng này": dồn chữ về ô Ghi chú
+     để khỏi mất, vì hai ô kia không còn hiện ở đâu nữa. Chỉ dồn khi Ghi chú
+     đang trống, không ghi đè thứ người ta đã viết. */
+  if(!String(rec.remark || '').trim()){
+    const cu = [rec.updatePrev, rec.updateNow].map(x=>String(x || '').trim()).filter(Boolean);
+    if(cu.length) rec.remark = cu.join(' · ');
+  }
   if(!Array.isArray(rec.loggers)){
     rec.loggers = [{
       lid: 'legacy',
@@ -1361,8 +1394,8 @@ function shipmentMeta(record){
     actualArrivalMonth: record.actualArrivalMonth || '', note: record.note || '',
     docOwner: record.docOwner || '', status: record.status || '',
     remark: record.remark || '',
-    /* Hai ô "Update tháng trước / tháng này" — người phụ trách tự gõ kèm ngày,
-       app không điền hộ. Nhìn hai ô cạnh nhau là biết lô nào đứng im. */
+    /* updatePrev / updateNow là hai ô cũ (v52–v61), đã bỏ. Vẫn giữ trong dữ liệu
+       để không mất lịch sử, nhưng app không hiện và không cho sửa nữa. */
     updatePrev: record.updatePrev || '',
     updateNow: record.updateNow || '',
     loggerUpdateMonth: record.loggerUpdateMonth || '',
@@ -22163,6 +22196,7 @@ document.getElementById('tabs').addEventListener('click', e=>{
   document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
   if(btn.dataset.tab==='library') renderLibrary();
   if(btn.dataset.tab==='report') renderReport();
+  if(btn.dataset.tab==='archive') renderArchive();
 });
 
 /* ==========================================================================
@@ -22743,8 +22777,6 @@ function lotFormValues(){
     docOwner: (v('lot-docowner')||'').trim(),
     status: v('lot-status'),
     remark: (v('lot-remark')||'').trim(),
-    updatePrev: (v('lot-update-prev')||'').trim(),
-    updateNow: (v('lot-update-now')||'').trim(),
     loggerUpdateMonth: v('lot-updatemonth'),
     reported: !!(document.getElementById('lot-reported') || {}).checked,
   };
@@ -22757,7 +22789,7 @@ function resetLotForm(){
   const sum = document.getElementById('lot-summary');
   if(sum) sum.innerHTML = '';
   ['lot-submail','lot-product','lot-dest','lot-note','lot-shipmonth','lot-eta','lot-arrival',
-   'lot-docowner','lot-remark','lot-update-prev','lot-update-now','lot-updatemonth'].forEach(id=>{
+   'lot-docowner','lot-remark','lot-updatemonth'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.value = '';
   });
@@ -22834,7 +22866,6 @@ async function saveLotFromForm(){
       shipMonth: f.shipMonth, eta: f.eta, actualArrivalMonth: f.actualArrivalMonth,
       note: f.note,
       docOwner: f.docOwner, status: f.status, remark: f.remark,
-      updatePrev: f.updatePrev, updateNow: f.updateNow,
       loggerUpdateMonth: f.loggerUpdateMonth,
       reported: !!f.reported,
       fileName: loggers.map(l=>l.fileName).join(' · '),
@@ -24327,12 +24358,6 @@ window.openEditLot = async function(id){
       <div class="field"><label class="field-label">Tình trạng</label><select id="ed-status"></select></div>
       <div class="field"><label class="field-label">Ghi chú</label><input type="text" id="ed-remark" value="${v(rec.remark)}"></div>
     </div>
-    <div class="grid-2">
-      <div class="field"><label class="field-label">Update tháng trước</label>
-        <input type="text" id="ed-update-prev" value="${v(rec.updatePrev)}" placeholder="24/09: đang dự trù NPL"></div>
-      <div class="field"><label class="field-label">Update tháng này</label>
-        <input type="text" id="ed-update-now" value="${v(rec.updateNow)}" placeholder="01/10: dự kiến cuối tháng 10"></div>
-    </div>
     <div class="field"><label class="field-label">Tháng update thông tin data logger</label>
       <div style="display:flex;gap:6px;align-items:stretch;">
         <input type="month" id="ed-updatemonth" value="${v(rec.loggerUpdateMonth)}" disabled style="flex:1;">
@@ -24447,8 +24472,6 @@ window.openEditLot = async function(id){
     rec.docOwner = document.getElementById('ed-docowner').value.trim();
     rec.status = document.getElementById('ed-status').value;
     rec.remark = document.getElementById('ed-remark').value.trim();
-    rec.updatePrev = document.getElementById('ed-update-prev').value.trim();
-    rec.updateNow  = document.getElementById('ed-update-now').value.trim();
     rec.loggerUpdateMonth = document.getElementById('ed-updatemonth').value;
     const coBaoCao = !!document.getElementById('ed-reported').checked;
 
@@ -24534,7 +24557,7 @@ window.openEditLot = async function(id){
    ========================================================================== */
 const REPORT_COLUMNS = ['TT','Lô hàng (Sub mail TBXK)','Tên hàng xuất khẩu','Tháng ship hàng','ETA',
   'Tháng hàng đến thực tế','Cảng đến','Số lượng data logger','Nhiệt độ cao nhất','Nhiệt độ thấp nhất',
-  'Nhiệt độ trung bình','Note','DOC phụ trách','Update tháng trước','Update tháng này',
+  'Nhiệt độ trung bình','Note','DOC phụ trách','Ghi chú',
   'Tháng update thông tin data logger'];
 /* Cột "Tình trạng" KHÔNG đưa vào báo cáo: nội dung nó nói đúng cái mà "Update
    tháng này" đã nói rồi ("Hàng chưa tới" vs "24/09: khách chưa gửi"). Trường
@@ -24542,11 +24565,68 @@ const REPORT_COLUMNS = ['TT','Lô hàng (Sub mail TBXK)','Tên hàng xuất kh�
    nào còn phải theo. */
 
 /* Hai cột này gõ thẳng trong bảng báo cáo, không phải mở hộp Sửa lô. */
-const REPORT_EDIT_COLS = { 13: 'updatePrev', 14: 'updateNow' };
+const REPORT_EDIT_COLS = { 13: 'remark' };
 /* Các cột căn giữa / là số: TT, số lượng logger, 3 cột nhiệt độ. */
 const REPORT_NUM_COLS = [0, 7, 8, 9, 10];
 /* Ba cột nhiệt độ — làm tròn 1 chữ số thập phân khi hiện và khi xuất Excel. */
 const REPORT_TEMP_COLS = [8, 9, 10];
+
+/* ==========================================================================
+   LÔ NÀO CÒN PHẢI BÁO CÁO
+   Lô CÒN ĐANG CHỜ data logger thì tháng nào cũng phải có trong báo cáo —
+   tháng 9 hàng chưa tới, tháng 10 vẫn chưa tới, tháng 11 mới tới thì cả ba
+   tháng đều phải xuất hiện. Dấu "đã báo cáo" KHÔNG giấu được loại lô này.
+
+   Chỉ hai trường hợp lô rời bảng báo cáo (sau khi đã đánh dấu):
+     • Tình trạng "Lỗi / Không xin được" — chốt là không xin được nữa
+     • Đã có đủ file data logger — đã báo cáo kèm số liệu rồi
+
+   Một lô rời báo cáo thì sang tab Lưu trữ, KHÔNG mất đi. Hai hàm này là hai
+   mặt của cùng một luật, để hai tab không bao giờ lệch nhau.
+   ========================================================================== */
+function conPhaiBaoCao(r){
+  if(!hasRealLogger(r) && r.status !== 'Lỗi / Không xin được') return true;
+  return !r.reported;
+}
+function daChotBaoCao(r){ return !conPhaiBaoCao(r); }
+
+/* Lọc theo khoảng tháng, dùng chung cho tab Báo cáo và tab Lưu trữ.
+   idMode = ô chọn "Lọc theo": ship → tháng ship hàng, update → tháng update
+   thông tin data logger. */
+function locTheoKhoangThang(items, idFrom, idTo, idMode){
+  const fromEl = document.getElementById(idFrom);
+  const toEl = document.getElementById(idTo);
+  const from = fromEl ? fromEl.value : '';
+  const to = toEl ? toEl.value : '';
+  if(!from && !to) return items;
+  const cot = (document.getElementById(idMode) || {}).value === 'update'
+    ? (r => r.loggerUpdateMonth || '')
+    : (r => r.shipMonth || '');
+  const trongKhoang = m=>{
+    if(!m) return false;
+    if(from && m < from) return false;
+    if(to && m > to) return false;
+    return true;
+  };
+  return items.filter(r=>trongKhoang(cot(r)));
+}
+
+/* Gom theo THÁNG SHIP HÀNG, tháng mới nhất lên trước, nhóm "chưa điền tháng"
+   xuống cuối. Đúng thứ tự của mẫu Excel đang dùng. */
+function gomTheoThangShip(items){
+  const map = new Map();
+  items.forEach(r=>{
+    const k = r.shipMonth || '';
+    if(!map.has(k)) map.set(k, []);
+    map.get(k).push(r);
+  });
+  const keys = Array.from(map.keys()).sort((a,b)=>{
+    if(!a) return 1;
+    if(!b) return -1;
+    return b.localeCompare(a);
+  });
+  return keys.map(k=>({ key:k, title: monthTitle(k), items: map.get(k) }));
+}
 
 function monthTitle(key){
   if(!key) return 'Chưa điền tháng ship hàng';
@@ -24570,8 +24650,7 @@ function reportRowsFor(items){
     (typeof r.avg === 'number') ? r.avg : null,
     r.note || '',
     r.docOwner || '',
-    r.updatePrev || '',
-    r.updateNow || '',
+    r.remark || '',
     /* Lô chưa có file logger nào thì cột này phải TRỐNG — "tháng update thông
        tin data logger" của một lô không có data logger là vô nghĩa. Dữ liệu cũ
        nhập từ bản trước có thể còn sót tháng ở đây, chặn luôn ở chỗ hiển thị. */
@@ -24581,57 +24660,16 @@ function reportRowsFor(items){
 
 async function reportGroups(){
   const idx = await loadIndex();
-  const fromEl = document.getElementById('rp-from');
-  const toEl = document.getElementById('rp-to');
-  const from = fromEl ? fromEl.value : '';
-  const to = toEl ? toEl.value : '';
-  let items = idx.slice();
-  if(from || to){
-    /* Lọc theo cột nào là do ô "Lọc theo" quyết định:
-         ship   → Tháng ship hàng. Xem tháng đó đi những lô nào.
-         update → Tháng update thông tin data logger. Bắt được cả lô ship từ
-                  mấy tháng trước mà tháng này mới xin được file.
-       Phần gom nhóm KHÔNG đổi — vẫn theo tháng ship, đúng mẫu Excel. Nên lọc
-       kiểu update có thể ra nhiều nhóm tháng khác nhau, đó là đúng. */
-    const cot = (document.getElementById('rp-mode') || {}).value === 'update'
-      ? (r => r.loggerUpdateMonth || '')
-      : (r => r.shipMonth || '');
-    const trongKhoang = m=>{
-      if(!m) return false;
-      if(from && m < from) return false;
-      if(to && m > to) return false;
-      return true;
-    };
-    items = items.filter(r=>trongKhoang(cot(r)));
-  }
-  /* ==========================================================================
-     LÔ NÀO CÒN PHẢI BÁO CÁO
-     Lô CÒN ĐANG CHỜ data logger thì tháng nào cũng phải có trong báo cáo —
-     tháng 9 hàng chưa tới, tháng 10 vẫn chưa tới, tháng 11 mới tới thì cả ba
-     tháng đều phải xuất hiện. Dấu "đã báo cáo" KHÔNG giấu được loại lô này.
-
-     Chỉ hai trường hợp lô rời bảng báo cáo (sau khi đã đánh dấu):
-       • Tình trạng "Lỗi / Không xin được" — chốt là không xin được nữa
-       • Đã có đủ file data logger — đã báo cáo kèm số liệu rồi
-     ========================================================================== */
-  const conPhaiBaoCao = r=>{
-    if(!hasRealLogger(r) && r.status !== 'Lỗi / Không xin được') return true;
-    return !r.reported;
-  };
+  /* Lọc theo cột nào là do ô "Lọc theo" quyết định:
+       ship   → Tháng ship hàng. Xem tháng đó đi những lô nào.
+       update → Tháng update thông tin data logger. Bắt được cả lô ship từ
+                mấy tháng trước mà tháng này mới xin được file.
+     Phần gom nhóm KHÔNG đổi — vẫn theo tháng ship, đúng mẫu Excel. Nên lọc
+     kiểu update có thể ra nhiều nhóm tháng khác nhau, đó là đúng. */
+  let items = locTheoKhoangThang(idx.slice(), 'rp-from', 'rp-to', 'rp-mode');
   const hienCaDaBaoCao = !!(document.getElementById('rp-show-reported') || {}).checked;
   if(!hienCaDaBaoCao) items = items.filter(conPhaiBaoCao);
-  const map = new Map();
-  items.forEach(r=>{
-    const k = r.shipMonth || '';
-    if(!map.has(k)) map.set(k, []);
-    map.get(k).push(r);
-  });
-  const keys = Array.from(map.keys()).sort((a,b)=>{
-    if(!a) return 1;                        /* nhóm "chưa điền tháng" xuống cuối */
-    if(!b) return -1;
-    return b.localeCompare(a);              /* tháng mới nhất lên trước */
-  });
-  return keys.map(k=>({ key:k, title: monthTitle(k), items: map.get(k) }));
+  return gomTheoThangShip(items);
 }
 
 function reportCellText(value, colIndex){
@@ -24734,11 +24772,11 @@ async function renderPendingLotsBox(){
   if(loc && !dem.has(loc)) loc = '';          /* người đó hết lô chờ thì về "tất cả" */
 
   const hien = loc ? conTheo.filter(r=>_docPending(r) === loc) : conTheo;
-  const chuaGhi = hien.filter(r=>!String(r.updateNow || '').trim()).length;
+  const chuaGhi = hien.filter(r=>!String(r.remark || '').trim()).length;
 
   hien.sort((a, b)=>{
-    const ca = String(a.updateNow || '').trim() ? 1 : 0;
-    const cb = String(b.updateNow || '').trim() ? 1 : 0;
+    const ca = String(a.remark || '').trim() ? 1 : 0;
+    const cb = String(b.remark || '').trim() ? 1 : 0;
     if(ca !== cb) return ca - cb;
     const sa = soThangDaCho(a), sb = soThangDaCho(b);
     if(sa === null) return 1;
@@ -24766,18 +24804,16 @@ async function renderPendingLotsBox(){
       ? '<span class="status-chip" style="background:rgba(180,113,26,.14);color:var(--amber);white-space:nowrap;margin-left:8px;font-size:11px;">' +
         escapeHtml(r.status) + '</span>'
       : '';
-    const truoc = o(r.updatePrev), nay = o(r.updateNow);
+    const ghi = o(r.remark);
     return `<div class="sec-row" style="align-items:flex-start;">
-      <span class="sec-dot ${nay ? 'sec-ok' : 'sec-warn'}" style="margin-top:5px;"></span>
+      <span class="sec-dot ${ghi ? 'sec-ok' : 'sec-warn'}" style="margin-top:5px;"></span>
       <div style="flex:1;min-width:0;">
         <b>${escapeHtml(r.subMail || r.productName || 'Lô chưa đặt tên')}</b>${nhan}
         <div class="hint" style="margin-top:3px;">${dong2}</div>
         ${sai}
-        <div class="pending-updates">
-          <div><span class="pu-label">Update tháng trước</span>
-               <span class="pu-text${truoc ? '' : ' pu-empty'}">${truoc || '—'}</span></div>
-          <div><span class="pu-label">Update tháng này</span>
-               <span class="pu-text${nay ? '' : ' pu-empty'}">${nay || 'chưa ghi'}</span></div>
+        <div class="pending-updates" style="grid-template-columns:1fr;">
+          <div><span class="pu-label">Ghi chú</span>
+               <span class="pu-text${ghi ? '' : ' pu-empty'}">${ghi || 'chưa ghi gì tháng này'}</span></div>
         </div>
       </div>
       ${canEditLot(r) ? `<button class="btn btn-ghost btn-sm" style="flex-shrink:0;" onclick="openEditLot('${r.id}')">Cập nhật</button>` : ''}
@@ -24801,8 +24837,8 @@ async function renderPendingLotsBox(){
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
       ${chonNguoi}
       <span class="hint">${chuaGhi
-        ? '<b style="color:var(--amber);">' + chuaGhi + ' lô chưa ghi update tháng này</b>'
-        : 'Đã ghi update cho tất cả.'}</span>
+        ? '<b style="color:var(--amber);">' + chuaGhi + ' lô chưa ghi chú gì</b>'
+        : 'Đã ghi chú cho tất cả.'}</span>
     </div>
     ${rows}
   </div>`;
@@ -25025,9 +25061,9 @@ function xlsxBlob(rows, colWidths){
   ]);
 }
 
-async function exportReportXlsx(){
-  const btn = document.getElementById('btn-export-xlsx');
-  const groups = await reportGroups();
+/* Ghi file Excel từ một danh sách nhóm theo tháng. Dùng chung cho tab Báo cáo
+   và tab Lưu trữ — hai tab khác nhau ở bộ cột và tên file, phần còn lại y nhau. */
+async function xuatGroupsRaXlsx(groups, cols, rowsFor, tenFile, btn){
   if(!groups.length){ toast('Chưa có lô nào để xuất.'); return; }
   const old = btn ? btn.innerHTML : '';
   if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Đang tạo file…'; }
@@ -25035,8 +25071,8 @@ async function exportReportXlsx(){
     const rows = [];
     groups.forEach(g=>{
       rows.push([{ t: g.title + ':', s: 3 }]);
-      rows.push(REPORT_COLUMNS.map(c=>({ t: c, s: 1 })));
-      reportRowsFor(g.items).forEach(r=>{
+      rows.push(cols.map(c=>({ t: c, s: 1 })));
+      rowsFor(g.items).forEach(r=>{
         rows.push(r.map((c, i)=>{
           if(typeof c === 'number') return { n: (REPORT_TEMP_COLS.indexOf(i) >= 0 ? Math.round(c * 10) / 10 : c), s: 2 };
           return { t: (c === null || c === undefined) ? '' : String(c), s: 2 };
@@ -25049,7 +25085,7 @@ async function exportReportXlsx(){
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'bao-cao-tuyen-lanh-' + new Date().toISOString().slice(0, 10) + '.xlsx';
+    a.download = tenFile + '-' + new Date().toISOString().slice(0, 10) + '.xlsx';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -25061,6 +25097,11 @@ async function exportReportXlsx(){
   }finally{
     if(btn){ btn.disabled = false; btn.innerHTML = old; }
   }
+}
+
+async function exportReportXlsx(){
+  await xuatGroupsRaXlsx(await reportGroups(), REPORT_COLUMNS, reportRowsFor,
+    'bao-cao-tuyen-lanh', document.getElementById('btn-export-xlsx'));
 }
 
 /* Đánh dấu "đã báo cáo" cho TẤT CẢ lô đang hiện trong bảng — làm một lần sau
@@ -25081,7 +25122,7 @@ async function markShownAsReported(){
       : 'Không có lô nào để đánh dấu.');
     return;
   }
-  if(!confirm('Đánh dấu ' + items.length + ' lô đang hiện là ĐÃ BÁO CÁO?\n\nChúng sẽ không hiện ở Báo cáo tháng nữa. Muốn xem lại thì tích ô "Hiện cả lô đã báo cáo".')) return;
+  if(!confirm('Đánh dấu ' + items.length + ' lô đang hiện là ĐÃ BÁO CÁO?\n\nChúng sẽ không hiện ở Báo cáo tháng nữa, nhưng KHÔNG mất đi: toàn bộ nằm ở tab Lưu trữ, xuất Excel được, muốn trả lại thì bấm "Trả về báo cáo".')) return;
   const cu = btn ? btn.innerHTML : '';
   if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Đang đánh dấu…'; }
   let xong = 0, hong = 0;
@@ -25094,6 +25135,7 @@ async function markShownAsReported(){
   }
   await renderReport();
   await renderLibrary();
+  await renderArchive();
   const themCho = conCho.length ? ' ' + conCho.length + ' lô còn chờ data logger vẫn giữ lại, tháng sau hiện tiếp.' : '';
   if(hong) toast('Đã đánh dấu ' + xong + '/' + items.length + ' lô. ' + hong + ' lô máy chủ từ chối — chỉ người tạo lô hoặc admin mới đánh dấu được.' + themCho);
   else toast('Đã đánh dấu ' + xong + ' lô là đã báo cáo.' + themCho);
@@ -25107,6 +25149,112 @@ async function markShownAsReported(){
   ['rp-from','rp-to','rp-show-reported','rp-mode'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.addEventListener('change', renderReport);
+  });
+})();
+
+/* ==========================================================================
+   TAB LƯU TRỮ
+   --------------------------------------------------------------------------
+   Lô rời bảng Báo cáo tháng KHÔNG mất đi — nó sang đây. Luật rời báo cáo nằm
+   ở hàm conPhaiBaoCao / daChotBaoCao phía trên, hai tab dùng chung một luật
+   nên không bao giờ lệch nhau: lô nào mất ở Báo cáo thì đúng lô đó có ở đây.
+
+   Bảng này thêm cột Tình trạng so với bảng báo cáo, để nhìn ra lô rời báo cáo
+   vì "Lỗi / Không xin được" hay vì đã đủ file.
+
+   Nút "Trả về báo cáo" bỏ dấu đã báo cáo, lô quay lại Báo cáo tháng ngay.
+   ========================================================================== */
+const ARCHIVE_COLUMNS = REPORT_COLUMNS.concat(['Tình trạng']);
+
+function archiveRowsFor(items){
+  return reportRowsFor(items).map((row, i)=>row.concat([items[i].status || '']));
+}
+
+async function archiveGroups(){
+  const idx = await loadIndex();
+  let items = idx.filter(daChotBaoCao);
+  items = locTheoKhoangThang(items, 'ar-from', 'ar-to', 'ar-mode');
+  const doc = (document.getElementById('ar-doc') || {}).value || '';
+  if(doc) items = items.filter(r=>String(r.docOwner || '').trim() === doc);
+  return gomTheoThangShip(items);
+}
+
+/* Ô lọc DOC chỉ liệt kê người CÓ lô trong lưu trữ — đỡ chọn vào tên rỗng.
+   Giữ nguyên lựa chọn đang có nếu tên đó vẫn còn lô. */
+async function fillArchiveDocSelect(){
+  const sel = document.getElementById('ar-doc');
+  if(!sel) return;
+  const idx = await loadIndex();
+  const ten = Array.from(new Set(idx.filter(daChotBaoCao)
+    .map(r=>String(r.docOwner || '').trim()).filter(Boolean)))
+    .sort((a,b)=>a.localeCompare(b,'vi'));
+  const cu = sel.value;
+  sel.innerHTML = '<option value="">— Tất cả —</option>' + ten.map(n=>
+    `<option value="${escapeHtml(n)}"${n === cu ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('');
+  if(cu && ten.indexOf(cu) < 0) sel.value = '';
+}
+
+window.traVeBaoCao = async function(id, btn){
+  if(!confirm('Trả lô này về bảng Báo cáo tháng?\n\nNó sẽ bỏ dấu "đã báo cáo" và hiện lại ở Báo cáo tháng.')) return;
+  const cu = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'Đang trả…'; }
+  try{
+    const ok = await setShipmentReported(id, false);
+    if(!ok) throw new Error('Máy chủ từ chối.');
+    toast('Đã trả lô về Báo cáo tháng.');
+    await renderArchive();
+    const rp = document.getElementById('panel-report');
+    if(rp && rp.classList.contains('active')) await renderReport();
+  }catch(e){
+    console.error('trả về báo cáo lỗi', e);
+    if(btn){ btn.disabled = false; btn.textContent = cu; }
+    toast(saveErrorMessage(e));
+  }
+};
+
+async function renderArchive(){
+  const el = document.getElementById('archive-body');
+  if(!el) return;
+  await fillArchiveDocSelect();
+  const groups = await archiveGroups();
+  const tong = groups.reduce((a,g)=>a + g.items.length, 0);
+  if(!tong){
+    el.innerHTML = `<div class="empty" style="margin-top:18px;">Chưa có lô nào trong lưu trữ.</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="hint" style="margin:18px 0 -6px;">${tong} lô đã chốt báo cáo.</div>` +
+    groups.map(g=>{
+      const rows = archiveRowsFor(g.items).map((row, ri)=>{
+        const lo = g.items[ri];
+        const nut = canEditLot(lo)
+          ? `<button class="btn btn-ghost btn-sm" onclick="traVeBaoCao('${escapeHtml(lo.id)}', this)">Trả về báo cáo</button>`
+          : '';
+        return `<tr>${row.map((c, i)=>{
+          const lop = REPORT_NUM_COLS.indexOf(i) >= 0 ? 'num' : '';
+          return `<td class="${lop}">${escapeHtml(reportCellText(c, i))}</td>`;
+        }).join('')}<td>${nut}</td></tr>`;
+      }).join('');
+      return `<div class="rp-month">
+        <h3>${escapeHtml(g.title)}:</h3>
+        <div class="rp-wrap"><table class="rp-table">
+          <tr>${ARCHIVE_COLUMNS.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}<th></th></tr>
+          ${rows}
+        </table></div>
+      </div>`;
+    }).join('');
+}
+
+async function exportArchiveXlsx(){
+  await xuatGroupsRaXlsx(await archiveGroups(), ARCHIVE_COLUMNS, archiveRowsFor,
+    'luu-tru-tuyen-lanh', document.getElementById('btn-export-archive'));
+}
+
+(function wireArchiveTab(){
+  const btnX = document.getElementById('btn-export-archive');
+  if(btnX) btnX.addEventListener('click', exportArchiveXlsx);
+  ['ar-from','ar-to','ar-mode','ar-doc'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('change', renderArchive);
   });
 })();
 
