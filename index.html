@@ -696,7 +696,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5v
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v63 · 2026-10-06 · thêm tab Lưu trữ cho lô đã chốt báo cáo';
+const APP_VERSION = 'v68 · 2026-10-08 · ô cảng trung chuyển chọn từ danh mục như ô điểm đến';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 /* Tên bảng và kho file — phải khớp với 01-tao-bang.sql */
@@ -21622,8 +21622,22 @@ const WORLD_PORTS = [
   {name:'Victoria Falls, Zimbabwe', type:'sea', country:'Zimbabwe'},
 ];
 
+/* ==========================================================================
+   BẢNG TOẠ ĐỘ CÓ SẴN — CHỈ ĐƯỢC KHỚP VÀO PHẦN TÊN CẢNG
+
+   Bảng này có cả mục cấp QUỐC GIA ("china" → tâm Trung Quốc 38.07N/104.69E,
+   nằm ở Cam Túc, vùng khô cao gần 1.500 m). Bản trước quét cả chuỗi, nên tên
+   cảng dạng "Ningbo, China" khớp trúng chữ "china" và lấy luôn TÂM TRUNG QUỐC
+   làm cảng Ningbo — biểu đồ hoá ra nhiệt độ sa mạc Tây Bắc Trung Quốc, cuối
+   tháng 10 ban đêm xuống dưới 0°C. Đó chính là chỗ ra số âm.
+
+   Nay chỉ khớp vào PHẦN TRƯỚC DẤU PHẨY (tên cảng). Không có trong bảng thì để
+   dịch vụ bản đồ tra, và tên nước sau dấu phẩy dùng để lọc đúng nước.
+   Gõ trống không mỗi tên nước ("Chile") thì vẫn khớp như cũ.
+   ========================================================================== */
 function lookupKnownPort(name){
-  const n = ' ' + norm(name).replace(/[''`]/g,'').replace(/[,.]/g,' ').replace(/\s+/g,' ').trim() + ' ';
+  const tenCang = String(name || '').split(',')[0];
+  const n = ' ' + norm(tenCang).replace(/[''`]/g,'').replace(/[,.]/g,' ').replace(/\s+/g,' ').trim() + ' ';
   let best = null;
   for(const p of KNOWN_PORTS){
     for(const k of p.keys){
@@ -21641,8 +21655,97 @@ function lookupKnownPort(name){
    Bản trước không kiểm tra res.ok, nên 429/5xx cũng ra null y như không tìm thấy,
    và người dùng luôn thấy đúng một câu "chưa xác định được toạ độ" dù nguyên nhân
    hoàn toàn khác nhau — dẫn tới đi sửa nhầm chỗ (tưởng sai tên cảng). */
-async function geocodeRaw(name){
-  const url = 'https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(name.trim()) + '&count=1&format=json';
+/* ==========================================================================
+   CHỌN ĐÚNG ĐỊA DANH TRONG DANH SÁCH DỊCH VỤ BẢN ĐỒ TRẢ VỀ
+
+   Bản trước hỏi `count=1` rồi lấy luôn kết quả đầu tiên, KHÔNG kiểm tra gì.
+   Tên cảng nào trùng với một thôn xóm bé xíu ở chỗ khác là cả dự đoán nhiệt độ
+   sai bét mà không ai biết — ví dụ tên "Ningbo" còn khớp cả mấy điểm dân cư ở
+   Tây Tạng cao 4.000 m, nơi cuối tháng 10 ban đêm xuống dưới 0°C.
+
+   Nay hỏi 10 kết quả rồi chấm điểm:
+     • đúng NƯỚC ghi sau dấu phẩy ("Ningbo, China")  → cộng nhiều nhất
+     • tên khớp ĐÚNG, không phải chỉ chứa chữ đó     → cộng nhiều
+     • thành phố đông dân                             → cộng theo cỡ dân số
+     • trên cao (vùng núi)                            → trừ, vì cảng biển/sân bay
+                                                        hàng xuất không nằm ở 4.000 m
+   ========================================================================== */
+function _tenNuocGiongNhau(a, b){
+  const x = norm(a || '').replace(/\s+/g, '');
+  const y = norm(b || '').replace(/\s+/g, '');
+  if(!x || !y) return false;
+  return x === y || x.indexOf(y) >= 0 || y.indexOf(x) >= 0;
+}
+/* Mã loại địa điểm của GeoNames (dịch vụ bản đồ trả về trong feature_code).
+   Tuyến hàng xuất đi từ CẢNG BIỂN và SÂN BAY, nên nhiệt độ phải lấy ngay khu
+   cảng / khu sân bay, không lấy trung tâm thành phố cách đó mấy chục cây. */
+const MA_SAN_BAY = ['AIRP','AIRB','AIRF','AIRH','AIRS','AIRQ'];
+const MA_CANG_BIEN = ['PRT','PORT','HBR','HBRX','MAR','ANCH','QUAY','WHRF','DCK','DCKY'];
+
+function _chamDiemDiaDanh(r, tenChinh, nuocMongMuon, loaiCang){
+  let diem = 0;
+  if(nuocMongMuon && _tenNuocGiongNhau(r.country, nuocMongMuon)) diem += 30;
+  if(tenChinh && norm(r.name || '') === norm(tenChinh)) diem += 12;
+
+  /* Đúng loại cảng đang cần: sân bay cho hàng air, bến cảng cho hàng biển.
+     Cộng mạnh khi tên của nó có chứa tên cảng mình tra ("Ningbo Lishe
+     International Airport" khi tra "Ningbo"), cộng nhẹ khi chỉ đúng loại. */
+  const ma = String(r.feature_code || '').toUpperCase();
+  const dungLoai = (loaiCang === 'air' && MA_SAN_BAY.indexOf(ma) >= 0)
+                || (loaiCang === 'sea' && MA_CANG_BIEN.indexOf(ma) >= 0);
+  if(dungLoai){
+    const cungTen = tenChinh && norm(r.name || '').indexOf(norm(tenChinh)) >= 0;
+    diem += cungTen ? 28 : 8;
+  }
+
+  const dan = (typeof r.population === 'number' && r.population > 0) ? r.population : 0;
+  if(dan) diem += Math.log10(dan) * 2;
+  const cao = (typeof r.elevation === 'number') ? r.elevation : 0;
+  if(cao > 0) diem -= (cao / 1000) * 3;
+  return diem;
+}
+
+/* ==========================================================================
+   LOẠI THẲNG NHỮNG ĐỊA ĐIỂM KHÔNG THỂ LÀ CẢNG
+
+   Chấm điểm thôi chưa đủ: chấm điểm chỉ xếp hạng, địa điểm bậy nhất vẫn có thể
+   đứng đầu nếu danh sách chỉ có mỗi nó. Hai điều kiện dưới đây là SỰ THẬT VẬT
+   LÝ, không phải phỏng đoán, nên áp thẳng:
+
+     • Cảng biển nằm ở mực nước biển. Cảng biển cao 1.500 m là chuyện không có.
+     • Sân bay thì có thể cao thật (El Alto, Bolivia cao 4.061 m là sân bay
+       thương mại cao nhất thế giới), nên trần của sân bay phải nới rộng.
+
+   Lọc theo kiểu "chỉ bỏ khi còn chỗ để bỏ": nếu lọc xong không còn ứng viên nào
+   thì coi như không lọc. Làm vậy để tên nước viết khác nhau (VD "Ivory Coast"
+   với "Côte d'Ivoire") không làm app chết hẳn — nó chỉ mất lớp bảo vệ đó thôi.
+   ========================================================================== */
+const TRAN_CAO_CANG_BIEN = 500;     /* mét */
+const TRAN_CAO_SAN_BAY   = 4500;    /* mét — El Alto 4.061 m vẫn phải lọt */
+
+function _tranDoCao(loaiCang){
+  return (loaiCang === 'sea') ? TRAN_CAO_CANG_BIEN : TRAN_CAO_SAN_BAY;
+}
+function _locUngVien(ds, nuocMongMuon, loaiCang){
+  let kq = ds.slice();
+  if(nuocMongMuon){
+    const dungNuoc = kq.filter(r=>_tenNuocGiongNhau(r.country, nuocMongMuon));
+    if(dungNuoc.length) kq = dungNuoc;
+  }
+  const tran = _tranDoCao(loaiCang);
+  const hopLy = kq.filter(r => typeof r.elevation !== 'number' || r.elevation <= tran);
+  if(hopLy.length) kq = hopLy;
+  return kq;
+}
+
+/* Loại của cảng theo danh mục VNACCS: 'sea' | 'air' | 'land'. */
+function _loaiCangTheoTen(name){
+  const p = PORT_BY_NAME ? PORT_BY_NAME[String(name || '').trim()] : null;
+  return p ? (p.type || null) : null;
+}
+
+async function geocodeRaw(name, nuocMongMuon, loaiCang){
+  const url = 'https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(name.trim()) + '&count=10&format=json';
   let res;
   try{
     res = await fetch(url);
@@ -21659,19 +21762,45 @@ async function geocodeRaw(name){
   try{ data = await res.json(); }
   catch(e){ const err = new Error('bad json'); err.kind = 'server'; throw err; }
   if(data && data.results && data.results.length){
-    const r = data.results[0];
-    return { lat:r.latitude, lon:r.longitude, label:[r.name,r.admin1,r.country].filter(Boolean).join(', ') };
+    const tenChinh = String(name).split(',')[0].trim();
+    const ungVien = _locUngVien(data.results, nuocMongMuon, loaiCang);
+    if(!ungVien.length) return null;
+    let r = ungVien[0], tot = _chamDiemDiaDanh(r, tenChinh, nuocMongMuon, loaiCang);
+    for(const c of ungVien.slice(1)){
+      const d = _chamDiemDiaDanh(c, tenChinh, nuocMongMuon, loaiCang);
+      if(d > tot){ tot = d; r = c; }
+    }
+    return {
+      lat: r.latitude, lon: r.longitude,
+      label: [r.name, r.admin1, r.country].filter(Boolean).join(', '),
+      country: r.country || '',
+      kind: String(r.feature_code || ''),
+      elevation: (typeof r.elevation === 'number') ? r.elevation : null,
+      /* Không có ứng viên nào ở độ cao hợp lý nên buộc phải lấy cái này —
+         đánh dấu để màn hình nói thẳng ra là tên cảng đó tra không ra chỗ nào
+         hợp lý, thay vì vẽ một biểu đồ sai mà không ai biết. */
+      nghiNgo: (typeof r.elevation === 'number') && (r.elevation > _tranDoCao(loaiCang))
+    };
   }
   return null;   /* dịch vụ chạy tốt, chỉ là không có địa danh này */
 }
-async function geocode(name){
+async function geocode(name, loaiCangGoiY){
   if(!name || !name.trim()) return null;
   const known = lookupKnownPort(name);
   if(known) return known;
 
-  const cacheKey = 'geocode:' + norm(name);
+  /* Khoá nhớ đổi từ "geocode:" sang "geocode2:" vì cách chọn địa danh đã sửa —
+     toạ độ sai do bản cũ chọn nhầm vẫn còn nằm trong kho nhớ, phải bỏ qua hết
+     chứ không thì sửa code xong vẫn ra số cũ. */
+  const cacheKey = 'geocode2:' + norm(name);
   const cached = await safeGet(cacheKey, false);
   if(cached){ try{ return JSON.parse(cached); }catch(e){} }
+
+  /* Phần sau dấu phẩy của tên cảng là TÊN NƯỚC ("Ningbo, China") — dùng nó để
+     loại các địa danh trùng tên ở nước khác. */
+  const nuocMongMuon = name.includes(',') ? name.split(',').pop().trim() : '';
+  /* Cảng biển hay sân bay — để chọn đúng điểm trong khu cảng / khu sân bay. */
+  const loaiCang = loaiCangGoiY || _loaiCangTheoTen(name);
 
   /* Open-Meteo requires the part after a comma (country/admin) to match EXACTLY.
      "Hải Phòng, Việt Nam" fails because "Việt Nam" isn't the indexed English form,
@@ -21688,7 +21817,7 @@ async function geocode(name){
   let hardError = null;
   for(const q of attempts){
     try{
-      const out = await geocodeRaw(q);
+      const out = await geocodeRaw(q, nuocMongMuon, loaiCang);
       if(out){
         try{ await safeSet(cacheKey, JSON.stringify(out), false); }catch(e){}
         geocode.lastFailure = null;
@@ -21700,7 +21829,7 @@ async function geocode(name){
         /* dính giới hạn tần suất: chờ một nhịp rồi thử lại đúng truy vấn đó */
         await new Promise(r=>setTimeout(r, 1200));
         try{
-          const out = await geocodeRaw(q);
+          const out = await geocodeRaw(q, nuocMongMuon, loaiCang);
           if(out){
             try{ await safeSet(cacheKey, JSON.stringify(out), false); }catch(e2){}
             geocode.lastFailure = null;
@@ -22477,11 +22606,15 @@ async function _toaDoCang(p){
     // Official VNACCS port/airport list has no coordinates — resolve live via the
     // existing geocoder (fast known-ports table first, then Open-Meteo geocoding as
     // fallback), then cache on the entry so this only happens once per session.
-    const geo = await geocode(p.name);
+    const geo = await geocode(p.name, p.type);
     if(!geo) return null;
     p.lat = geo.lat; p.lon = geo.lon;
+    if(typeof geo.elevation === 'number') p.elevation = geo.elevation;
+    p.nghiNgo = !!geo.nghiNgo;
   }
-  return { label: p.name, lat: p.lat, lon: p.lon, country: p.country, type: p.type };
+  return { label: p.name, lat: p.lat, lon: p.lon, country: p.country, type: p.type,
+           elevation: (typeof p.elevation === 'number') ? p.elevation : null,
+           nghiNgo: !!p.nghiNgo };
 }
 
 async function resolvePortInput(inputEl){
@@ -22518,7 +22651,8 @@ function addTransitRow(){
   wrap.innerHTML = `
     <div style="flex:2;">
       <label class="mini">Tên cảng trung chuyển</label>
-      <input type="text" class="transit-name" placeholder="VD: Cái Mép, Việt Nam">
+      <input type="text" class="transit-name" list="lk-port-datalist" autocomplete="off"
+             placeholder="Gõ tên cảng rồi chọn trong danh sách...">
     </div>
     <div style="flex:1;">
       <label class="mini">Ngày thứ mấy (tuỳ chọn)</label>
@@ -22541,11 +22675,12 @@ document.getElementById('btn-add-transit').addEventListener('click', addTransitR
 
 function getTransitStops(){
   return Array.from(document.querySelectorAll('.transit-row')).map(row=>{
-    const name = row.querySelector('.transit-name').value.trim();
+    const el = row.querySelector('.transit-name');
+    const name = el.value.trim();
     const offsetRaw = row.querySelector('.transit-offset').value;
     const dwellRaw = row.querySelector('.transit-dwell').value;
     return {
-      name,
+      name, el,
       offset: offsetRaw==='' ? null : parseFloat(offsetRaw),
       dwell: dwellRaw==='' ? 0 : Math.max(0, parseFloat(dwellRaw)),
     };
@@ -23285,7 +23420,8 @@ async function runLookup(){
     // ---- 1. resolve endpoints: origin is always Vietnam; destination comes straight
     //         from the resolved port/country lookup (no geocoding call needed, always exact) ----
     const og = await geocode(origin);
-    const ds = { lat: destResolved.lat, lon: destResolved.lon, label: destLabel };
+    const ds = { lat: destResolved.lat, lon: destResolved.lon, label: destLabel,
+                 elevation: destResolved.elevation, nghiNgo: !!destResolved.nghiNgo };
 
     // ---- 2. match stored shipments: same destination COUNTRY only (regardless of the
     //         SEA/AIR toggle — real logger data is useful reference either way).
@@ -23389,8 +23525,56 @@ async function runLookup(){
     const preDays = PRE_DAYS_DEFAULT[lkTransportMode] != null ? PRE_DAYS_DEFAULT[lkTransportMode] : 4;
     const totalDays = tripDays + preDays;
 
+    /* ======================================================================
+       TÊN TRA KHÔNG RA THÌ BÁO NHẬP SAI, KHÔNG VẼ BIỂU ĐỒ
+
+       Bản trước: điểm trung chuyển nào tra không ra toạ độ thì bị lặng lẽ bỏ
+       khỏi hành trình (`.filter(w=>w.lat!=null)`) — biểu đồ vẫn vẽ ra như
+       thường, chỉ là thiếu mất một chặng, và không ai biết.
+
+       Nay gõ sai một chữ là nói thẳng tên nào sai. Thà không có biểu đồ còn
+       hơn có một biểu đồ sai mà tưởng đúng.
+       ====================================================================== */
+    function _tenTraKhongRa(geo, ten){
+      if(!geo) return ten;                 /* không tìm thấy gì */
+      if(geo.nghiNgo) return ten;          /* tìm ra nhưng không phải chỗ hợp lý */
+      return null;
+    }
+    /* dsSai: [{ten, goiY:[...]}] */
+    function _cauBaoNhapSai(dsSai){
+      const phan = dsSai.map(x=>{
+        const g = (x.goiY && x.goiY.length)
+          ? ' (ý bạn là: ' + x.goiY.join(' · ') + '?)'
+          : '';
+        return '"' + x.ten + '"' + g;
+      });
+      return 'Nhập sai tên: ' + phan.join('; ') + '. Không tra được điểm này trên bản đồ, nên không tính được '
+           + 'nhiệt độ hành trình. Chọn đúng tên trong danh sách gợi ý của ô đó rồi tra lại.';
+    }
+
     if(og && ds){
-      const transitGeo = await Promise.all(transitStops.map(t=>geocode(t.name)));
+      /* Điểm trung chuyển tra y hệt ô điểm đến: `resolvePortInput` khớp theo danh
+         mục cảng, gõ thiếu vẫn nhận ra, và nhiều cảng cùng khớp thì nó liệt kê ra
+         hỏi lại chứ không đoán bừa. Gọi lần lượt chứ không Promise.all, vì nó ghi
+         danh sách gợi ý vào `window._portGoiY` dùng chung — chạy song song là
+         gợi ý của ô này nhảy sang ô kia. */
+      const transitGeo = [];
+      const tenSai = [];
+      const saiDiemDi = _tenTraKhongRa(og, origin);
+      if(saiDiemDi) tenSai.push({ ten: saiDiemDi, goiY: [] });
+      for(const t of transitStops){
+        const g = t.el ? await resolvePortInput(t.el) : await geocode(t.name);
+        transitGeo.push(g);
+        const x = _tenTraKhongRa(g, t.name);
+        if(x) tenSai.push({ ten: x, goiY: (window._portGoiY || []).slice(0, 6) });
+      }
+      const saiDiemDen = _tenTraKhongRa(ds, destLabel);
+      if(saiDiemDen) tenSai.push({ ten: saiDiemDen, goiY: [] });
+
+      if(tenSai.length){
+        climateError = _cauBaoNhapSai(tenSai);
+        toast(climateError);
+      }else{
       // AIR: origin & destination each get a default 1-day ground-handling dwell
       // (tarmac exposure before departure / after arrival) since that's the real
       // heat risk window for air freight — the rest of the timeline is assumed
@@ -23410,7 +23594,8 @@ async function runLookup(){
         {type:'origin', name: origin, lat: og.lat, lon: og.lon,
          offset: 0, dwell: Math.max(groundDwell, preDays)},
         ...transitAll,
-        {type:'dest', name: destLabel, lat:ds.lat, lon:ds.lon, offset: totalDays, dwell:groundDwell},
+        {type:'dest', name: destLabel, lat:ds.lat, lon:ds.lon,
+         offset: totalDays, dwell:groundDwell},
       ];
       // For any transit stop without an explicit day number, estimate its day
       // proportionally to real sailing/flying distance (origin -> stops in the order
@@ -23599,6 +23784,7 @@ async function runLookup(){
 
       journey = { waypoints, dayDates, ambientMax, ambientMin, containerMax, containerMin,
                   peakAmbient, peakContainer, worstContainer, totalDays, isAir, isLand, preDays };
+      }
     }else if(!og || !ds){
       climateError = geocodeErrorMessage();
     }
