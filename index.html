@@ -696,7 +696,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5v
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v68 · 2026-10-08 · ô cảng trung chuyển chọn từ danh mục như ô điểm đến';
+const APP_VERSION = 'v70 · 2026-10-15 · bỏ cảng Kompongsom (tên cũ của Sihanoukville, đã có riêng) khỏi danh mục';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 /* Tên bảng và kho file — phải khớp với 01-tao-bang.sql */
@@ -3061,7 +3061,6 @@ const WORLD_PORTS = [
   {name:'Kampot, Cambodia', type:'air', country:'Cambodia'},
   {name:'Kompong Thom, Cambodia', type:'air', country:'Cambodia'},
   {name:'Kompong-Chhna, Cambodia', type:'air', country:'Cambodia'},
-  {name:'Kompongsom, Cambodia', type:'air', country:'Cambodia'},
   {name:'Krakor, Cambodia', type:'air', country:'Cambodia'},
   {name:'Kratie, Cambodia', type:'air', country:'Cambodia'},
   {name:'Oddor Meanche, Cambodia', type:'air', country:'Cambodia'},
@@ -10270,7 +10269,6 @@ const WORLD_PORTS = [
   {name:'Kas Kong, Cambodia', type:'sea', country:'Cambodia'},
   {name:'Kompong Thom, Cambodia', type:'sea', country:'Cambodia'},
   {name:'Kompong-Chhna, Cambodia', type:'sea', country:'Cambodia'},
-  {name:'Kompongsom, Cambodia', type:'sea', country:'Cambodia'},
   {name:'Krakor, Cambodia', type:'sea', country:'Cambodia'},
   {name:'Kratie, Cambodia', type:'sea', country:'Cambodia'},
   {name:'Oddor Meanche, Cambodia', type:'sea', country:'Cambodia'},
@@ -21638,10 +21636,13 @@ const WORLD_PORTS = [
 function lookupKnownPort(name){
   const tenCang = String(name || '').split(',')[0];
   const n = ' ' + norm(tenCang).replace(/[''`]/g,'').replace(/[,.]/g,' ').replace(/\s+/g,' ').trim() + ' ';
+  /* Danh mục VNACCS có tên viết DÍNH ("Phnompenh") trong khi bảng này viết
+     "phnom penh" — nên so thêm một lượt với khoảng trắng bỏ hết. */
+  const gon = n.replace(/\s+/g,'');
   let best = null;
   for(const p of KNOWN_PORTS){
     for(const k of p.keys){
-      if(n.includes(' '+k+' ') || n.trim()===k){
+      if(n.includes(' '+k+' ') || n.trim()===k || gon===k.replace(/\s+/g,'')){
         if(!best || k.length > best._k.length){ best = {lat:p.lat, lon:p.lon, label:p.label, _k:k}; }
       }
     }
@@ -22620,8 +22621,16 @@ async function _toaDoCang(p){
 async function resolvePortInput(inputEl){
   const val = inputEl.value.trim();
   window._portGoiY = [];
+  window._portLoiToaDo = '';
+  /* Chọn ĐÚNG tên trong danh sách nhưng dịch vụ bản đồ không tra ra toạ độ:
+     ghi lại lý do thật để chỗ gọi nói đúng, đừng bắt người dùng "gõ lại tên". */
+  const _toaDoHoacLoi = async (o)=>{
+    const kq = await _toaDoCang(o);
+    if(!kq) window._portLoiToaDo = geocodeErrorMessage();
+    return kq;
+  };
   const port = PORT_BY_NAME[val];
-  if(port) return await _toaDoCang(port);
+  if(port) return await _toaDoHoacLoi(port);
   const country = COUNTRY_BY_NAME[val];
   if(country) return { label: country.name, lat: country.lat, lon: country.lon, country: country.name, type: null };
 
@@ -22635,7 +22644,7 @@ async function resolvePortInput(inputEl){
     const m = gan[0];
     inputEl.value = m.o.name;            /* hiện rõ đã chọn cảng nào */
     if(m.loai === 'nuoc') return { label: m.o.name, lat: m.o.lat, lon: m.o.lon, country: m.o.name, type: null };
-    return await _toaDoCang(m.o);
+    return await _toaDoHoacLoi(m.o);
   }
   window._portGoiY = gan.slice(0, 6).map(x=>x.o.name);
   return null;
@@ -22960,7 +22969,9 @@ async function saveLotFromForm(){
   const destResolved = await resolvePortInput(destInput);
   if(!destResolved){
     const gy = (window._portGoiY || []);
-    toast(gy.length
+    toast(window._portLoiToaDo
+      ? window._portLoiToaDo
+      : gy.length
       ? 'Có ' + gy.length + ' cảng khớp: ' + gy.join(' · ') + '. Gõ thêm cho rõ rồi lưu lại.'
       : 'Gõ tên cảng/sân bay/quốc gia rồi chọn đúng tên trong danh sách gợi ý nhé.');
     return;
@@ -23394,10 +23405,18 @@ async function runLookup(){
 
   const destResolved = await resolvePortInput(destInput);
   if(!destResolved){
-    toast('Gõ tên cảng/sân bay/quốc gia rồi chọn đúng tên trong danh sách gợi ý nhé.');
+    const loiToaDo = window._portLoiToaDo || '';
+    toast(loiToaDo || 'Gõ tên cảng/sân bay/quốc gia rồi chọn đúng tên trong danh sách gợi ý nhé.');
     btn.disabled = false;
     btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg> Tìm khuyến nghị';
     resultsEl.innerHTML = '';
+    if(loiToaDo){
+      /* Câu báo trượt biến mất sau vài giây — để lý do nằm lại trên màn hình. */
+      const box = document.createElement('div');
+      box.className = 'empty';
+      box.textContent = loiToaDo;
+      resultsEl.appendChild(box);
+    }
     return;
   }
   const dest = destResolved.country; // used for matching stored loggers (which store country)
@@ -24671,7 +24690,9 @@ window.openEditLot = async function(id){
       const giai = await resolvePortInput(edDest);
       if(!giai){
         const gy = (window._portGoiY || []);
-        toast(gy.length
+        toast(window._portLoiToaDo
+          ? window._portLoiToaDo
+          : gy.length
           ? 'Có ' + gy.length + ' cảng khớp "' + cangMoi + '": ' + gy.join(' · ') + '. Gõ thêm cho rõ rồi Lưu lại.'
           : 'Không tìm thấy cảng nào khớp "' + cangMoi + '". Kiểm tra lại tên.');
         btn.disabled = false; btn.textContent = 'Lưu thay đổi';
