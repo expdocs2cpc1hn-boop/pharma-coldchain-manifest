@@ -696,7 +696,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5v
 
 /* DẤU PHIÊN BẢN — để biết chắc web đang chạy file nào, khỏi phải đoán xem đã up
    đúng bản mới chưa. Hiện ở bảng "🛡️ Bảo mật" và in ra console lúc mở trang. */
-const APP_VERSION = 'v70 · 2026-10-15 · bỏ cảng Kompongsom (tên cũ của Sihanoukville, đã có riêng) khỏi danh mục';
+const APP_VERSION = 'v71 · 2026-10-15 · tên trùng cả sân bay lẫn cảng biển (Entebbe...): lấy đúng mục theo loại hình đang chọn';
 console.log('%c[TUYẾN LẠNH] Phiên bản đang chạy: ' + APP_VERSION, 'color:#5bd9e8;font-weight:bold');
 
 /* Tên bảng và kho file — phải khớp với 01-tao-bang.sql */
@@ -22524,6 +22524,16 @@ function resolveCountryInput(inputEl){
    listed either way since a plain country name isn't mode-specific. */
 const PORT_BY_NAME = {};
 WORLD_PORTS.forEach(p=>{ PORT_BY_NAME[p.name] = p; });
+/* Cùng một tên có thể có CẢ mục sân bay lẫn mục cảng biển ("Entebbe, Uganda").
+   PORT_BY_NAME chỉ giữ một mục (mục viết sau đè mục viết trước), nên bảng này
+   giữ riêng từng loại để chọn đúng mục theo loại hình đang chọn. */
+const PORT_BY_NAME_LOAI = {};
+WORLD_PORTS.forEach(p=>{ PORT_BY_NAME_LOAI[p.name + '|' + p.type] = p; });
+function _mucTheoLoaiHinh(p, mode){
+  if(!p || !mode) return p;
+  const dung = PORT_BY_NAME_LOAI[p.name + '|' + String(mode).toLowerCase()];
+  return dung || p;
+}
 /* Đăng ký sau WORLD_PORTS: nếu trùng tên thì bản đường bộ được ưu tiên. */
 LAND_CITIES.forEach(p=>{ PORT_BY_NAME[p.name] = p; });
 VN_ORIGINS.forEach(p=>{ if(!PORT_BY_NAME[p.name]) PORT_BY_NAME[p.name] = p; });
@@ -22618,7 +22628,7 @@ async function _toaDoCang(p){
            nghiNgo: !!p.nghiNgo };
 }
 
-async function resolvePortInput(inputEl){
+async function resolvePortInput(inputEl, mode){
   const val = inputEl.value.trim();
   window._portGoiY = [];
   window._portLoiToaDo = '';
@@ -22629,7 +22639,7 @@ async function resolvePortInput(inputEl){
     if(!kq) window._portLoiToaDo = geocodeErrorMessage();
     return kq;
   };
-  const port = PORT_BY_NAME[val];
+  const port = _mucTheoLoaiHinh(PORT_BY_NAME[val], mode);
   if(port) return await _toaDoHoacLoi(port);
   const country = COUNTRY_BY_NAME[val];
   if(country) return { label: country.name, lat: country.lat, lon: country.lon, country: country.name, type: null };
@@ -22644,7 +22654,7 @@ async function resolvePortInput(inputEl){
     const m = gan[0];
     inputEl.value = m.o.name;            /* hiện rõ đã chọn cảng nào */
     if(m.loai === 'nuoc') return { label: m.o.name, lat: m.o.lat, lon: m.o.lon, country: m.o.name, type: null };
-    return await _toaDoHoacLoi(m.o);
+    return await _toaDoHoacLoi(_mucTheoLoaiHinh(m.o, mode));
   }
   window._portGoiY = gan.slice(0, 6).map(x=>x.o.name);
   return null;
@@ -22966,7 +22976,7 @@ async function saveLotFromForm(){
   }
 
   const destInput = document.getElementById('lot-dest');
-  const destResolved = await resolvePortInput(destInput);
+  const destResolved = await resolvePortInput(destInput, f.transportMode);
   if(!destResolved){
     const gy = (window._portGoiY || []);
     toast(window._portLoiToaDo
@@ -23403,7 +23413,7 @@ async function runLookup(){
   btn.innerHTML = '<span class="spinner"></span> Đang tra cứu…';
   resultsEl.innerHTML = `<div class="empty"><span class="spinner" style="width:20px;height:20px;"></span><div style="margin-top:10px;">Đang xác định vị trí…</div></div>`;
 
-  const destResolved = await resolvePortInput(destInput);
+  const destResolved = await resolvePortInput(destInput, lkTransportMode);
   if(!destResolved){
     const loiToaDo = window._portLoiToaDo || '';
     toast(loiToaDo || 'Gõ tên cảng/sân bay/quốc gia rồi chọn đúng tên trong danh sách gợi ý nhé.');
@@ -23582,7 +23592,7 @@ async function runLookup(){
       const saiDiemDi = _tenTraKhongRa(og, origin);
       if(saiDiemDi) tenSai.push({ ten: saiDiemDi, goiY: [] });
       for(const t of transitStops){
-        const g = t.el ? await resolvePortInput(t.el) : await geocode(t.name);
+        const g = t.el ? await resolvePortInput(t.el, lkTransportMode) : await geocode(t.name);
         transitGeo.push(g);
         const x = _tenTraKhongRa(g, t.name);
         if(x) tenSai.push({ ten: x, goiY: (window._portGoiY || []).slice(0, 6) });
@@ -24687,7 +24697,7 @@ window.openEditLot = async function(id){
     const cangMoi = edDest.value.trim();
     const cangCu  = String(rec.destPort || rec.dest || '').trim();
     if(cangMoi !== cangCu){
-      const giai = await resolvePortInput(edDest);
+      const giai = await resolvePortInput(edDest, edMode.value);
       if(!giai){
         const gy = (window._portGoiY || []);
         toast(window._portLoiToaDo
